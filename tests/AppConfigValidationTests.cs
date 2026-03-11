@@ -83,16 +83,6 @@ public class AppConfigValidationTests
     }
 
     [TestMethod]
-    public void Validate_InvalidMoveToEndShortcut_Throws()
-    {
-        // 終端移動ショートカット不正を拒否
-        InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
-            ValidateWith(config => config.Ui.MoveToEndShortcut = "Delete"));
-
-        StringAssert.Contains(ex.Message, "ui.moveToEndShortcut");
-    }
-
-    [TestMethod]
     public void Validate_InvalidPlayShortcut_Throws()
     {
         // 再生ショートカット不正を拒否

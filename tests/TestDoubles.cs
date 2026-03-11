@@ -11,8 +11,6 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
     public Func<IntPtr, string, int, bool> TypeTextHandler { get; set; } = (_, _, _) => true;
     public Func<IntPtr, bool> PressPlayHandler { get; set; } = _ => true;
     public Func<IntPtr, int, bool> MoveToStartHandler { get; set; } = (_, _) => true;
-    public Func<IntPtr, int, bool> MoveToEndHandler { get; set; } = (_, _) => true;
-    public Func<IntPtr, bool> PressBackspaceHandler { get; set; } = _ => true;
     public Func<IntPtr, bool> PressDeleteHandler { get; set; } = _ => true;
     public Func<IntPtr, ReadInputResult> ReadInputHandler { get; set; }
         = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA);
@@ -26,8 +24,6 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
     public int ClearInputCalls { get; private set; }
     public int PressPlayCalls { get; private set; }
     public int MoveToStartCalls { get; private set; }
-    public int MoveToEndCalls { get; private set; }
-    public int PressBackspaceCalls { get; private set; }
     public int PressDeleteCalls { get; private set; }
 
     public bool TryResolveTarget(out Process process, out IntPtr mainHwnd)
@@ -72,18 +68,6 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
     {
         MoveToStartCalls++;
         return MoveToStartHandler(mainHwnd, actionDelayMs);
-    }
-
-    public bool MoveToEnd(IntPtr mainHwnd, int actionDelayMs)
-    {
-        MoveToEndCalls++;
-        return MoveToEndHandler(mainHwnd, actionDelayMs);
-    }
-
-    public bool PressBackspace(IntPtr mainHwnd)
-    {
-        PressBackspaceCalls++;
-        return PressBackspaceHandler(mainHwnd);
     }
 
     public bool PressDelete(IntPtr mainHwnd)

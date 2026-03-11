@@ -54,7 +54,6 @@
 ## `UiConfig`
 
 - `MoveToStartShortcut` (`default: "F3"`)
-- `MoveToEndShortcut` (`default: "F4"`)
 - `PlayShortcut` (`default: "Space"`)
 - `PlayPreShortcutDelayMs` (`default: 60`)
 - `SendEnterAfterSentenceBreak` (`default: false`)
@@ -62,7 +61,7 @@
 
 重要です。
 
-- `MoveToStartShortcut`/`MoveToEndShortcut`は`F1-F12`のいずれかに設定してください
+- `MoveToStartShortcut`は`F1-F12`のいずれかに設定してください
 - `SentenceBreakTriggers`は複数文字指定に対応し、最長一致を優先します
 
 ## `TextTransformConfig`
@@ -144,7 +143,6 @@ var config = new AppConfig
     Ui = new UiConfig
     {
         MoveToStartShortcut = "F3",
-        MoveToEndShortcut = "F4",
         PlayShortcut = "Space",
         PlayPreShortcutDelayMs = 60,
         SendEnterAfterSentenceBreak = true,

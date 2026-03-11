@@ -236,43 +236,38 @@ public class UiControllerTests
     }
 
     [TestMethod]
-    public void MoveToStartAndEnd_SendConfiguredShortcutKeys()
+    public void MoveToStart_SendsConfiguredShortcutKey()
     {
-        // 設定ショートカットを送信
+        // 先頭移動ショートカットを送信
         var messages = ReflectionTestHelper.RunInSta(() =>
         {
             UiConfig ui = new UiConfig
             {
-                MoveToStartShortcut = "Home",
-                MoveToEndShortcut = "End"
+                MoveToStartShortcut = "Home"
             };
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
             VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
 
             Assert.IsTrue(controller.MoveToStart(window.Handle, 0));
-            Assert.IsTrue(controller.MoveToEnd(window.Handle, 0));
             return window.Messages.ToArray();
         });
 
         Assert.IsTrue(messages.Any(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == 0x24));
-        Assert.IsTrue(messages.Any(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == 0x23));
     }
 
     [TestMethod]
-    public void PressBackspaceAndDelete_SendExpectedKeys()
+    public void PressDelete_SendsExpectedKey()
     {
-        // 削除キー送信を確認
+        // deleteキー送信を確認
         var messages = ReflectionTestHelper.RunInSta(() =>
         {
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
             VoicepeakUiController controller = CreateController(new UiConfig(), new FakeVoicepeakProcessApi());
 
-            Assert.IsTrue(controller.PressBackspace(window.Handle));
             Assert.IsTrue(controller.PressDelete(window.Handle));
             return window.Messages.ToArray();
         });
 
-        Assert.IsTrue(messages.Any(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == 0x08));
         Assert.IsTrue(messages.Any(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == 0x2E));
     }
 

@@ -334,12 +334,12 @@ public class ExecutionLogicTests
             ReflectionTestHelper.InvokeCoreStatic("VoicepeakEngine", "BuildInputMismatchCause", "abc", string.Empty, true));
         Assert.AreEqual(
             "guard_chars_not_removed",
-            ReflectionTestHelper.InvokeCoreStatic("VoicepeakEngine", "BuildInputMismatchCause", "abc", "AabcB", true));
-        Assert.AreEqual(
-            "leading_guard_remaining_move_to_start_or_delete_issue",
             ReflectionTestHelper.InvokeCoreStatic("VoicepeakEngine", "BuildInputMismatchCause", "abc", "Aabc", true));
         Assert.AreEqual(
-            "trailing_guard_remaining_move_to_end_or_backspace_issue",
+            "leading_guard_remaining_move_to_start_or_delete_issue",
+            ReflectionTestHelper.InvokeCoreStatic("VoicepeakEngine", "BuildInputMismatchCause", "abc", "AabcX", true));
+        Assert.AreEqual(
+            "contains_expected_but_not_exact",
             ReflectionTestHelper.InvokeCoreStatic("VoicepeakEngine", "BuildInputMismatchCause", "abc", "abcB", true));
         Assert.AreEqual(
             "contains_expected_but_not_exact",

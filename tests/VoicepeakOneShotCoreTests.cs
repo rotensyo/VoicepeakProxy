@@ -88,9 +88,7 @@ public class VoicepeakOneShotCoreTests
             TypeTextHandler = (_, _, _) => true,
             ClearInputHandler = () => true,
             MoveToStartHandler = (_, _) => true,
-            MoveToEndHandler = (_, _) => true,
             PressDeleteHandler = _ => true,
-            PressBackspaceHandler = _ => true,
             PressPlayHandler = _ => true,
             IsAliveHandler = _ => true
         };

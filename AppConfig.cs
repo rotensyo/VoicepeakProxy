@@ -55,7 +55,6 @@ public sealed class PrepareConfig
 public sealed class UiConfig
 {
     public string MoveToStartShortcut { get; set; } = "F3";
-    public string MoveToEndShortcut { get; set; } = "F4";
     public string PlayShortcut { get; set; } = "Space";
     public int PlayPreShortcutDelayMs { get; set; } = 60;
     public bool SendEnterAfterSentenceBreak { get; set; } = false;
@@ -185,11 +184,6 @@ internal static class AppConfigValidator
         if (!VoicepeakUiController.IsValidShortcut(config.Ui.MoveToStartShortcut))
         {
             throw new InvalidOperationException("ui.moveToStartShortcut の形式が不正です（例: F3, Ctrl+F4, Space）");
-        }
-
-        if (!VoicepeakUiController.IsValidShortcut(config.Ui.MoveToEndShortcut))
-        {
-            throw new InvalidOperationException("ui.moveToEndShortcut の形式が不正です（例: F3, Ctrl+F4, Space）");
         }
 
         if (!VoicepeakUiController.IsValidShortcut(config.Ui.PlayShortcut))

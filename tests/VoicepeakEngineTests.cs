@@ -229,16 +229,6 @@ public class VoicepeakEngineTests
             false,
             "delete_failed",
             "key_message_not_applied");
-        AssertInputValidate(
-            RunInputValidateWithGuardStep(ui => ui.MoveToEndHandler = (_, _) => false),
-            false,
-            "move_to_end_failed",
-            "shortcut_not_applied_or_context_mismatch");
-        AssertInputValidate(
-            RunInputValidateWithGuardStep(ui => ui.PressBackspaceHandler = _ => false),
-            false,
-            "backspace_failed",
-            "key_message_not_applied");
     }
 
     [TestMethod]
@@ -261,7 +251,7 @@ public class VoicepeakEngineTests
     {
         // 不一致理由を返却
         FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
-        ui.ReadInputHandler = _ => ReadInputResult.Ok("Aabc", 4, ReadInputSource.PrimaryUiA);
+        ui.ReadInputHandler = _ => ReadInputResult.Ok("AabcX", 5, ReadInputSource.PrimaryUiA);
 
         using CancellationTokenSource cts = new CancellationTokenSource();
         VoicepeakEngine engine = CreateEngine(ui: ui, appCts: cts);
@@ -269,7 +259,7 @@ public class VoicepeakEngineTests
         object result = ReflectionTestHelper.InvokeCoreInstance(engine, "RunInputValidate", Process.GetCurrentProcess(), IntPtr.Zero, "abc", 0, true);
 
         AssertInputValidate(result, false, "text_mismatch", "leading_guard_remaining_move_to_start_or_delete_issue");
-        Assert.AreEqual("Aabc", ReflectionTestHelper.GetProperty(result, "ActualText"));
+        Assert.AreEqual("AabcX", ReflectionTestHelper.GetProperty(result, "ActualText"));
     }
 
     [TestMethod]
@@ -284,7 +274,7 @@ public class VoicepeakEngineTests
         object result = ReflectionTestHelper.InvokeCoreInstance(engine, "RunInputValidate", Process.GetCurrentProcess(), IntPtr.Zero, "abc", 0, true);
 
         AssertInputValidate(result, true, string.Empty, string.Empty);
-        CollectionAssert.AreEqual(new[] { "AabcB" }, ui.TypedTexts);
+        CollectionAssert.AreEqual(new[] { "Aabc" }, ui.TypedTexts);
     }
 
     [TestMethod]

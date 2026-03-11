@@ -214,14 +214,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return SendShortcut(mainHwnd, _ui.MoveToStartShortcut);
     }
 
-    public bool MoveToEnd(IntPtr mainHwnd, int actionDelayMs)
-    {
-        SleepActionDelay(actionDelayMs);
-        return SendShortcut(mainHwnd, _ui.MoveToEndShortcut);
-    }
-
-    public bool PressBackspace() => SendKey(IntPtr.Zero, VirtualKey.Back);
-    public bool PressBackspace(IntPtr mainHwnd) => SendKey(mainHwnd, VirtualKey.Back);
     public bool PressDelete(IntPtr mainHwnd) => SendKey(mainHwnd, VirtualKey.Delete);
 
     internal static bool IsValidShortcut(string raw)

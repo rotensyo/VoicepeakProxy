@@ -512,7 +512,7 @@ internal sealed class VoicepeakEngine : IDisposable
         }
 
         string expected = InputTextNormalizer.Normalize(text);
-        string toType = useProbeGuardChars ? ("A" + expected + "B") : expected;
+        string toType = useProbeGuardChars ? ("A" + expected) : expected;
         if (!_ui.TypeText(hwnd, toType, charDelay))
         {
             return InputValidateResult.Fail("type_text_failed", "wm_char_input_failed", string.Empty);
@@ -536,15 +536,6 @@ internal sealed class VoicepeakEngine : IDisposable
                 return InputValidateResult.Fail("delete_failed", "key_message_not_applied", string.Empty);
             }
 
-            if (!_ui.MoveToEnd(hwnd, _config.Prepare.ActionDelayMs))
-            {
-                return InputValidateResult.Fail("move_to_end_failed", "shortcut_not_applied_or_context_mismatch", string.Empty);
-            }
-
-            if (!_ui.PressBackspace(hwnd))
-            {
-                return InputValidateResult.Fail("backspace_failed", "key_message_not_applied", string.Empty);
-            }
         }
 
         ReadInputResult read = _ui.ReadInputTextDetailed(hwnd);
@@ -577,7 +568,7 @@ internal sealed class VoicepeakEngine : IDisposable
 
         if (usedProbeGuardChars)
         {
-            string expectedWithGuards = "A" + (expected ?? string.Empty) + "B";
+            string expectedWithGuards = "A" + (expected ?? string.Empty);
             if (string.Equals(a, expectedWithGuards, StringComparison.Ordinal))
             {
                 return "guard_chars_not_removed";
@@ -588,10 +579,6 @@ internal sealed class VoicepeakEngine : IDisposable
                 return "leading_guard_remaining_move_to_start_or_delete_issue";
             }
 
-            if (a.EndsWith("B", StringComparison.Ordinal))
-            {
-                return "trailing_guard_remaining_move_to_end_or_backspace_issue";
-            }
         }
 
         if (!string.IsNullOrEmpty(expected) && a.IndexOf(expected, StringComparison.Ordinal) >= 0)
