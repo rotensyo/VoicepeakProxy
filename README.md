@@ -236,6 +236,22 @@ config.TextTransform.ReplaceRules.Add(new ReplaceRule
 - `Stop()` 後または停止中の `Enqueue(...)` は `InvalidOperationException` を投げます
 - `Dispose()` 後の `Enqueue(...)` は `ObjectDisposedException` を投げます
 
+#### 正常系状態遷移(模式図)
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> ExecutingInputValidate: dequeue
+    ExecutingInputValidate --> ExecutingPrePlayWait: ready
+    ExecutingPrePlayWait --> Speaking: playAt
+    Speaking --> Speaking: retry
+    Speaking --> Stopping: completed
+    Stopping --> ExecutingInputValidate: next
+    Stopping --> Idle: finish
+    Idle --> Idle: wait
+    Idle --> [*]: stop
+```
+
 ### 7.2 単発実行の流れ
 
 1. `VoicepeakOneShot.SpeakOnce(...)` を呼ぶ
