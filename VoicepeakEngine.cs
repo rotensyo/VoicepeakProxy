@@ -131,82 +131,94 @@ internal sealed class VoicepeakEngine : IDisposable
             return true;
         }
 
-        if (!_ui.MoveToStart(hwnd, _config.Prepare.ActionDelayMs))
+        for (int startAttempt = 0; startAttempt <= _config.Audio.StartConfirmMaxRetries; startAttempt++)
         {
-            _log.Error("起動時動作チェック失敗: 先頭移動ショートカットの実行に失敗しました。");
-            return mode == BootValidationMode.Optional;
-        }
-
-        if (!_ui.PressPlay(hwnd))
-        {
-            _log.Error("起動時動作チェック失敗: 再生ボタンの押下に失敗しました。");
-            return mode == BootValidationMode.Optional;
-        }
-
-        long monitorStartAt = MonoClock.NowMs();
-        long startDeadline = monitorStartAt + _config.Audio.StartConfirmWindowMs;
-        bool started = false;
-        long speakingStartedAt = -1;
-        long belowSince = -1;
-
-        while (true)
-        {
-            if (!IsProcessAlive(process))
+            if (!_ui.MoveToStart(hwnd, _config.Prepare.ActionDelayMs))
             {
-                OnProcessLost();
+                _log.Error("起動時動作チェック失敗: 先頭移動ショートカットの実行に失敗しました。");
                 return mode == BootValidationMode.Optional;
             }
 
-            long now = MonoClock.NowMs();
-            AudioSessionSnapshot snap = _audio.ReadPeak(process.Id);
-
-            if (!started)
+            if (!_ui.PressPlay(hwnd))
             {
-                if (snap.Peak >= _config.Audio.PeakThreshold)
+                _log.Error("起動時動作チェック失敗: 再生ボタンの押下に失敗しました。");
+                return mode == BootValidationMode.Optional;
+            }
+
+            long monitorStartAt = MonoClock.NowMs();
+            long startDeadline = monitorStartAt + _config.Audio.StartConfirmWindowMs;
+            bool started = false;
+            long speakingStartedAt = -1;
+            long belowSince = -1;
+
+            while (true)
+            {
+                if (!IsProcessAlive(process))
                 {
-                    started = true;
-                    speakingStartedAt = now;
-                }
-                else if (now > startDeadline)
-                {
-                    _log.Error("起動時動作チェック失敗: 音声の再生が確認できませんでした。");
+                    OnProcessLost();
                     return mode == BootValidationMode.Optional;
                 }
-            }
-            else
-            {
-                if (_config.Audio.MaxSpeakingDurationSec > 0)
-                {
-                    long maxMs = _config.Audio.MaxSpeakingDurationSec * 1000L;
-                    if ((now - speakingStartedAt) > maxMs)
-                    {
-                        _log.Error("起動時動作チェック失敗: 音声の終了が確認できませんでした。");
-                        _ui.MoveToStart(hwnd, _config.Prepare.ActionDelayMs);
-                        return mode == BootValidationMode.Optional;
-                    }
-                }
 
-                if (snap.Peak < _config.Audio.PeakThreshold)
+                long now = MonoClock.NowMs();
+                AudioSessionSnapshot snap = _audio.ReadPeak(process.Id);
+
+                if (!started)
                 {
-                    if (belowSince < 0)
+                    if (snap.Peak >= _config.Audio.PeakThreshold)
                     {
-                        belowSince = now;
+                        started = true;
+                        speakingStartedAt = now;
                     }
-                    else if ((now - belowSince) >= _config.Audio.StopConfirmMs)
+                    else if (now > startDeadline)
                     {
-                        _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
-                        _log.Info("boot_validation_ok");
-                        return true;
+                        bool hasNextAttempt = startAttempt < _config.Audio.StartConfirmMaxRetries;
+                        if (hasNextAttempt)
+                        {
+                            _log.Warn($"boot_start_confirm_retry attempt={startAttempt + 1}");
+                            break;
+                        }
+
+                        _log.Error("起動時動作チェック失敗: 音声の再生が確認できませんでした。");
+                        return mode == BootValidationMode.Optional;
                     }
                 }
                 else
                 {
-                    belowSince = -1;
-                }
-            }
+                    if (_config.Audio.MaxSpeakingDurationSec > 0)
+                    {
+                        long maxMs = _config.Audio.MaxSpeakingDurationSec * 1000L;
+                        if ((now - speakingStartedAt) > maxMs)
+                        {
+                            _log.Error("起動時動作チェック失敗: 音声の終了が確認できませんでした。");
+                            _ui.MoveToStart(hwnd, _config.Prepare.ActionDelayMs);
+                            return mode == BootValidationMode.Optional;
+                        }
+                    }
 
-            Thread.Sleep(_config.Audio.PollIntervalMs);
+                    if (snap.Peak < _config.Audio.PeakThreshold)
+                    {
+                        if (belowSince < 0)
+                        {
+                            belowSince = now;
+                        }
+                        else if ((now - belowSince) >= _config.Audio.StopConfirmMs)
+                        {
+                            _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
+                            _log.Info("boot_validation_ok");
+                            return true;
+                        }
+                    }
+                    else
+                    {
+                        belowSince = -1;
+                    }
+                }
+
+                Thread.Sleep(_config.Audio.PollIntervalMs);
+            }
         }
+
+        return mode == BootValidationMode.Optional;
     }
 
     // リクエストを受理してキューへ投入
@@ -384,94 +396,104 @@ internal sealed class VoicepeakEngine : IDisposable
                 return;
             }
 
-            if (!_ui.MoveToStart(hwnd, _config.Prepare.ActionDelayMs))
+            for (int startAttempt = 0; startAttempt <= _config.Audio.StartConfirmMaxRetries; startAttempt++)
             {
-                DropJob(job, "move_to_start_failed");
-                _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
-                return;
-            }
-
-            if (!_ui.PressPlay(hwnd))
-            {
-                DropJob(job, "play_failed");
-                _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
-                return;
-            }
-
-            _log.Info($"play_pressed jobId={job.JobId} index={i}");
-
-            lock (_gate)
-            {
-                _state = WorkerState.Speaking;
-            }
-
-            SpeakMonitorResult speakResult = JobExecutionCore.MonitorSpeaking(
-                _config,
-                _ui,
-                _audio,
-                process,
-                hwnd,
-                _log,
-                () => _stopping || _appCts.IsCancellationRequested,
-                () => _interruptRequested,
-                () => ConsumeInterruptIfAny(log: false));
-            if (speakResult.Kind == SpeakMonitorKind.Completed)
-            {
-                _log.Info($"speak_end_confirmed jobId={job.JobId} index={i}");
-                lock (_gate)
+                if (!_ui.MoveToStart(hwnd, _config.Prepare.ActionDelayMs))
                 {
-                    _state = WorkerState.Stopping;
-                }
-
-                int trailing = isLast
-                    ? JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(_config, job.TrailingPauseMs, "trailing", job.JobId, i, null, _log)
-                    : 0;
-                if (trailing > 0)
-                {
-                    long waitUntil = speakResult.SegEndAtMs + trailing;
-                    MonoClock.SleepUntil(waitUntil, () => _stopping || _appCts.IsCancellationRequested || _interruptRequested);
-                }
-
-                if (_interruptRequested)
-                {
-                    ConsumeInterruptIfAny(log: false);
-                    _log.Info("interrupt_applied state=Stopping");
-                    DropJob(job, "interrupt");
+                    DropJob(job, "move_to_start_failed");
+                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
                     return;
                 }
 
-                continue;
-            }
+                if (!_ui.PressPlay(hwnd))
+                {
+                    DropJob(job, "play_failed");
+                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
+                    return;
+                }
 
-            if (speakResult.Kind == SpeakMonitorKind.Interrupted)
-            {
-                _log.Info("interrupt_applied state=Speaking");
-                DropJob(job, "interrupt");
-                _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
-                return;
-            }
+                _log.Info($"play_pressed jobId={job.JobId} index={i}");
 
-            if (speakResult.Kind == SpeakMonitorKind.StartTimeout)
-            {
-                _log.Error("monitor_timeout reason=start_confirm");
-                DropJob(job, "start_confirm_failed");
-                _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
-                return;
-            }
+                lock (_gate)
+                {
+                    _state = WorkerState.Speaking;
+                }
 
-            if (speakResult.Kind == SpeakMonitorKind.MaxDuration)
-            {
-                _log.Error("monitor_timeout reason=max_duration");
-                DropJob(job, "max_speaking_duration");
-                _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
-                return;
-            }
+                SpeakMonitorResult speakResult = JobExecutionCore.MonitorSpeaking(
+                    _config,
+                    _ui,
+                    _audio,
+                    process,
+                    hwnd,
+                    _log,
+                    () => _stopping || _appCts.IsCancellationRequested,
+                    () => _interruptRequested,
+                    () => ConsumeInterruptIfAny(log: false));
+                if (speakResult.Kind == SpeakMonitorKind.Completed)
+                {
+                    _log.Info($"speak_end_confirmed jobId={job.JobId} index={i}");
+                    lock (_gate)
+                    {
+                        _state = WorkerState.Stopping;
+                    }
 
-            if (speakResult.Kind == SpeakMonitorKind.ProcessLost)
-            {
-                OnProcessLost();
-                DropJob(job, "process_lost");
-                return;
+                    int trailing = isLast
+                        ? JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(_config, job.TrailingPauseMs, "trailing", job.JobId, i, null, _log)
+                        : 0;
+                    if (trailing > 0)
+                    {
+                        long waitUntil = speakResult.SegEndAtMs + trailing;
+                        MonoClock.SleepUntil(waitUntil, () => _stopping || _appCts.IsCancellationRequested || _interruptRequested);
+                    }
+
+                    if (_interruptRequested)
+                    {
+                        ConsumeInterruptIfAny(log: false);
+                        _log.Info("interrupt_applied state=Stopping");
+                        DropJob(job, "interrupt");
+                        return;
+                    }
+
+                    break;
+                }
+
+                if (speakResult.Kind == SpeakMonitorKind.Interrupted)
+                {
+                    _log.Info("interrupt_applied state=Speaking");
+                    DropJob(job, "interrupt");
+                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
+                    return;
+                }
+
+                if (speakResult.Kind == SpeakMonitorKind.StartTimeout)
+                {
+                    bool hasNextAttempt = startAttempt < _config.Audio.StartConfirmMaxRetries;
+                    if (hasNextAttempt)
+                    {
+                        _log.Warn($"start_confirm_retry jobId={job.JobId} index={i} attempt={startAttempt + 1}");
+                        continue;
+                    }
+
+                    _log.Error("monitor_timeout reason=start_confirm");
+                    DropJob(job, "start_confirm_failed");
+                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
+                    return;
+                }
+
+                if (speakResult.Kind == SpeakMonitorKind.MaxDuration)
+                {
+                    _log.Error("monitor_timeout reason=max_duration");
+                    DropJob(job, "max_speaking_duration");
+                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
+                    return;
+                }
+
+                if (speakResult.Kind == SpeakMonitorKind.ProcessLost)
+                {
+                    OnProcessLost();
+                    DropJob(job, "process_lost");
+                    return;
+                }
             }
         }
     }

@@ -43,6 +43,32 @@ public class VoicepeakEngineExecuteJobTests
         Assert.IsTrue(ui.ClearInputCalls >= 1);
     }
 
+    [TestMethod]
+    public void ExecuteJob_StartTimeout_RetriesAndCompletes()
+    {
+        TestLogger logger = new TestLogger();
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        FakeAudioSessionReader audio = new FakeAudioSessionReader();
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
+        AppConfig config = CreateConfig();
+        config.Audio.StartConfirmWindowMs = 1;
+        config.Audio.StartConfirmMaxRetries = 1;
+        config.Audio.StopConfirmMs = 1;
+
+        using CancellationTokenSource cts = new CancellationTokenSource();
+        VoicepeakEngine engine = new VoicepeakEngine(config, cts, new AppLogger(logger), ui, audio, false);
+
+        ReflectionTestHelper.InvokeCoreInstance(engine, "ExecuteJob", CreateJob("hello"));
+
+        Assert.AreEqual(2, ui.PressPlayCalls);
+        Assert.IsFalse(logger.WarnMessages.Exists(m => m.Contains("reason=start_confirm_failed")));
+    }
+
     private static VoicepeakEngine CreateEngine(FakeVoicepeakUiController ui, FakeAudioSessionReader audio, TestLogger logger, CancellationTokenSource cts)
     {
         return new VoicepeakEngine(CreateConfig(), cts, new AppLogger(logger), ui, audio, false);

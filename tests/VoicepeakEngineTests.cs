@@ -101,6 +101,32 @@ public class VoicepeakEngineTests
     }
 
     [TestMethod]
+    public void BootValidate_StartTimeout_RetriesAndSucceeds()
+    {
+        // start timeout時に再試行で成功
+        FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
+        FakeAudioSessionReader audio = new FakeAudioSessionReader();
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
+        AppConfig config = CreateEngineConfig();
+        config.Audio.StartConfirmWindowMs = 1;
+        config.Audio.StartConfirmMaxRetries = 1;
+        config.Audio.StopConfirmMs = 1;
+
+        using CancellationTokenSource cts = new CancellationTokenSource();
+        VoicepeakEngine engine = new VoicepeakEngine(config, cts, new AppLogger(new TestLogger()), ui, audio, false);
+
+        bool result = engine.BootValidate(BootValidationMode.Required);
+
+        Assert.IsTrue(result);
+        Assert.AreEqual(2, ui.PressPlayCalls);
+    }
+
+    [TestMethod]
     public void BootValidate_DelayedStart_DoesNotCountTowardMaxDuration()
     {
         // 開始前待機は最大発話時間に含めない

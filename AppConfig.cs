@@ -34,6 +34,7 @@ public sealed class AudioConfig
     public float PeakThreshold { get; set; } = 0.000000001f;
     public int PollIntervalMs { get; set; } = 50;
     public int StartConfirmWindowMs { get; set; } = 1000;
+    public int StartConfirmMaxRetries { get; set; } = 0;
     public int StopConfirmMs { get; set; } = 300;
     public int MaxSpeakingDurationSec { get; set; } = 300;
 }
@@ -134,6 +135,11 @@ internal static class AppConfigValidator
         if (config.Audio.StartConfirmWindowMs <= 0)
         {
             throw new InvalidOperationException("audio.startConfirmWindowMs は 1 以上で指定してください");
+        }
+
+        if (config.Audio.StartConfirmMaxRetries < 0)
+        {
+            throw new InvalidOperationException("audio.startConfirmMaxRetries は 0 以上で指定してください");
         }
 
         if (config.Audio.StopConfirmMs <= 0)

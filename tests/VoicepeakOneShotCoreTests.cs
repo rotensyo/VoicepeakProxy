@@ -46,6 +46,28 @@ public class VoicepeakOneShotCoreTests
         Assert.AreEqual(1, result.SegmentsExecuted);
     }
 
+    [TestMethod]
+    public void SpeakOnceCore_StartTimeout_RetriesAndSucceeds()
+    {
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        FakeAudioSessionReader audio = new FakeAudioSessionReader();
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
+        AppConfig config = CreateConfig();
+        config.Audio.StartConfirmWindowMs = 1;
+        config.Audio.StartConfirmMaxRetries = 1;
+        config.Audio.StopConfirmMs = 1;
+
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), RequestValidationMode.Strict, ui, audio);
+
+        Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
+        Assert.AreEqual(2, ui.PressPlayCalls);
+    }
+
     private static AppConfig CreateConfig()
     {
         AppConfig config = new AppConfig();

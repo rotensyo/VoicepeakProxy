@@ -17,6 +17,7 @@ public class AppConfigValidationTests
         Assert.AreEqual(500, config.Server.MaxQueuedJobs);
         Assert.AreEqual(50, config.Audio.PollIntervalMs);
         Assert.AreEqual(1000, config.Audio.StartConfirmWindowMs);
+        Assert.AreEqual(0, config.Audio.StartConfirmMaxRetries);
         Assert.AreEqual(300, config.Audio.StopConfirmMs);
         Assert.AreEqual("初期化完了", config.Prepare.BootValidationText);
         CollectionAssert.AreEqual(new[] { "。", "！", "？", "!", "?" }, config.Ui.SentenceBreakTriggers);
@@ -61,6 +62,7 @@ public class AppConfigValidationTests
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Server.MaxQueuedJobs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.PollIntervalMs = 0));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.StartConfirmWindowMs = 0));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.StartConfirmMaxRetries = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.StopConfirmMs = 0));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.ActionDelayMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.BootValidationMaxRetries = -1));
@@ -166,6 +168,7 @@ public class AppConfigValidationTests
             config.Server.MaxQueuedJobs = 0;
             config.Audio.PollIntervalMs = 1;
             config.Audio.StartConfirmWindowMs = 1;
+            config.Audio.StartConfirmMaxRetries = 0;
             config.Audio.StopConfirmMs = 1;
             config.Prepare.ActionDelayMs = 0;
             config.Prepare.BootValidationMaxRetries = 0;
