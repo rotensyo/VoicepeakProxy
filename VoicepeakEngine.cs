@@ -210,14 +210,19 @@ internal sealed class VoicepeakEngine : IDisposable
     }
 
     // リクエストを受理してキューへ投入
-    public EnqueueResult Enqueue(SpeakRequest req, RequestValidationMode? validationOverride = null)
+    public EnqueueResult Enqueue(SpeakRequest req)
     {
+        if (req == null)
+        {
+            throw new ArgumentNullException(nameof(req));
+        }
+
         if (_stopping || _appCts.IsCancellationRequested || _shutdownRequested)
         {
             throw new InvalidOperationException("Runtime is stopping and cannot accept new requests.");
         }
 
-        RequestValidationMode mode = validationOverride ?? _config.Validation.RequestValidation;
+        RequestValidationMode mode = _config.Validation.RequestValidation;
         try
         {
             Job job = JobCompiler.Compile(req, _config, mode);
@@ -230,8 +235,8 @@ internal sealed class VoicepeakEngine : IDisposable
                         {
                             return new EnqueueResult
                             {
-                                StatusCode = 429,
-                                Body = "{\"accepted\":false,\"error\":\"queue_full\",\"message\":\"キューが上限に達しています\"}"
+                                Status = EnqueueStatus.QueueFull,
+                                ErrorMessage = "キューが上限に達しています"
                             };
                         }
 
@@ -257,14 +262,14 @@ internal sealed class VoicepeakEngine : IDisposable
 
             _log.Info($"job_received jobId={job.JobId} mode={job.Mode} interrupt={job.Interrupt}");
             _wake.Set();
-            return new EnqueueResult { StatusCode = 202, Body = "{\"accepted\":true}" };
+            return new EnqueueResult { Status = EnqueueStatus.Accepted, JobId = job.JobId };
         }
         catch (Exception ex)
         {
             return new EnqueueResult
             {
-                StatusCode = 400,
-                Body = "{\"accepted\":false,\"error\":\"" + EscapeForJson(ex.Message) + "\"}"
+                Status = EnqueueStatus.InvalidRequest,
+                ErrorMessage = ex.Message
             };
         }
     }

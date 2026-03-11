@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace VoicepeakProxyCore.Tests;
@@ -9,7 +9,7 @@ public class AudioSessionReaderTests
     [TestMethod]
     public void ReadPeak_NoMatchingSession_ReturnsDefaultSnapshot()
     {
-        // 一致セッションなしは既定値
+        // 荳閾ｴ繧ｻ繝・す繝ｧ繝ｳ縺ｪ縺励・譌｢螳壼､
         FakeAudioSessionSource source = new FakeAudioSessionSource
         {
             ReadSessionsHandler = () => new[]
@@ -29,7 +29,7 @@ public class AudioSessionReaderTests
     [TestMethod]
     public void ReadPeak_UsesMaxPeakAndActiveState()
     {
-        // 最大peakとActive状態を採用
+        // 譛螟ｧpeak縺ｨActive迥ｶ諷九ｒ謗｡逕ｨ
         FakeAudioSessionSource source = new FakeAudioSessionSource
         {
             ReadSessionsHandler = () => new[]
@@ -51,7 +51,7 @@ public class AudioSessionReaderTests
     [TestMethod]
     public void ReadPeak_Exception_LogsWarningAndReturnsDefault()
     {
-        // 例外時は警告して既定値返却
+        // 萓句､匁凾縺ｯ隴ｦ蜻翫＠縺ｦ譌｢螳壼､霑泌唆
         TestLogger logger = new TestLogger();
         FakeAudioSessionSource source = new FakeAudioSessionSource
         {

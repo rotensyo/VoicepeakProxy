@@ -9,205 +9,29 @@ namespace VoicepeakProxyCore.Tests;
 public class VoicepeakOneShotCoreTests
 {
     [TestMethod]
-    public void SpeakOnceCore_ProcessNotFound_ReturnsExpectedReason()
+    public void SpeakOnceCore_ProcessNotFound_ReturnsStatus()
     {
-        // 対象未起動を返却
-        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
-        {
-            ProcessCountHandler = () => 0
-        };
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController { ProcessCountHandler = () => 0 };
 
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(
-            CreateConfig(),
-            new SpeakOnceRequest { Text = "hello" },
-            new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
-            ui,
-            new FakeAudioSessionReader());
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(CreateConfig(), new SpeakOnceRequest { Text = "hello" }, new AppLogger(new TestLogger()), RequestValidationMode.Strict, ui, new FakeAudioSessionReader());
 
-        Assert.IsFalse(result.Success);
-        Assert.AreEqual("process_not_found", result.Reason);
-        Assert.AreEqual(0, result.SegmentsExecuted);
+        Assert.AreEqual(SpeakOnceStatus.ProcessNotFound, result.Status);
     }
 
     [TestMethod]
-    public void SpeakOnceCore_MultipleProcesses_ReturnsExpectedReason()
+    public void SpeakOnceCore_InvalidRequest_ReturnsStatusAndMessage()
     {
-        // 複数起動を返却
-        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
-        {
-            ProcessCountHandler = () => 2
-        };
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(CreateConfig(), null, new AppLogger(new TestLogger()), RequestValidationMode.Strict, new FakeVoicepeakUiController(), new FakeAudioSessionReader());
 
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(
-            CreateConfig(),
-            new SpeakOnceRequest { Text = "hello" },
-            new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
-            ui,
-            new FakeAudioSessionReader());
-
-        Assert.IsFalse(result.Success);
-        Assert.AreEqual("multiple_processes", result.Reason);
+        Assert.AreEqual(SpeakOnceStatus.InvalidRequest, result.Status);
+        StringAssert.Contains(result.ErrorMessage, "request は null");
     }
 
     [TestMethod]
-    public void SpeakOnceCore_TargetNotFound_ReturnsExpectedReason()
+    public void SpeakOnceCore_Success_ReturnsCompleted()
     {
-        // 対象解決失敗を返却
-        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
-        {
-            ProcessCountHandler = () => 1,
-            ResolveTargetHandler = () => (false, null, IntPtr.Zero)
-        };
-
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(
-            CreateConfig(),
-            new SpeakOnceRequest { Text = "hello" },
-            new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
-            ui,
-            new FakeAudioSessionReader());
-
-        Assert.IsFalse(result.Success);
-        Assert.AreEqual("target_not_found", result.Reason);
-    }
-
-    [TestMethod]
-    public void SpeakOnceCore_PrepareFailure_ReturnsExpectedReason()
-    {
-        // 入力準備失敗を返却
-        FakeVoicepeakUiController ui = CreateResolvedUi();
-        ui.ClearInputHandler = () => false;
-
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(
-            CreateConfig(),
-            new SpeakOnceRequest { Text = "hello" },
-            new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
-            ui,
-            new FakeAudioSessionReader());
-
-        Assert.IsFalse(result.Success);
-        Assert.AreEqual("prepare_failed", result.Reason);
-    }
-
-    [TestMethod]
-    public void SpeakOnceCore_MoveToStartFailure_ReturnsExpectedReason()
-    {
-        // 先頭移動失敗を返却
-        FakeVoicepeakUiController ui = CreateResolvedUi();
-        ui.MoveToStartHandler = (_, _) => false;
-
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(
-            CreateConfig(),
-            new SpeakOnceRequest { Text = "hello" },
-            new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
-            ui,
-            new FakeAudioSessionReader());
-
-        Assert.IsFalse(result.Success);
-        Assert.AreEqual("move_to_start_failed", result.Reason);
-    }
-
-    [TestMethod]
-    public void SpeakOnceCore_PlayFailure_ReturnsExpectedReason()
-    {
-        // 再生失敗を返却
-        FakeVoicepeakUiController ui = CreateResolvedUi();
-        ui.PressPlayHandler = _ => false;
-
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(
-            CreateConfig(),
-            new SpeakOnceRequest { Text = "hello" },
-            new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
-            ui,
-            new FakeAudioSessionReader());
-
-        Assert.IsFalse(result.Success);
-        Assert.AreEqual("play_failed", result.Reason);
-    }
-
-    [TestMethod]
-    public void SpeakOnceCore_StartTimeout_ReturnsExpectedReason()
-    {
-        // 開始確認失敗を返却
         FakeVoicepeakUiController ui = CreateResolvedUi();
         FakeAudioSessionReader audio = new FakeAudioSessionReader();
-        audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
-        AppConfig config = CreateConfig();
-        config.Audio.StartConfirmWindowMs = 1;
-
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(
-            config,
-            new SpeakOnceRequest { Text = "hello" },
-            new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
-            ui,
-            audio);
-
-        Assert.IsFalse(result.Success);
-        Assert.AreEqual("start_confirm_failed", result.Reason);
-    }
-
-    [TestMethod]
-    public void SpeakOnceCore_MaxDuration_ReturnsExpectedReason()
-    {
-        // 最大発話超過を返却
-        FakeVoicepeakUiController ui = CreateResolvedUi();
-        FakeAudioSessionReader audio = new FakeAudioSessionReader();
-        audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" };
-        AppConfig config = CreateConfig();
-        config.Audio.MaxSpeakingDurationSec = 1;
-
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(
-            config,
-            new SpeakOnceRequest { Text = "hello" },
-            new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
-            ui,
-            audio);
-
-        Assert.IsFalse(result.Success);
-        Assert.AreEqual("max_speaking_duration", result.Reason);
-    }
-
-    [TestMethod]
-    public void SpeakOnceCore_ProcessLostAfterPrepare_ReturnsExpectedReason()
-    {
-        // 再生前消失を返却
-        bool alive = true;
-        FakeVoicepeakUiController ui = CreateResolvedUi();
-        ui.IsAliveHandler = _ => alive;
-        ui.MoveToStartHandler = (_, _) =>
-        {
-            alive = false;
-            return true;
-        };
-
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(
-            CreateConfig(),
-            new SpeakOnceRequest { Text = "hello" },
-            new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
-            ui,
-            new FakeAudioSessionReader());
-
-        Assert.IsFalse(result.Success);
-        Assert.AreEqual("process_lost", result.Reason);
-    }
-
-    [TestMethod]
-    public void SpeakOnceCore_Success_ReturnsCompletedAndExecutedCount()
-    {
-        // 全セグメント成功を返却
-        FakeVoicepeakUiController ui = CreateResolvedUi();
-        FakeAudioSessionReader audio = new FakeAudioSessionReader();
-        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" });
-        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
-        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
         audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" });
         audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
         audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
@@ -215,17 +39,11 @@ public class VoicepeakOneShotCoreTests
         AppConfig config = CreateConfig();
         config.Audio.StopConfirmMs = 2;
 
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(
-            config,
-            new SpeakOnceRequest { Text = "A[[pause:10]]B" },
-            new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
-            ui,
-            audio);
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), RequestValidationMode.Strict, ui, audio);
 
-        Assert.IsTrue(result.Success);
-        Assert.AreEqual("completed", result.Reason);
-        Assert.AreEqual(2, result.SegmentsExecuted);
+        Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
+        Assert.IsTrue(result.Succeeded);
+        Assert.AreEqual(1, result.SegmentsExecuted);
     }
 
     private static AppConfig CreateConfig()

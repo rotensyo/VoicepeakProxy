@@ -12,12 +12,20 @@ internal enum JobMode
     Flush
 }
 
+// 公開キュー投入モード
+public enum EnqueueMode
+{
+    Queue,
+    Next,
+    Flush
+}
+
 // 常駐API向け入力モデル
 public sealed class SpeakRequest
 {
-    public string text { get; set; }
-    public string mode { get; set; }
-    public bool interrupt { get; set; }
+    public string Text { get; set; } = string.Empty;
+    public EnqueueMode Mode { get; set; } = EnqueueMode.Queue;
+    public bool Interrupt { get; set; }
 }
 
 // 実行キュー上の内部ジョブ
@@ -47,21 +55,19 @@ internal static class JobCompiler
     {
         if (req == null)
         {
-            throw new InvalidOperationException("リクエストボディが必要です。");
+            throw new InvalidOperationException("request は null にできません");
         }
 
-        string sourceText = req.text;
-        string sourceMode = req.mode;
+        string sourceText = req.Text;
+        EnqueueMode sourceMode = req.Mode;
 
         if (validationMode == RequestValidationMode.Disabled)
         {
             sourceText ??= string.Empty;
-            sourceMode = (sourceMode ?? "queue").Trim().ToLowerInvariant();
         }
         else if (validationMode == RequestValidationMode.Lenient)
         {
             sourceText ??= string.Empty;
-            sourceMode = string.IsNullOrWhiteSpace(sourceMode) ? "queue" : sourceMode.Trim().ToLowerInvariant();
         }
         else
         {
@@ -69,21 +75,14 @@ internal static class JobCompiler
             {
                 throw new InvalidOperationException("text は null にできません");
             }
-
-            if (string.IsNullOrWhiteSpace(sourceMode))
-            {
-                throw new InvalidOperationException("mode は queue|next|flush のいずれかを指定してください");
-            }
-
-            sourceMode = sourceMode.Trim().ToLowerInvariant();
         }
 
         JobMode mode = sourceMode switch
         {
-            "queue" => JobMode.Queue,
-            "next" => JobMode.Next,
-            "flush" => JobMode.Flush,
-            _ => throw new InvalidOperationException("mode は queue|next|flush のいずれかを指定してください")
+            EnqueueMode.Queue => JobMode.Queue,
+            EnqueueMode.Next => JobMode.Next,
+            EnqueueMode.Flush => JobMode.Flush,
+            _ => throw new InvalidOperationException("mode が不正です")
         };
 
         string input = sourceText ?? string.Empty;
@@ -136,7 +135,7 @@ internal static class JobCompiler
         return new Job
         {
             Mode = mode,
-            Interrupt = req.interrupt,
+            Interrupt = req.Interrupt,
             Segments = segments,
             TrailingPauseMs = trailingPause
         };
@@ -167,8 +166,18 @@ internal static class JobCompiler
 }
 
 // 常駐API向け受理結果
+public enum EnqueueStatus
+{
+    Accepted,
+    QueueFull,
+    InvalidRequest
+}
+
+// 常駐API向け受理結果
 public sealed class EnqueueResult
 {
-    public int StatusCode { get; set; }
-    public string Body { get; set; } = "{}";
+    public EnqueueStatus Status { get; set; }
+    public string JobId { get; set; } = string.Empty;
+    public string ErrorMessage { get; set; } = string.Empty;
+    public bool Succeeded => Status == EnqueueStatus.Accepted;
 }

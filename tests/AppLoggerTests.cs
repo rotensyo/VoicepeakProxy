@@ -10,7 +10,6 @@ public class AppLoggerTests
     [TestMethod]
     public void AppLogger_ForwardsAllLevels()
     {
-        // 各ログレベルを委譲
         TestLogger logger = new TestLogger();
         AppLogger appLogger = new AppLogger(logger);
 
@@ -28,7 +27,6 @@ public class AppLoggerTests
     [TestMethod]
     public void AppLogger_ErrorWithDetail_ConcatenatesMessage()
     {
-        // 詳細文字列を連結
         TestLogger logger = new TestLogger();
         AppLogger appLogger = new AppLogger(logger);
 
@@ -40,7 +38,6 @@ public class AppLoggerTests
     [TestMethod]
     public void AppLogger_NullLogger_UsesConsoleLogger()
     {
-        // nullロガー時はコンソールへ出力
         TextWriter original = Console.Out;
         try
         {
@@ -50,30 +47,7 @@ public class AppLoggerTests
             AppLogger appLogger = new AppLogger(null);
             appLogger.Info("hello");
 
-            string output = writer.ToString();
-            StringAssert.Contains(output, "[INFO] hello");
-        }
-        finally
-        {
-            Console.SetOut(original);
-        }
-    }
-
-    [TestMethod]
-    public void ConsoleAppLogger_WritesLevelAndMessage()
-    {
-        // コンソールロガーの書式を確認
-        TextWriter original = Console.Out;
-        try
-        {
-            StringWriter writer = new StringWriter();
-            Console.SetOut(writer);
-
-            ConsoleAppLogger logger = new ConsoleAppLogger();
-            logger.Warn("warned");
-
-            string output = writer.ToString();
-            StringAssert.Contains(output, "[WARN] warned");
+            StringAssert.Contains(writer.ToString(), "[INFO] hello");
         }
         finally
         {

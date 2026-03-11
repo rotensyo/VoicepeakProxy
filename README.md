@@ -75,10 +75,9 @@ dotnet build
 - `VoicepeakRuntime.Start(AppConfig config, IAppLogger logger = null)`
   - 常駐ランタイムを起動します
   - 設定検証と起動時バリデーションを行い、成功時に `VoicepeakRuntime` を返します
-- `VoicepeakRuntime.Enqueue(SpeakRequest request, RequestValidationMode? validationOverride = null)`
+- `VoicepeakRuntime.Enqueue(SpeakRequest request)`
   - 発話要求を待機キューへ受理します
   - 実行は非同期で行われ、戻り値は受理結果 (`EnqueueResult`) です
-  - `validationOverride` を指定すると、その要求だけ入力検証モードを上書きできます
 - `VoicepeakRuntime.Stop()`
   - 新規受理を停止し、ランタイム停止処理を開始します
   - `Stop()` 後の `Enqueue(...)` は `InvalidOperationException` を投げます
@@ -96,23 +95,14 @@ dotnet build
 
 ### 4.2 単発実行 API
 
-- `VoicepeakOneShot.SpeakOnce(AppConfig config, SpeakOnceRequest request, IAppLogger logger = null, RequestValidationMode? validationOverride = null)`
-- `VoicepeakOneShot.SpeakOnceNoValidation(AppConfig config, SpeakOnceRequest request, IAppLogger logger = null)`
+- `VoicepeakOneShot.SpeakOnce(AppConfig config, SpeakOnceRequest request, IAppLogger logger = null)`
 
 用途:
 
 - 常駐させず 1 回だけ実行したい場合
 - バッチ処理や外部スクリプトから単発呼び出ししたい場合
 
-単発 API の使い分け:
-
-- `SpeakOnce(...)`
-  - リクエスト入力の検証あり
-  - `validationOverride` を省略した場合は `config.Validation.RequestValidation` を使う
-  - `Strict` / `Lenient` / `Disabled` を選べる
-- `SpeakOnceNoValidation(...)`
-  - リクエスト入力の検証を行わない
-  - 内部的には `SpeakOnce(..., RequestValidationMode.Disabled)` と同じ
+単発 API の入力検証は `config.Validation.RequestValidation` に従います。
 
 ここでいう `validation` は、`SpeakOnceRequest.Text` を `Job` に変換する際の入力検証です。  
 起動時バリデーション (`BootValidation`) や `AppConfig` 自体の設定検証とは別です。  
@@ -132,17 +122,17 @@ using var runtime = VoicepeakRuntime.Start(config);
 
 var result = runtime.Enqueue(new SpeakRequest
 {
-    text = "こんにちは。テストです。",
-    mode = "queue",
-    interrupt = false
+    Text = "こんにちは。テストです。",
+    Mode = EnqueueMode.Queue,
+    Interrupt = false
 });
 
-Console.WriteLine($"status={result.StatusCode} body={result.Body}");
+Console.WriteLine($"status={result.Status} jobId={result.JobId} error={result.ErrorMessage}");
 ```
 
 ### 5.2 単発実行
 
-入力検証を無効にしたい場合の最小例です。
+単発実行の最小例です。
 
 ```csharp
 using VoicepeakProxyCore;
@@ -154,26 +144,8 @@ var request = new SpeakOnceRequest
     Text = "単発読み上げです。"
 };
 
-SpeakOnceResult result = VoicepeakOneShot.SpeakOnceNoValidation(config, request);
-Console.WriteLine($"success={result.Success} reason={result.Reason} segments={result.SegmentsExecuted}");
-```
-
-入力検証ありで実行したい場合:
-
-```csharp
-using VoicepeakProxyCore;
-
-var config = new AppConfig();
-
-var request = new SpeakOnceRequest
-{
-    Text = "単発読み上げです。"
-};
-
-SpeakOnceResult result = VoicepeakOneShot.SpeakOnce(
-    config,
-    request,
-    validationOverride: RequestValidationMode.Strict);
+SpeakOnceResult result = VoicepeakOneShot.SpeakOnce(config, request);
+Console.WriteLine($"status={result.Status} ok={result.Succeeded} segments={result.SegmentsExecuted}");
 ```
 
 ---
@@ -184,19 +156,19 @@ SpeakOnceResult result = VoicepeakOneShot.SpeakOnce(
 
 `VoicepeakRuntime.Enqueue(...)` で使う型です。
 
-- `text: string`
+- `Text: string`
   - 発話テキスト
   - `[[pause:NNN]]` を埋め込み可能
-- `mode: string`
-  - `queue` / `next` / `flush`
-- `interrupt: bool`
+- `Mode: EnqueueMode`
+  - `Queue` / `Next` / `Flush`
+- `Interrupt: bool`
   - 実行中ジョブに対する割り込み要求
 
 `mode` の意味:
 
-- `queue`: 待機キュー末尾へ追加
-- `next`: 待機キュー先頭へ追加
-- `flush`: 待機キューを消して先頭へ追加
+- `Queue`: 待機キュー末尾へ追加
+- `Next`: 待機キュー先頭へ追加
+- `Flush`: 待機キューを消して先頭へ追加
 
 ### 6.2 単発実行用 `SpeakOnceRequest`
 
@@ -286,37 +258,39 @@ config.TextTransform.ReplaceRules.Add(new ReplaceRule
 
 常駐ランタイムの受理結果です。
 
-- `StatusCode`
-  - `202`: 受理
-  - `429`: キュー満杯
-  - `400`: 入力不正
-- `Body`
-  - JSON 文字列
+- `Status`
+  - `Accepted`: 受理
+  - `QueueFull`: キュー満杯
+  - `InvalidRequest`: 入力不正
+- `JobId`
+  - `Status` が `Accepted` の場合に設定
+- `ErrorMessage`
+  - `Status` が `QueueFull` / `InvalidRequest` の場合に設定
 
 補足:
 
-- この型は HTTP 由来の形を残しています
-- DLL 利用時でも `Body` は JSON 文字列で返ります
+- 戻り値はDLL向けの型付き結果です
 
 ### 8.2 `SpeakOnceResult`
 
 単発実行の結果です。
 
-- `Success: bool`
-- `Reason: string`
+- `Status: SpeakOnceStatus`
+- `Succeeded: bool`
 - `SegmentsExecuted: int`
+- `ErrorMessage: string`
 
-代表的な `Reason`:
+代表的な `Status`:
 
-- `completed`
-- `invalid_request:...`
-- `process_not_found`
-- `multiple_processes`
-- `target_not_found`
-- `prepare_failed`
-- `start_confirm_failed`
-- `max_speaking_duration`
-- `process_lost`
+- `Completed`
+- `InvalidRequest`
+- `ProcessNotFound`
+- `MultipleProcesses`
+- `TargetNotFound`
+- `PrepareFailed`
+- `StartConfirmTimeout`
+- `MaxSpeakingDurationExceeded`
+- `ProcessLost`
 
 ---
 
@@ -483,9 +457,7 @@ var config = new AppConfig
 
 使い分け:
 
-- 常駐ランタイムでは `Enqueue(..., validationOverride)` で 1 リクエスト単位の上書きが可能です
-- 単発実行では `SpeakOnce(...)` の `validationOverride` で上書き可能です
-- `SpeakOnceNoValidation(...)` は `RequestValidationMode.Disabled` 固定です
+- 常駐ランタイムと単発実行の入力検証は `config.Validation.RequestValidation` を使用します
 
 ---
 
@@ -578,7 +550,7 @@ public interface IAppLogger
 - `Audio.PollIntervalMs`
 - VOICEPEAK 側で実際に音声セッションが継続していないか
 
-### `queue_full (429)`
+### `QueueFull`
 
 原因:
 
@@ -603,9 +575,8 @@ public interface IAppLogger
 
 ## 15. 制約と今後の注意点
 
-- 常駐ランタイムの戻り値はまだ HTTP 由来の `EnqueueResult` 形式です
+- 常駐ランタイムの戻り値は `EnqueueResult` の型付き結果です
 - 発話完了待機 API は未実装です
 - 設定の YAML 書き出し API は未提供です
 - UI 依存実装のため、VOICEPEAK 側変更に弱いです
-- `SpeakRequest` は旧 HTTP 設計の名残で lower-case プロパティです
-
+- `SpeakRequest` は `Text` / `Mode` / `Interrupt` を使用します

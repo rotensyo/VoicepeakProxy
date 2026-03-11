@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Threading;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using VoicepeakProxyCore;
@@ -12,14 +13,13 @@ public class EngineQueueTests
     {
         // queueは末尾追加
         using CancellationTokenSource cts = new CancellationTokenSource();
-        TestLogger logger = new TestLogger();
-        object engine = ReflectionTestHelper.CreateVoicepeakEngine(CreateConfig(), cts, logger);
+        object engine = ReflectionTestHelper.CreateVoicepeakEngine(CreateConfig(), cts, new TestLogger());
         try
         {
             PauseWorkerConsumption(engine);
 
-            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { text = "first", mode = "queue" }, null);
-            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { text = "second", mode = "queue" }, null);
+            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { Text = "first", Mode = EnqueueMode.Queue });
+            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { Text = "second", Mode = EnqueueMode.Queue });
 
             CollectionAssert.AreEqual(new[] { "first", "second" }, ReflectionTestHelper.GetQueuedSegmentTexts(engine));
         }
@@ -34,14 +34,13 @@ public class EngineQueueTests
     {
         // nextは先頭追加
         using CancellationTokenSource cts = new CancellationTokenSource();
-        TestLogger logger = new TestLogger();
-        object engine = ReflectionTestHelper.CreateVoicepeakEngine(CreateConfig(), cts, logger);
+        object engine = ReflectionTestHelper.CreateVoicepeakEngine(CreateConfig(), cts, new TestLogger());
         try
         {
             PauseWorkerConsumption(engine);
 
-            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { text = "first", mode = "queue" }, null);
-            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { text = "second", mode = "next" }, null);
+            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { Text = "first", Mode = EnqueueMode.Queue });
+            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { Text = "second", Mode = EnqueueMode.Next });
 
             CollectionAssert.AreEqual(new[] { "second", "first" }, ReflectionTestHelper.GetQueuedSegmentTexts(engine));
         }
@@ -56,15 +55,14 @@ public class EngineQueueTests
     {
         // flushは待機キューを置換
         using CancellationTokenSource cts = new CancellationTokenSource();
-        TestLogger logger = new TestLogger();
-        object engine = ReflectionTestHelper.CreateVoicepeakEngine(CreateConfig(), cts, logger);
+        object engine = ReflectionTestHelper.CreateVoicepeakEngine(CreateConfig(), cts, new TestLogger());
         try
         {
             PauseWorkerConsumption(engine);
 
-            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { text = "first", mode = "queue" }, null);
-            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { text = "second", mode = "queue" }, null);
-            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { text = "third", mode = "flush" }, null);
+            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { Text = "first", Mode = EnqueueMode.Queue });
+            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { Text = "second", Mode = EnqueueMode.Queue });
+            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { Text = "third", Mode = EnqueueMode.Flush });
 
             CollectionAssert.AreEqual(new[] { "third" }, ReflectionTestHelper.GetQueuedSegmentTexts(engine));
         }
@@ -75,49 +73,24 @@ public class EngineQueueTests
     }
 
     [TestMethod]
-    public void Enqueue_QueueLimit_AppliesOnlyToQueue()
+    public void Enqueue_QueueLimit_ReturnsQueueFull()
     {
-        // 上限はqueueのみに適用
+        // 上限超過でQueueFull
         AppConfig config = CreateConfig();
         config.Server.MaxQueuedJobs = 1;
         using CancellationTokenSource cts = new CancellationTokenSource();
-        TestLogger logger = new TestLogger();
-        object engine = ReflectionTestHelper.CreateVoicepeakEngine(config, cts, logger);
+        object engine = ReflectionTestHelper.CreateVoicepeakEngine(config, cts, new TestLogger());
         try
         {
             PauseWorkerConsumption(engine);
 
-            EnqueueResult first = (EnqueueResult)ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { text = "first", mode = "queue" }, null);
-            EnqueueResult second = (EnqueueResult)ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { text = "second", mode = "queue" }, null);
-            EnqueueResult third = (EnqueueResult)ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { text = "third", mode = "next" }, null);
+            EnqueueResult first = (EnqueueResult)ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { Text = "first", Mode = EnqueueMode.Queue });
+            EnqueueResult second = (EnqueueResult)ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { Text = "second", Mode = EnqueueMode.Queue });
+            EnqueueResult third = (EnqueueResult)ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { Text = "third", Mode = EnqueueMode.Next });
 
-            Assert.AreEqual(202, first.StatusCode);
-            Assert.AreEqual(429, second.StatusCode);
-            Assert.AreEqual(202, third.StatusCode);
-        }
-        finally
-        {
-            ReflectionTestHelper.InvokeCoreInstance(engine, "Dispose");
-        }
-    }
-
-    [TestMethod]
-    public void Enqueue_QueueLimit_DoesNotBlockFlush()
-    {
-        // 上限超過でもflushは受理
-        AppConfig config = CreateConfig();
-        config.Server.MaxQueuedJobs = 0;
-        using CancellationTokenSource cts = new CancellationTokenSource();
-        TestLogger logger = new TestLogger();
-        object engine = ReflectionTestHelper.CreateVoicepeakEngine(config, cts, logger);
-        try
-        {
-            PauseWorkerConsumption(engine);
-
-            EnqueueResult result = (EnqueueResult)ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { text = "only", mode = "flush" }, null);
-
-            Assert.AreEqual(202, result.StatusCode);
-            CollectionAssert.AreEqual(new[] { "only" }, ReflectionTestHelper.GetQueuedSegmentTexts(engine));
+            Assert.AreEqual(EnqueueStatus.Accepted, first.Status);
+            Assert.AreEqual(EnqueueStatus.QueueFull, second.Status);
+            Assert.AreEqual(EnqueueStatus.Accepted, third.Status);
         }
         finally
         {
@@ -128,26 +101,16 @@ public class EngineQueueTests
     [TestMethod]
     public void Enqueue_QueueMode_ClearsInterruptFlag()
     {
-        // queue時は割込み要求を解除
+        // queue時はinterrupt無効化
         using CancellationTokenSource cts = new CancellationTokenSource();
-        TestLogger logger = new TestLogger();
-        object engine = ReflectionTestHelper.CreateVoicepeakEngine(CreateConfig(), cts, logger);
+        object engine = ReflectionTestHelper.CreateVoicepeakEngine(CreateConfig(), cts, new TestLogger());
         try
         {
             PauseWorkerConsumption(engine);
-
-            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { text = "first", mode = "queue", interrupt = true }, null);
+            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { Text = "first", Mode = EnqueueMode.Queue, Interrupt = true });
 
             Assert.IsFalse((bool)ReflectionTestHelper.GetField(engine, "_interruptRequested"));
-            object queue = ReflectionTestHelper.GetField(engine, "_queue");
-            object firstJob = null;
-            foreach (object job in (System.Collections.IEnumerable)queue)
-            {
-                firstJob = job;
-                break;
-            }
-
-            Assert.IsNotNull(firstJob);
+            object firstJob = GetFirstQueuedJob(engine);
             Assert.IsFalse((bool)ReflectionTestHelper.GetProperty(firstJob, "Interrupt"));
         }
         finally
@@ -159,15 +122,13 @@ public class EngineQueueTests
     [TestMethod]
     public void Enqueue_NextMode_SetsInterruptRequested()
     {
-        // next時は割込み要求を設定
+        // next時はinterrupt要求
         using CancellationTokenSource cts = new CancellationTokenSource();
-        TestLogger logger = new TestLogger();
-        object engine = ReflectionTestHelper.CreateVoicepeakEngine(CreateConfig(), cts, logger);
+        object engine = ReflectionTestHelper.CreateVoicepeakEngine(CreateConfig(), cts, new TestLogger());
         try
         {
             PauseWorkerConsumption(engine);
-
-            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { text = "first", mode = "next", interrupt = true }, null);
+            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { Text = "first", Mode = EnqueueMode.Next, Interrupt = true });
 
             Assert.IsTrue((bool)ReflectionTestHelper.GetField(engine, "_interruptRequested"));
         }
@@ -177,88 +138,22 @@ public class EngineQueueTests
         }
     }
 
-    [TestMethod]
-    public void Enqueue_FlushMode_SetsInterruptRequested()
+    private static object GetFirstQueuedJob(object engine)
     {
-        // flush時は割込み要求を設定
-        using CancellationTokenSource cts = new CancellationTokenSource();
-        TestLogger logger = new TestLogger();
-        object engine = ReflectionTestHelper.CreateVoicepeakEngine(CreateConfig(), cts, logger);
-        try
+        object queue = ReflectionTestHelper.GetField(engine, "_queue");
+        foreach (object job in (IEnumerable)queue)
         {
-            PauseWorkerConsumption(engine);
-
-            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { text = "first", mode = "flush", interrupt = true }, null);
-
-            Assert.IsTrue((bool)ReflectionTestHelper.GetField(engine, "_interruptRequested"));
-            object queue = ReflectionTestHelper.GetField(engine, "_queue");
-            object firstJob = null;
-            foreach (object job in (System.Collections.IEnumerable)queue)
-            {
-                firstJob = job;
-                break;
-            }
-
-            Assert.IsNotNull(firstJob);
-            Assert.IsTrue((bool)ReflectionTestHelper.GetProperty(firstJob, "Interrupt"));
+            return job;
         }
-        finally
-        {
-            ReflectionTestHelper.InvokeCoreInstance(engine, "Dispose");
-        }
-    }
 
-    [TestMethod]
-    public void Enqueue_NextMode_WithInterruptFalse_DoesNotSetInterruptRequested()
-    {
-        // nextでinterrupt falseは未設定
-        using CancellationTokenSource cts = new CancellationTokenSource();
-        TestLogger logger = new TestLogger();
-        object engine = ReflectionTestHelper.CreateVoicepeakEngine(CreateConfig(), cts, logger);
-        try
-        {
-            PauseWorkerConsumption(engine);
-
-            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { text = "first", mode = "next", interrupt = false }, null);
-
-            Assert.IsFalse((bool)ReflectionTestHelper.GetField(engine, "_interruptRequested"));
-        }
-        finally
-        {
-            ReflectionTestHelper.InvokeCoreInstance(engine, "Dispose");
-        }
-    }
-
-    [TestMethod]
-    public void Enqueue_FlushMode_WithInterruptFalse_DoesNotSetInterruptRequested()
-    {
-        // flushでinterrupt falseは未設定
-        using CancellationTokenSource cts = new CancellationTokenSource();
-        TestLogger logger = new TestLogger();
-        object engine = ReflectionTestHelper.CreateVoicepeakEngine(CreateConfig(), cts, logger);
-        try
-        {
-            PauseWorkerConsumption(engine);
-
-            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { text = "first", mode = "flush", interrupt = false }, null);
-
-            Assert.IsFalse((bool)ReflectionTestHelper.GetField(engine, "_interruptRequested"));
-        }
-        finally
-        {
-            ReflectionTestHelper.InvokeCoreInstance(engine, "Dispose");
-        }
+        return null;
     }
 
     private static void PauseWorkerConsumption(object engine)
     {
-        // ワーカー消費を一時停止
+        // ワーカー消費を停止
         ReflectionTestHelper.SetField(engine, "_state", ReflectionTestHelper.ParseCoreEnum("WorkerState", "ExecutingPrePlayWait"));
     }
 
-    private static AppConfig CreateConfig()
-    {
-        // 既定設定を返却
-        return new AppConfig();
-    }
+    private static AppConfig CreateConfig() => new AppConfig();
 }

@@ -74,7 +74,7 @@ public sealed class VoicepeakRuntime : IDisposable
     }
 
     // 発話要求をキューへ受理
-    public EnqueueResult Enqueue(SpeakRequest request, RequestValidationMode? validationOverride = null)
+    public EnqueueResult Enqueue(SpeakRequest request)
     {
         ThrowIfDisposed();
         if (Volatile.Read(ref _accepting) == 0)
@@ -82,7 +82,7 @@ public sealed class VoicepeakRuntime : IDisposable
             throw new InvalidOperationException("Runtime is stopping and cannot accept new requests.");
         }
 
-        return _engine.Enqueue(request, validationOverride);
+        return _engine.Enqueue(request);
     }
 
     // 新規受理を停止して終了処理へ遷移
