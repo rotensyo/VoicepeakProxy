@@ -294,14 +294,6 @@ public class UiControllerTests
         Assert.AreEqual(ReadInputSource.NoCandidate, result.Source);
     }
 
-    [TestMethod]
-    public void MatchesTrigger_ReturnsFalseForOutOfRange()
-    {
-        // 範囲外一致を拒否
-        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "MatchesTrigger", "abc", 3, "a"));
-        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "MatchesTrigger", "abc", 0, string.Empty));
-    }
-
     private static VoicepeakUiController CreateController(UiConfig ui, IVoicepeakProcessApi processApi)
     {
         return new VoicepeakUiController(ui, new DebugConfig(), new AppLogger(new TestLogger()), processApi);

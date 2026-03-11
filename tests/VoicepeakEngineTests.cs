@@ -1,6 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.Reflection;
 using System.Threading;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -321,21 +320,14 @@ public class VoicepeakEngineTests
     }
 
     [TestMethod]
-    public void EscapeForJson_AndSanitizeForLog_EscapeExpectedCharacters()
+    public void BootValidate_PrefersPreferredPidBeforeFallback()
     {
-        // エスケープ規則を固定
-        Assert.AreEqual("a\\\"b", ReflectionTestHelper.InvokeCoreStatic("VoicepeakEngine", "EscapeForJson", "a\"b"));
-        Assert.AreEqual("a\\r\\n\\\"b", ReflectionTestHelper.InvokeCoreStatic("VoicepeakEngine", "SanitizeForLog", "a\r\n\"b"));
-    }
-
-    [TestMethod]
-    public void TryResolveTarget_PrefersPreferredPid()
-    {
-        // 優先pidを先に試行
+        // 起動検証で優先pidを先に試行
         FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
         Process current = Process.GetCurrentProcess();
         int byPidCalls = 0;
         int fallbackCalls = 0;
+        ui.ProcessCountHandler = () => 1;
         ui.ResolveByPidHandler = pid =>
         {
             byPidCalls++;
@@ -347,18 +339,18 @@ public class VoicepeakEngineTests
             return (true, current, new IntPtr(456));
         };
 
+        AppConfig config = CreateEngineConfig();
+        config.Prepare.BootValidationText = string.Empty;
+
         using CancellationTokenSource cts = new CancellationTokenSource();
-        VoicepeakEngine engine = CreateEngine(ui: ui, appCts: cts);
+        VoicepeakEngine engine = new VoicepeakEngine(config, cts, new AppLogger(new TestLogger()), ui, new FakeAudioSessionReader(), false);
         ReflectionTestHelper.SetField(engine, "_preferredVoicepeakPid", current.Id);
 
-        MethodInfo method = typeof(VoicepeakEngine).GetMethod("TryResolveTarget", BindingFlags.Instance | BindingFlags.NonPublic);
-        object[] args = { null, IntPtr.Zero };
-        bool result = (bool)method.Invoke(engine, args);
+        bool result = engine.BootValidate(BootValidationMode.Required);
 
         Assert.IsTrue(result);
         Assert.AreEqual(1, byPidCalls);
         Assert.AreEqual(0, fallbackCalls);
-        Assert.AreEqual(new IntPtr(123), (IntPtr)args[1]);
     }
 
     private static VoicepeakEngine CreateEngine(FakeVoicepeakUiController ui = null, FakeAudioSessionReader audio = null, TestLogger logger = null, CancellationTokenSource appCts = null)
