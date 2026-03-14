@@ -20,6 +20,9 @@ public class AppConfigValidationTests
         Assert.AreEqual(0, config.Audio.StartConfirmMaxRetries);
         Assert.AreEqual(300, config.Audio.StopConfirmMs);
         Assert.AreEqual("初期化完了", config.Prepare.BootValidationText);
+        Assert.IsTrue(config.Ui.CompositePrimeAtValidationEnabled);
+        Assert.IsFalse(config.Ui.CompositePrimeBeforeTextFocusWhenUnprimedEnabled);
+        Assert.IsFalse(config.Ui.CompositeRecoveryClickOnStartTimeoutRetryEnabled);
         CollectionAssert.AreEqual(new[] { "。", "！", "？", "!", "?" }, config.Ui.SentenceBreakTriggers);
         Assert.AreEqual(BootValidationMode.Required, config.Validation.BootValidation);
         Assert.AreEqual(RequestValidationMode.Strict, config.Validation.RequestValidation);
@@ -80,6 +83,13 @@ public class AppConfigValidationTests
             ValidateWith(config => config.Ui.MoveToStartShortcut = "Delete"));
 
         StringAssert.Contains(ex.Message, "ui.moveToStartShortcut");
+    }
+
+    [TestMethod]
+    public void Validate_CtrlUpMoveToStartShortcut_IsAllowed()
+    {
+        // Ctrl+Upを許可
+        ValidateWith(config => config.Ui.MoveToStartShortcut = "Ctrl+Up");
     }
 
     [TestMethod]

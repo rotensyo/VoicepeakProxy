@@ -44,6 +44,8 @@ public class VoicepeakOneShotCoreTests
         Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
         Assert.IsTrue(result.Succeeded);
         Assert.AreEqual(1, result.SegmentsExecuted);
+        Assert.IsTrue(ui.CallLog.IndexOf("prepare_playback") >= 0);
+        Assert.IsTrue(ui.CallLog.IndexOf("prepare_playback") < ui.CallLog.IndexOf("press_play"));
     }
 
     [TestMethod]
@@ -66,6 +68,53 @@ public class VoicepeakOneShotCoreTests
 
         Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
         Assert.AreEqual(2, ui.PressPlayCalls);
+    }
+
+    [TestMethod]
+    public void SpeakOnceCore_StartTimeoutRetry_CompositeRecoveryClick_CallsTryPrimeInputContextOnce()
+    {
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        FakeAudioSessionReader audio = new FakeAudioSessionReader();
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
+        ui.ShouldAttemptPrimeInputContextHandler = (_, _, reason) => reason == InputContextPrimeReason.StartTimeoutRetry;
+        AppConfig config = CreateConfig();
+        config.Ui.MoveToStartShortcut = "Ctrl+Up";
+        config.Ui.CompositeRecoveryClickOnStartTimeoutRetryEnabled = true;
+        config.Audio.StartConfirmWindowMs = 1;
+        config.Audio.StartConfirmMaxRetries = 2;
+        config.Audio.StopConfirmMs = 1;
+
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), RequestValidationMode.Strict, ui, audio);
+
+        Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
+        CollectionAssert.AreEqual(new[] { InputContextPrimeReason.StartTimeoutRetry }, ui.PrimeReasons);
+    }
+
+    [TestMethod]
+    public void SpeakOnceCore_IgnoresCompositePrimeBeforeTextFocusSetting()
+    {
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        FakeAudioSessionReader audio = new FakeAudioSessionReader();
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
+        AppConfig config = CreateConfig();
+        config.Ui.MoveToStartShortcut = "Ctrl+Up";
+        config.Ui.CompositePrimeBeforeTextFocusWhenUnprimedEnabled = true;
+
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), RequestValidationMode.Strict, ui, audio);
+
+        Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
+        CollectionAssert.AreEqual(new[] { false }, ui.PrepareForTextInputCompositePrimeFlags);
+        Assert.AreEqual(0, ui.TryPrimeInputContextCalls);
     }
 
     private static AppConfig CreateConfig()

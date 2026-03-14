@@ -43,6 +43,79 @@ public class UiControllerTests
     }
 
     [TestMethod]
+    public void IsValidMoveToStartShortcut_AcceptsCtrlUp()
+    {
+        // 先頭移動専用でCtrl+Upを許可
+        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsValidMoveToStartShortcut", "Ctrl+Up"));
+        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsValidMoveToStartShortcut", "Alt+Up"));
+    }
+
+    [TestMethod]
+    public void IsCompositeMoveToStartShortcut_ReturnsExpectedValues()
+    {
+        // 複合先頭移動だけを識別
+        Assert.IsTrue(VoicepeakUiController.IsCompositeMoveToStartShortcut("Ctrl+Up"));
+        Assert.IsFalse(VoicepeakUiController.IsCompositeMoveToStartShortcut("Home"));
+    }
+
+    [TestMethod]
+    public void ShouldAttemptPrimeInputContext_NonCompositeShortcut_ReturnsFalse()
+    {
+        // 単一ショートカットではprimeしない
+        VoicepeakUiController controller = CreateController(new UiConfig { MoveToStartShortcut = "Home" }, new FakeVoicepeakProcessApi());
+        Process process = Process.GetCurrentProcess();
+        IntPtr hwnd = new IntPtr(123);
+
+        Assert.IsFalse(controller.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.Validation));
+        Assert.IsFalse(controller.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.BeforeTextFocusWhenUnprimed));
+        Assert.IsFalse(controller.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.StartTimeoutRetry));
+    }
+
+    [TestMethod]
+    public void ShouldAttemptPrimeInputContext_BeforeTextFocus_UsesFlagAndPrimeState()
+    {
+        // 未prime時だけ入力前primeを許可
+        UiConfig ui = new UiConfig
+        {
+            MoveToStartShortcut = "Ctrl+Up",
+            CompositePrimeBeforeTextFocusWhenUnprimedEnabled = true
+        };
+        VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
+        Process process = Process.GetCurrentProcess();
+        IntPtr hwnd = new IntPtr(123);
+
+        Assert.IsTrue(controller.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.BeforeTextFocusWhenUnprimed));
+
+        ReflectionTestHelper.SetField(controller, "_primedProcessId", process.Id);
+        ReflectionTestHelper.SetField(controller, "_primedMainHwnd", hwnd);
+
+        Assert.IsFalse(controller.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.BeforeTextFocusWhenUnprimed));
+    }
+
+    [TestMethod]
+    public void ShouldAttemptPrimeInputContext_StartTimeoutRetry_UsesDedicatedFlag()
+    {
+        // 再試行時修正クリックは専用フラグで制御
+        UiConfig disabled = new UiConfig
+        {
+            MoveToStartShortcut = "Ctrl+Up",
+            CompositeRecoveryClickOnStartTimeoutRetryEnabled = false
+        };
+        UiConfig enabled = new UiConfig
+        {
+            MoveToStartShortcut = "Ctrl+Up",
+            CompositeRecoveryClickOnStartTimeoutRetryEnabled = true
+        };
+        Process process = Process.GetCurrentProcess();
+        IntPtr hwnd = new IntPtr(123);
+
+        Assert.IsFalse(CreateController(disabled, new FakeVoicepeakProcessApi())
+            .ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.StartTimeoutRetry));
+        Assert.IsTrue(CreateController(enabled, new FakeVoicepeakProcessApi())
+            .ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.StartTimeoutRetry));
+    }
+
+    [TestMethod]
     public void IsExcludedControlType_AndName_WorkAsSpecified()
     {
         // 除外対象の型と名称を確認

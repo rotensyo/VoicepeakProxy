@@ -1,0 +1,12 @@
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "dotnet-test-explorer.testProjectPath": "tests/manual/VoicepeakProxyCore.ManualTests.csproj",
+    "dotnet-test-explorer.useNetCore": true,
+    "dotnet.testWindow.useTestingPlatformProtocol": false
+  }
+}

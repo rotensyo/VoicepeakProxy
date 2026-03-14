@@ -21,7 +21,13 @@ dotnet build
 ## テスト
 
 ```powershell
-dotnet test tests/VoicepeakProxyCore.Tests.csproj
+dotnet test tests/auto/VoicepeakProxyCore.Tests.csproj
+```
+
+手動テストは別プロジェクトです。
+
+```powershell
+dotnet test tests/manual/VoicepeakProxyCore.ManualTests.csproj
 ```
 
 ## 主な依存関係

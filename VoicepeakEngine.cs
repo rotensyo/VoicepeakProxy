@@ -90,6 +90,11 @@ internal sealed class VoicepeakEngine : IDisposable
             return mode == BootValidationMode.Optional;
         }
 
+        if (_ui.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.Validation))
+        {
+            _ui.TryPrimeInputContext(process, hwnd, InputContextPrimeReason.Validation);
+        }
+
         string target = _config.Prepare.BootValidationText ?? string.Empty;
         InputValidateResult bootValidate = InputValidateResult.Fail("unknown", "unknown", string.Empty);
         bool bootInputOk = false;
@@ -131,9 +136,10 @@ internal sealed class VoicepeakEngine : IDisposable
             return true;
         }
 
+        bool recoveryClickUsed = false;
         for (int startAttempt = 0; startAttempt <= _config.Audio.StartConfirmMaxRetries; startAttempt++)
         {
-            if (!_ui.MoveToStart(hwnd, _config.Prepare.ActionDelayMs))
+            if (!_ui.PrepareForPlayback(process, hwnd, _config.Prepare.ActionDelayMs))
             {
                 _log.Error("起動時動作チェック失敗: 先頭移動ショートカットの実行に失敗しました。");
                 return mode == BootValidationMode.Optional;
@@ -174,6 +180,13 @@ internal sealed class VoicepeakEngine : IDisposable
                         bool hasNextAttempt = startAttempt < _config.Audio.StartConfirmMaxRetries;
                         if (hasNextAttempt)
                         {
+                            if (!recoveryClickUsed
+                                && _ui.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.StartTimeoutRetry))
+                            {
+                                _ui.TryPrimeInputContext(process, hwnd, InputContextPrimeReason.StartTimeoutRetry);
+                                recoveryClickUsed = true;
+                            }
+
                             _log.Warn($"boot_start_confirm_retry attempt={startAttempt + 1}");
                             break;
                         }
@@ -203,7 +216,7 @@ internal sealed class VoicepeakEngine : IDisposable
                         }
                         else if ((now - belowSince) >= _config.Audio.StopConfirmMs)
                         {
-                            _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
+                            _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true);
                             _log.Info("boot_validation_ok");
                             return true;
                         }
@@ -345,6 +358,7 @@ internal sealed class VoicepeakEngine : IDisposable
         {
             Segment seg = job.Segments[i];
             bool isLast = i == job.Segments.Count - 1;
+            bool recoveryClickUsed = false;
             _log.Info($"segment_start jobId={job.JobId} index={i}");
 
             lock (_gate)
@@ -353,13 +367,13 @@ internal sealed class VoicepeakEngine : IDisposable
             }
 
             long segmentStartAt = MonoClock.NowMs();
-            bool prepared = JobExecutionCore.PrepareSegment(_config, _ui, process, hwnd, seg.Text, _log);
+            bool prepared = JobExecutionCore.PrepareSegment(_config, _ui, process, hwnd, seg.Text, _log, true);
             long readyAt = MonoClock.NowMs();
 
             if (!prepared)
             {
                 DropJob(job, "prepare_failed");
-                _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
+                _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true);
                 return;
             }
 
@@ -367,7 +381,7 @@ internal sealed class VoicepeakEngine : IDisposable
             {
                 _log.Info("interrupt_applied state=ExecutingInputValidate");
                 DropJob(job, "interrupt");
-                _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
+                _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true);
                 return;
             }
 
@@ -385,7 +399,7 @@ internal sealed class VoicepeakEngine : IDisposable
                 ConsumeInterruptIfAny(log: false);
                 _log.Info("interrupt_applied state=ExecutingPrePlayWait");
                 DropJob(job, "interrupt");
-                _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
+                _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true);
                 return;
             }
 
@@ -398,17 +412,17 @@ internal sealed class VoicepeakEngine : IDisposable
 
             for (int startAttempt = 0; startAttempt <= _config.Audio.StartConfirmMaxRetries; startAttempt++)
             {
-                if (!_ui.MoveToStart(hwnd, _config.Prepare.ActionDelayMs))
+                if (!_ui.PrepareForPlayback(process, hwnd, _config.Prepare.ActionDelayMs))
                 {
                     DropJob(job, "move_to_start_failed");
-                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
+                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true);
                     return;
                 }
 
                 if (!_ui.PressPlay(hwnd))
                 {
                     DropJob(job, "play_failed");
-                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
+                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true);
                     return;
                 }
 
@@ -461,14 +475,14 @@ internal sealed class VoicepeakEngine : IDisposable
                 {
                     _log.Info("interrupt_applied state=Speaking");
                     DropJob(job, "interrupt");
-                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
+                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true);
                     return;
                 }
 
                 if (speakResult.Kind == SpeakMonitorKind.StartTimeout)
                 {
-                    bool hasNextAttempt = startAttempt < _config.Audio.StartConfirmMaxRetries;
-                    if (hasNextAttempt)
+                    bool shouldRetry = JobExecutionCore.HandleStartTimeoutRetry(_config, _ui, process, hwnd, startAttempt, ref recoveryClickUsed);
+                    if (shouldRetry)
                     {
                         _log.Warn($"start_confirm_retry jobId={job.JobId} index={i} attempt={startAttempt + 1}");
                         continue;
@@ -476,7 +490,7 @@ internal sealed class VoicepeakEngine : IDisposable
 
                     _log.Error("monitor_timeout reason=start_confirm");
                     DropJob(job, "start_confirm_failed");
-                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
+                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true);
                     return;
                 }
 
@@ -484,7 +498,7 @@ internal sealed class VoicepeakEngine : IDisposable
                 {
                     _log.Error("monitor_timeout reason=max_duration");
                     DropJob(job, "max_speaking_duration");
-                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs);
+                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true);
                     return;
                 }
 
@@ -506,7 +520,12 @@ internal sealed class VoicepeakEngine : IDisposable
             return InputValidateResult.Fail("process_not_alive", "voicepeak_process_exited_or_unavailable", string.Empty);
         }
 
-        if (!_ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs))
+        if (!_ui.PrepareForTextInput(process, hwnd, _config.Prepare.ActionDelayMs, true))
+        {
+            return InputValidateResult.Fail("move_to_start_failed", "shortcut_not_applied_or_context_mismatch", string.Empty);
+        }
+
+        if (!_ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true))
         {
             return InputValidateResult.Fail("clear_input_failed", "move_to_start_or_delete_not_applied", string.Empty);
         }
@@ -526,7 +545,7 @@ internal sealed class VoicepeakEngine : IDisposable
 
         if (useProbeGuardChars)
         {
-            if (!_ui.MoveToStart(hwnd, _config.Prepare.ActionDelayMs))
+            if (!_ui.PrepareForTextInput(process, hwnd, _config.Prepare.ActionDelayMs, true))
             {
                 return InputValidateResult.Fail("move_to_start_failed", "shortcut_not_applied_or_context_mismatch", string.Empty);
             }

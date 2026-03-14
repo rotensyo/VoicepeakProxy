@@ -37,7 +37,7 @@ internal readonly struct SpeakMonitorResult
 internal static class JobExecutionCore
 {
     // セグメント入力準備を実行
-    public static bool PrepareSegment(AppConfig config, IVoicepeakUiController ui, Process process, IntPtr hwnd, string text, AppLogger log)
+    public static bool PrepareSegment(AppConfig config, IVoicepeakUiController ui, Process process, IntPtr hwnd, string text, AppLogger log, bool allowCompositePrimeBeforeTextFocusWhenUnprimed)
     {
         if (!ui.IsAlive(process))
         {
@@ -45,7 +45,13 @@ internal static class JobExecutionCore
             return false;
         }
 
-        if (!ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs))
+        if (!ui.PrepareForTextInput(process, hwnd, config.Prepare.ActionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed))
+        {
+            log.Warn("prepare_failed_detail reason=prepare_text_input_failed cause=shortcut_not_applied_or_context_mismatch");
+            return false;
+        }
+
+        if (!ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed))
         {
             log.Warn("prepare_failed_detail reason=clear_input_failed cause=move_to_start_or_delete_not_applied");
             return false;
@@ -154,6 +160,31 @@ internal static class JobExecutionCore
 
             Thread.Sleep(config.Audio.PollIntervalMs);
         }
+    }
+
+    // 開始確認失敗後の再試行可否を判定
+    public static bool HandleStartTimeoutRetry(
+        AppConfig config,
+        IVoicepeakUiController ui,
+        Process process,
+        IntPtr hwnd,
+        int startAttempt,
+        ref bool recoveryClickUsed)
+    {
+        bool hasNextAttempt = startAttempt < config.Audio.StartConfirmMaxRetries;
+        if (!hasNextAttempt)
+        {
+            return false;
+        }
+
+        if (!recoveryClickUsed
+            && ui.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.StartTimeoutRetry))
+        {
+            ui.TryPrimeInputContext(process, hwnd, InputContextPrimeReason.StartTimeoutRetry);
+            recoveryClickUsed = true;
+        }
+
+        return true;
     }
 
     // 入力後待機時間を算出

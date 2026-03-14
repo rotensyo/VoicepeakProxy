@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -67,6 +68,29 @@ public class VoicepeakEngineTests
     }
 
     [TestMethod]
+    public void BootValidate_UsesPrepareForPlaybackBeforePlay()
+    {
+        // 再生前準備を経由
+        FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
+        FakeAudioSessionReader audio = new FakeAudioSessionReader();
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
+        AppConfig config = CreateEngineConfig();
+        config.Audio.StopConfirmMs = 2;
+
+        using CancellationTokenSource cts = new CancellationTokenSource();
+        VoicepeakEngine engine = new VoicepeakEngine(config, cts, new AppLogger(new TestLogger()), ui, audio, false);
+
+        bool result = engine.BootValidate(BootValidationMode.Required);
+
+        Assert.IsTrue(result);
+        Assert.IsTrue(ui.CallLog.IndexOf("prepare_playback") >= 0);
+        Assert.IsTrue(ui.CallLog.IndexOf("prepare_playback") < ui.CallLog.IndexOf("press_play"));
+    }
+
+    [TestMethod]
     public void BootValidate_PressPlayFailure_ReturnsFalse()
     {
         // 再生失敗で起動検証失敗
@@ -126,6 +150,76 @@ public class VoicepeakEngineTests
     }
 
     [TestMethod]
+    public void BootValidate_CompositeValidationPrime_CallsTryPrimeInputContext()
+    {
+        // 起動時primeを一度だけ実行
+        FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
+        ui.ReadInputHandler = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA);
+        ui.ShouldAttemptPrimeInputContextHandler = (_, _, reason) => reason == InputContextPrimeReason.Validation;
+        AppConfig config = CreateEngineConfig();
+        config.Ui.MoveToStartShortcut = "Ctrl+Up";
+        config.Prepare.BootValidationText = string.Empty;
+
+        using CancellationTokenSource cts = new CancellationTokenSource();
+        VoicepeakEngine engine = new VoicepeakEngine(config, cts, new AppLogger(new TestLogger()), ui, new FakeAudioSessionReader(), false);
+
+        bool result = engine.BootValidate(BootValidationMode.Required);
+
+        Assert.IsTrue(result);
+        Assert.AreEqual(1, ui.TryPrimeInputContextCalls);
+        CollectionAssert.AreEqual(new[] { InputContextPrimeReason.Validation }, ui.PrimeReasons);
+    }
+
+    [TestMethod]
+    public void BootValidate_SingleShortcut_DoesNotCallTryPrimeInputContext()
+    {
+        // 単一ショートカットではprimeしない
+        FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
+        ui.ReadInputHandler = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA);
+        AppConfig config = CreateEngineConfig();
+        config.Ui.MoveToStartShortcut = "Home";
+        config.Prepare.BootValidationText = string.Empty;
+
+        using CancellationTokenSource cts = new CancellationTokenSource();
+        VoicepeakEngine engine = new VoicepeakEngine(config, cts, new AppLogger(new TestLogger()), ui, new FakeAudioSessionReader(), false);
+
+        bool result = engine.BootValidate(BootValidationMode.Required);
+
+        Assert.IsTrue(result);
+        Assert.AreEqual(0, ui.TryPrimeInputContextCalls);
+    }
+
+    [TestMethod]
+    public void BootValidate_StartTimeoutRetry_CompositeRecoveryClick_CallsTryPrimeInputContext()
+    {
+        // start timeout再試行前だけ修正クリック
+        FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
+        FakeAudioSessionReader audio = new FakeAudioSessionReader();
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
+        ui.ShouldAttemptPrimeInputContextHandler = (_, _, reason) => reason == InputContextPrimeReason.StartTimeoutRetry;
+        AppConfig config = CreateEngineConfig();
+        config.Ui.MoveToStartShortcut = "Ctrl+Up";
+        config.Ui.CompositePrimeAtValidationEnabled = false;
+        config.Ui.CompositeRecoveryClickOnStartTimeoutRetryEnabled = true;
+        config.Audio.StartConfirmWindowMs = 1;
+        config.Audio.StartConfirmMaxRetries = 1;
+        config.Audio.StopConfirmMs = 1;
+
+        using CancellationTokenSource cts = new CancellationTokenSource();
+        VoicepeakEngine engine = new VoicepeakEngine(config, cts, new AppLogger(new TestLogger()), ui, audio, false);
+
+        bool result = engine.BootValidate(BootValidationMode.Required);
+
+        Assert.IsTrue(result);
+        CollectionAssert.AreEqual(new[] { InputContextPrimeReason.StartTimeoutRetry }, ui.PrimeReasons);
+    }
+
+    [TestMethod]
     public void BootValidate_DelayedStart_DoesNotCountTowardMaxDuration()
     {
         // 開始前待機は最大発話時間に含めない
@@ -142,7 +236,7 @@ public class VoicepeakEngineTests
         bool result = engine.BootValidate(BootValidationMode.Required);
 
         Assert.IsFalse(result);
-        Assert.AreEqual(2, ui.MoveToStartCalls);
+        Assert.AreEqual(1, ui.PrepareForPlaybackCalls);
     }
 
     [TestMethod]
@@ -220,7 +314,7 @@ public class VoicepeakEngineTests
     {
         // ガード除去失敗理由を固定
         AssertInputValidate(
-            RunInputValidateWithGuardStep(ui => ui.MoveToStartHandler = (_, _) => false),
+            RunInputValidateWithGuardStep(ui => ui.PrepareForTextInputHandler = (_, _, _, _) => false),
             false,
             "move_to_start_failed",
             "shortcut_not_applied_or_context_mismatch");
@@ -275,6 +369,23 @@ public class VoicepeakEngineTests
 
         AssertInputValidate(result, true, string.Empty, string.Empty);
         CollectionAssert.AreEqual(new[] { "Aabc" }, ui.TypedTexts);
+    }
+
+    [TestMethod]
+    public void RunInputValidate_UsesPrepareForTextInputBeforeClearAndGuardDelete()
+    {
+        // 入力欄準備を前後で実施
+        FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
+
+        using CancellationTokenSource cts = new CancellationTokenSource();
+        VoicepeakEngine engine = CreateEngine(ui: ui, appCts: cts);
+
+        object result = ReflectionTestHelper.InvokeCoreInstance(engine, "RunInputValidate", Process.GetCurrentProcess(), IntPtr.Zero, "abc", 0, true);
+
+        AssertInputValidate(result, true, string.Empty, string.Empty);
+        CollectionAssert.AreEqual(
+            new[] { "prepare_text", "clear_input", "type_text", "prepare_text", "press_delete" },
+            ui.CallLog.Take(5).ToArray());
     }
 
     [TestMethod]

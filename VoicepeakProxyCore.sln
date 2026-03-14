@@ -7,7 +7,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VoicepeakProxyCore", "Voice
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VoicepeakProxyCore.Tests", "tests\VoicepeakProxyCore.Tests.csproj", "{EBCD611C-5532-4CB9-AA6E-2EF787F4DAF8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VoicepeakProxyCore.Tests", "tests\auto\VoicepeakProxyCore.Tests.csproj", "{EBCD611C-5532-4CB9-AA6E-2EF787F4DAF8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

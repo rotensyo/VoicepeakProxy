@@ -57,6 +57,9 @@ public sealed class UiConfig
     public string MoveToStartShortcut { get; set; } = "F3";
     public string PlayShortcut { get; set; } = "Space";
     public int PlayPreShortcutDelayMs { get; set; } = 60;
+    public bool CompositePrimeAtValidationEnabled { get; set; } = true;
+    public bool CompositePrimeBeforeTextFocusWhenUnprimedEnabled { get; set; } = false;
+    public bool CompositeRecoveryClickOnStartTimeoutRetryEnabled { get; set; } = false;
     public bool SendEnterAfterSentenceBreak { get; set; } = false;
     public List<string> SentenceBreakTriggers { get; set; } = new List<string> { "。", "！", "？", "!", "?" };
 }
@@ -181,9 +184,9 @@ internal static class AppConfigValidator
             throw new InvalidOperationException("ui.playPreShortcutDelayMs は 0 以上で指定してください");
         }
 
-        if (!VoicepeakUiController.IsValidShortcut(config.Ui.MoveToStartShortcut))
+        if (!VoicepeakUiController.IsValidMoveToStartShortcut(config.Ui.MoveToStartShortcut))
         {
-            throw new InvalidOperationException("ui.moveToStartShortcut の形式が不正です（例: F3, Ctrl+F4, Space）");
+            throw new InvalidOperationException("ui.moveToStartShortcut の形式が不正です（例: F3, Home, Ctrl+Up）");
         }
 
         if (!VoicepeakUiController.IsValidShortcut(config.Ui.PlayShortcut))

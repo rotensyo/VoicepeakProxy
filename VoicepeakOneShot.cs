@@ -123,15 +123,16 @@ public static class VoicepeakOneShot
         {
             Segment seg = job.Segments[i];
             bool isLast = i == job.Segments.Count - 1;
+            bool recoveryClickUsed = false;
             log.Info($"segment_start jobId={job.JobId} index={i}");
 
             long segmentStartAt = MonoClock.NowMs();
-            bool prepared = JobExecutionCore.PrepareSegment(config, ui, process, hwnd, seg.Text, log);
+            bool prepared = JobExecutionCore.PrepareSegment(config, ui, process, hwnd, seg.Text, log, false);
             long readyAt = MonoClock.NowMs();
             if (!prepared)
             {
                 log.Warn($"job_dropped jobId={job.JobId} reason=prepare_failed");
-                ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs);
+                ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, false);
                 return new SpeakOnceResult { Status = SpeakOnceStatus.PrepareFailed, SegmentsExecuted = executed };
             }
 
@@ -149,17 +150,17 @@ public static class VoicepeakOneShot
 
             for (int startAttempt = 0; startAttempt <= config.Audio.StartConfirmMaxRetries; startAttempt++)
             {
-                if (!ui.MoveToStart(hwnd, config.Prepare.ActionDelayMs))
+                if (!ui.PrepareForPlayback(process, hwnd, config.Prepare.ActionDelayMs))
                 {
                     log.Warn($"job_dropped jobId={job.JobId} reason=move_to_start_failed");
-                    ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs);
+                    ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, false);
                     return new SpeakOnceResult { Status = SpeakOnceStatus.MoveToStartFailed, SegmentsExecuted = executed };
                 }
 
                 if (!ui.PressPlay(hwnd))
                 {
                     log.Warn($"job_dropped jobId={job.JobId} reason=play_failed");
-                    ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs);
+                    ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, false);
                     return new SpeakOnceResult { Status = SpeakOnceStatus.PlayFailed, SegmentsExecuted = executed };
                 }
 
@@ -193,8 +194,8 @@ public static class VoicepeakOneShot
 
                 if (speakResult.Kind == SpeakMonitorKind.StartTimeout)
                 {
-                    bool hasNextAttempt = startAttempt < config.Audio.StartConfirmMaxRetries;
-                    if (hasNextAttempt)
+                    bool shouldRetry = JobExecutionCore.HandleStartTimeoutRetry(config, ui, process, hwnd, startAttempt, ref recoveryClickUsed);
+                    if (shouldRetry)
                     {
                         log.Warn($"start_confirm_retry jobId={job.JobId} index={i} attempt={startAttempt + 1}");
                         continue;
@@ -202,7 +203,7 @@ public static class VoicepeakOneShot
 
                     log.Error("monitor_timeout reason=start_confirm");
                     log.Warn($"job_dropped jobId={job.JobId} reason=start_confirm_failed");
-                    ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs);
+                    ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, false);
                     return new SpeakOnceResult { Status = SpeakOnceStatus.StartConfirmTimeout, SegmentsExecuted = executed };
                 }
 
@@ -210,7 +211,7 @@ public static class VoicepeakOneShot
                 {
                     log.Error("monitor_timeout reason=max_duration");
                     log.Warn($"job_dropped jobId={job.JobId} reason=max_speaking_duration");
-                    ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs);
+                    ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, false);
                     return new SpeakOnceResult { Status = SpeakOnceStatus.MaxSpeakingDurationExceeded, SegmentsExecuted = executed };
                 }
 

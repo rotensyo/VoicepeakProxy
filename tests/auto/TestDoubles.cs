@@ -7,6 +7,10 @@ namespace VoicepeakProxyCore.Tests;
 internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
 {
     public Func<Process, bool> IsAliveHandler { get; set; } = _ => true;
+    public Func<Process, IntPtr, InputContextPrimeReason, bool> ShouldAttemptPrimeInputContextHandler { get; set; } = (_, _, _) => false;
+    public Func<Process, IntPtr, InputContextPrimeReason, bool> TryPrimeInputContextHandler { get; set; } = (_, _, _) => true;
+    public Func<Process, IntPtr, int, bool, bool> PrepareForTextInputHandler { get; set; } = (_, _, _, _) => true;
+    public Func<Process, IntPtr, int, bool> PrepareForPlaybackHandler { get; set; } = (_, _, _) => true;
     public Func<bool> ClearInputHandler { get; set; } = () => true;
     public Func<IntPtr, string, int, bool> TypeTextHandler { get; set; } = (_, _, _) => true;
     public Func<IntPtr, bool> PressPlayHandler { get; set; } = _ => true;
@@ -21,6 +25,12 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
     public Func<int> ProcessCountHandler { get; set; } = () => 0;
 
     public List<string> TypedTexts { get; } = new List<string>();
+    public List<string> CallLog { get; } = new List<string>();
+    public List<InputContextPrimeReason> PrimeReasons { get; } = new List<InputContextPrimeReason>();
+    public List<bool> PrepareForTextInputCompositePrimeFlags { get; } = new List<bool>();
+    public int TryPrimeInputContextCalls { get; private set; }
+    public int PrepareForTextInputCalls { get; private set; }
+    public int PrepareForPlaybackCalls { get; private set; }
     public int ClearInputCalls { get; private set; }
     public int PressPlayCalls { get; private set; }
     public int MoveToStartCalls { get; private set; }
@@ -46,33 +56,66 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
 
     public bool IsAlive(Process process) => IsAliveHandler(process);
 
-    public bool ClearInput(Process process, IntPtr mainHwnd, int actionDelayMs)
+    public bool ShouldAttemptPrimeInputContext(Process process, IntPtr mainHwnd, InputContextPrimeReason reason)
+    {
+        return ShouldAttemptPrimeInputContextHandler(process, mainHwnd, reason);
+    }
+
+    public bool TryPrimeInputContext(Process process, IntPtr mainHwnd, InputContextPrimeReason reason)
+    {
+        TryPrimeInputContextCalls++;
+        PrimeReasons.Add(reason);
+        CallLog.Add("prime_input_context");
+        return TryPrimeInputContextHandler(process, mainHwnd, reason);
+    }
+
+    public bool PrepareForTextInput(Process process, IntPtr mainHwnd, int actionDelayMs, bool allowCompositePrimeBeforeTextFocusWhenUnprimed)
+    {
+        PrepareForTextInputCalls++;
+        PrepareForTextInputCompositePrimeFlags.Add(allowCompositePrimeBeforeTextFocusWhenUnprimed);
+        CallLog.Add("prepare_text");
+        return PrepareForTextInputHandler(process, mainHwnd, actionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed);
+    }
+
+    public bool PrepareForPlayback(Process process, IntPtr mainHwnd, int actionDelayMs)
+    {
+        PrepareForPlaybackCalls++;
+        CallLog.Add("prepare_playback");
+        return PrepareForPlaybackHandler(process, mainHwnd, actionDelayMs);
+    }
+
+    public bool ClearInput(Process process, IntPtr mainHwnd, int actionDelayMs, bool allowCompositePrimeBeforeTextFocusWhenUnprimed)
     {
         ClearInputCalls++;
+        CallLog.Add("clear_input");
         return ClearInputHandler();
     }
 
     public bool TypeText(IntPtr mainHwnd, string text, int charDelayMs)
     {
         TypedTexts.Add(text ?? string.Empty);
+        CallLog.Add("type_text");
         return TypeTextHandler(mainHwnd, text, charDelayMs);
     }
 
     public bool PressPlay(IntPtr mainHwnd)
     {
         PressPlayCalls++;
+        CallLog.Add("press_play");
         return PressPlayHandler(mainHwnd);
     }
 
     public bool MoveToStart(IntPtr mainHwnd, int actionDelayMs)
     {
         MoveToStartCalls++;
+        CallLog.Add("move_to_start");
         return MoveToStartHandler(mainHwnd, actionDelayMs);
     }
 
     public bool PressDelete(IntPtr mainHwnd)
     {
         PressDeleteCalls++;
+        CallLog.Add("press_delete");
         return PressDeleteHandler(mainHwnd);
     }
 

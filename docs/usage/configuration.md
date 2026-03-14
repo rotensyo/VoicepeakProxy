@@ -56,12 +56,24 @@
 - `MoveToStartShortcut` (`default: "F3"`)
 - `PlayShortcut` (`default: "Space"`)
 - `PlayPreShortcutDelayMs` (`default: 60`)
+- `CompositePrimeAtValidationEnabled` (`default: true`)
+  - `MoveToStartShortcut = "Ctrl+Up"`時だけ使います
+  - 起動時バリデーションでprimeクリックを許可します
+- `CompositePrimeBeforeTextFocusWhenUnprimedEnabled` (`default: false`)
+  - `MoveToStartShortcut = "Ctrl+Up"`時だけ使います
+  - 未prime時に文字入力欄フォーカス直前のprimeクリックを許可します
+  - 常駐ループと起動時Validationで評価します
+  - `VoicepeakOneShot.SpeakOnce`では評価しません
+- `CompositeRecoveryClickOnStartTimeoutRetryEnabled` (`default: false`)
+  - `MoveToStartShortcut = "Ctrl+Up"`時だけ使います
+  - `StartTimeout`再試行前の修正クリックを1回だけ許可します
 - `SendEnterAfterSentenceBreak` (`default: false`)
 - `SentenceBreakTriggers` (`default: ["。", "！", "？", "!", "?"]`)
 
 重要です。
 
-- `MoveToStartShortcut`は`F1-F12`のいずれかに設定してください
+- `MoveToStartShortcut`は`F1-F12`または`Ctrl+Up`を設定してください
+- 上記3つの`Composite...`設定は`Ctrl+Up`時だけ評価されます
 - `SentenceBreakTriggers`は複数文字指定に対応し、最長一致を優先します
 
 ## `TextTransformConfig`
@@ -142,9 +154,12 @@ var config = new AppConfig
     },
     Ui = new UiConfig
     {
-        MoveToStartShortcut = "F3",
+        MoveToStartShortcut = "Ctrl+Up",
         PlayShortcut = "Space",
         PlayPreShortcutDelayMs = 60,
+        CompositePrimeAtValidationEnabled = true,
+        CompositePrimeBeforeTextFocusWhenUnprimedEnabled = false,
+        CompositeRecoveryClickOnStartTimeoutRetryEnabled = false,
         SendEnterAfterSentenceBreak = true,
         SentenceBreakTriggers = new System.Collections.Generic.List<string> { "。", "。、。" }
     }

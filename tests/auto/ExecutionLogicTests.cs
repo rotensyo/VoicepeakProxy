@@ -105,7 +105,7 @@ public class ExecutionLogicTests
         };
         TestLogger logger = new TestLogger();
 
-        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(logger));
+        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(logger), true);
 
         Assert.IsFalse(actual);
         Assert.IsTrue(logger.WarnMessages.Exists(m => m.Contains("process_not_alive")));
@@ -121,10 +121,22 @@ public class ExecutionLogicTests
         };
         TestLogger logger = new TestLogger();
 
-        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(logger));
+        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(logger), true);
 
         Assert.IsFalse(actual);
         Assert.IsTrue(logger.WarnMessages.Exists(m => m.Contains("clear_input_failed")));
+    }
+
+    [TestMethod]
+    public void PrepareSegment_UsesPrepareForTextInputBeforeClearAndType()
+    {
+        // 入力準備の順序を固定
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
+
+        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()), true);
+
+        Assert.IsTrue(actual);
+        CollectionAssert.AreEqual(new[] { "prepare_text", "clear_input", "type_text" }, ui.CallLog);
     }
 
     [TestMethod]
@@ -137,7 +149,7 @@ public class ExecutionLogicTests
         };
         TestLogger logger = new TestLogger();
 
-        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(logger));
+        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(logger), true);
 
         Assert.IsFalse(actual);
         Assert.IsTrue(logger.WarnMessages.Exists(m => m.Contains("type_text_failed")));
@@ -149,10 +161,91 @@ public class ExecutionLogicTests
         // 正規化後文字列を送信
         FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
 
-        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "  a\r\n b  ", new AppLogger(new TestLogger()));
+        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "  a\r\n b  ", new AppLogger(new TestLogger()), true);
 
         Assert.IsTrue(actual);
         CollectionAssert.AreEqual(new[] { "a b" }, ui.TypedTexts);
+    }
+
+    [TestMethod]
+    public void PrepareSegment_LoopContext_AllowsCompositePrimeBeforeTextFocus()
+    {
+        // ループ実行では入力前prime許可を渡す
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
+
+        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()), true);
+
+        Assert.IsTrue(actual);
+        CollectionAssert.AreEqual(new[] { true }, ui.PrepareForTextInputCompositePrimeFlags);
+    }
+
+    [TestMethod]
+    public void PrepareSegment_OneShotContext_DisablesCompositePrimeBeforeTextFocus()
+    {
+        // 単発実行では入力前primeを無効化
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
+
+        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()), false);
+
+        Assert.IsTrue(actual);
+        CollectionAssert.AreEqual(new[] { false }, ui.PrepareForTextInputCompositePrimeFlags);
+    }
+
+    [TestMethod]
+    public void HandleStartTimeoutRetry_RetryAvailableAndPrimeAllowed_PrimesOnceAndReturnsTrue()
+    {
+        // 再試行前の修正クリックを実行
+        AppConfig config = new AppConfig();
+        config.Audio.StartConfirmMaxRetries = 2;
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ShouldAttemptPrimeInputContextHandler = (_, _, reason) => reason == InputContextPrimeReason.StartTimeoutRetry
+        };
+        bool recoveryClickUsed = false;
+
+        bool actual = JobExecutionCore.HandleStartTimeoutRetry(config, ui, Process.GetCurrentProcess(), new IntPtr(123), 0, ref recoveryClickUsed);
+
+        Assert.IsTrue(actual);
+        Assert.IsTrue(recoveryClickUsed);
+        CollectionAssert.AreEqual(new[] { InputContextPrimeReason.StartTimeoutRetry }, ui.PrimeReasons);
+    }
+
+    [TestMethod]
+    public void HandleStartTimeoutRetry_RetryAvailableAfterFirstClick_SkipsSecondPrimeAndReturnsTrue()
+    {
+        // 修正クリックは一度だけ実行
+        AppConfig config = new AppConfig();
+        config.Audio.StartConfirmMaxRetries = 2;
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ShouldAttemptPrimeInputContextHandler = (_, _, reason) => reason == InputContextPrimeReason.StartTimeoutRetry
+        };
+        bool recoveryClickUsed = true;
+
+        bool actual = JobExecutionCore.HandleStartTimeoutRetry(config, ui, Process.GetCurrentProcess(), new IntPtr(123), 1, ref recoveryClickUsed);
+
+        Assert.IsTrue(actual);
+        Assert.IsTrue(recoveryClickUsed);
+        Assert.AreEqual(0, ui.TryPrimeInputContextCalls);
+    }
+
+    [TestMethod]
+    public void HandleStartTimeoutRetry_LastAttempt_ReturnsFalse()
+    {
+        // 最終試行では再試行しない
+        AppConfig config = new AppConfig();
+        config.Audio.StartConfirmMaxRetries = 1;
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ShouldAttemptPrimeInputContextHandler = (_, _, reason) => reason == InputContextPrimeReason.StartTimeoutRetry
+        };
+        bool recoveryClickUsed = false;
+
+        bool actual = JobExecutionCore.HandleStartTimeoutRetry(config, ui, Process.GetCurrentProcess(), new IntPtr(123), 1, ref recoveryClickUsed);
+
+        Assert.IsFalse(actual);
+        Assert.IsFalse(recoveryClickUsed);
+        Assert.AreEqual(0, ui.TryPrimeInputContextCalls);
     }
 
     [TestMethod]

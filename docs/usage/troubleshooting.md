@@ -47,6 +47,7 @@
 - `Audio.PeakThreshold`を見直してください
 - `Audio.StartConfirmWindowMs`を見直してください
 - 必要に応じて`Audio.StartConfirmMaxRetries`を増やしてください
+- `Ctrl+Up`使用時は`Ui.CompositeRecoveryClickOnStartTimeoutRetryEnabled`も検討してください
 
 ## `monitor_timeout reason=max_duration`
 
@@ -56,5 +57,7 @@
 
 ## ショートカット形式エラー
 
-- `F1-F12`, `Space`, `Home`, `End`と`Ctrl`/`Shift`/`Alt`の組み合わせを使用してください
+- `MoveToStartShortcut`は`F1-F12`または`Ctrl+Up`を使用してください
+- `Ctrl+Up`使用時のクリック注入は`Ui.Composite...`設定で明示制御します
+- それ以外のショートカットは`Space`, `Home`, `End`と`Ctrl`/`Shift`/`Alt`の組み合わせを使用してください
 - `Delete`や`Enter`は設定値としてサポートしていません

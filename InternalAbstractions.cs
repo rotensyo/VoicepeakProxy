@@ -3,6 +3,14 @@ using System.Diagnostics;
 
 namespace VoicepeakProxyCore;
 
+// クリック注入の契機を表す
+internal enum InputContextPrimeReason
+{
+    Validation,
+    BeforeTextFocusWhenUnprimed,
+    StartTimeoutRetry
+}
+
 // UI操作の依存を抽象化
 internal interface IVoicepeakUiController
 {
@@ -10,7 +18,11 @@ internal interface IVoicepeakUiController
     bool TryResolveTargetByPid(int pid, out Process process, out IntPtr mainHwnd);
     int GetVoicepeakProcessCount();
     bool IsAlive(Process process);
-    bool ClearInput(Process process, IntPtr mainHwnd, int actionDelayMs);
+    bool ShouldAttemptPrimeInputContext(Process process, IntPtr mainHwnd, InputContextPrimeReason reason);
+    bool TryPrimeInputContext(Process process, IntPtr mainHwnd, InputContextPrimeReason reason);
+    bool PrepareForTextInput(Process process, IntPtr mainHwnd, int actionDelayMs, bool allowCompositePrimeBeforeTextFocusWhenUnprimed);
+    bool PrepareForPlayback(Process process, IntPtr mainHwnd, int actionDelayMs);
+    bool ClearInput(Process process, IntPtr mainHwnd, int actionDelayMs, bool allowCompositePrimeBeforeTextFocusWhenUnprimed);
     bool TypeText(IntPtr mainHwnd, string text, int charDelayMs);
     bool PressPlay(IntPtr mainHwnd);
     bool MoveToStart(IntPtr mainHwnd, int actionDelayMs);
