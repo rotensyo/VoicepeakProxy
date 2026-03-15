@@ -54,3 +54,7 @@ stateDiagram-v2
 - `Audio.StartConfirmWindowMs`内に発話開始が検知できない場合は`StartTimeout`になります
 - `Audio.StartConfirmMaxRetries`が残っていれば、`MoveToStart`→`PressPlay`→開始確認を再試行します
 - この再試行は常駐実行、単発実行、起動時バリデーションに適用されます
+
+## 関連ドキュメント
+
+- UIA候補抽出契約:`docs/dev/uia-text-candidate-contract.md`

@@ -24,15 +24,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private const uint WmLButtonDown = 0x0201;
     private const uint WmLButtonUp = 0x0202;
     private const int MkLButton = 0x0001;
-    private static readonly HashSet<string> ExcludedNames = new HashSet<string>(StringComparer.Ordinal)
-    {
-        "音量",
-        "ボイス",
-        "バージョン",
-        "設定",
-        "感情"
-    };
-
     private readonly UiConfig _ui;
     private readonly PrepareConfig _prepare;
     private readonly DebugConfig _debug;
@@ -961,19 +952,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return allowedControlType && name != null && name.Length == 0;
     }
 
-    internal static bool IsExcludedControlType(ControlType controlType)
-    {
-        if (controlType == null)
-        {
-            return false;
-        }
-
-        string programmaticName = controlType.ProgrammaticName;
-        return string.Equals(programmaticName, "ControlType.Slider", StringComparison.Ordinal)
-            || string.Equals(programmaticName, "ControlType.ComboBox", StringComparison.Ordinal)
-            || string.Equals(programmaticName, "ControlType.ScrollBar", StringComparison.Ordinal);
-    }
-
     private void LogTextCandidates(List<TextCandidateInfo> candidates)
     {
         int count = candidates != null ? candidates.Count : 0;
@@ -1027,27 +1005,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
 
         return text.Replace("\r", string.Empty).Replace("\n", string.Empty);
-    }
-
-    private static bool HasTextLikePattern(AutomationElement element)
-    {
-        if (element == null)
-        {
-            return false;
-        }
-
-        return element.TryGetCurrentPattern(TextPattern.Pattern, out _) ||
-               element.TryGetCurrentPattern(ValuePattern.Pattern, out _);
-    }
-
-    internal static bool IsExcludedName(string name)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return false;
-        }
-
-        return ExcludedNames.Contains(name.Trim());
     }
 
     private static string GetElementText(AutomationElement element)

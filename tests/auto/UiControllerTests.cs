@@ -17,6 +17,7 @@ public class UiControllerTests
     private const int VkDelete = 0x2E;
     private const int VkPageUp = 0x21;
     private const int VkUp = 0x26;
+    private const int VkF3 = 0x72;
 
     [TestMethod]
     public void IsValidShortcut_AcceptsSupportedFormats()
@@ -120,27 +121,6 @@ public class UiControllerTests
     }
 
     [TestMethod]
-    public void IsExcludedControlType_AndName_WorkAsSpecified()
-    {
-        // 除外対象の型と名称を確認
-        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsExcludedControlType", ControlType.ComboBox));
-        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsExcludedControlType", ControlType.Slider));
-        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsExcludedControlType", ControlType.ScrollBar));
-        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsExcludedControlType", ControlType.Edit));
-
-        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsExcludedName", "感情"));
-        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsExcludedName", "  設定  "));
-        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsExcludedName", string.Empty));
-    }
-
-    [TestMethod]
-    public void IsExcludedName_NonExcluded_IsFalse()
-    {
-        // 非除外名称はfalse
-        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsExcludedName", "本文"));
-    }
-
-    [TestMethod]
     public void IsCollectTextCandidateTarget_UsesAllowedControlTypeAndStrictEmptyName()
     {
         // 候補条件は型と空文字名のみを許可
@@ -224,6 +204,38 @@ public class UiControllerTests
         Assert.AreEqual(18, (int)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ComputeNonCompositeDeleteSteps", ok, 5));
         Assert.AreEqual(11, (int)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ComputeNonCompositeDeleteSteps", negative, 1));
         Assert.AreEqual(14, (int)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ComputeNonCompositeDeleteSteps", failed, 4));
+    }
+
+    [TestMethod]
+    public void ClearInput_UsesPrepareClearInputMaxPasses_ForNonCompositePath()
+    {
+        // 非複合経路は設定した最大試行回数でループ
+        var messages = ReflectionTestHelper.RunInSta(() =>
+        {
+            UiConfig ui = new UiConfig
+            {
+                MoveToStartShortcut = "F3"
+            };
+            PrepareConfig prepare = new PrepareConfig
+            {
+                ClearInputMaxPasses = 2,
+                DeleteKeyDelayBaseMs = 0
+            };
+            VoicepeakUiController controller = new VoicepeakUiController(
+                ui,
+                prepare,
+                new DebugConfig(),
+                new AppLogger(new TestLogger()),
+                new FakeVoicepeakProcessApi());
+
+            using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
+            bool ok = controller.ClearInput(null, window.Handle, 0, false);
+            Assert.IsFalse(ok);
+            return window.Messages.ToArray();
+        });
+
+        Assert.AreEqual(2, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkF3));
+        Assert.AreEqual(2, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkF3));
     }
 
     [TestMethod]
