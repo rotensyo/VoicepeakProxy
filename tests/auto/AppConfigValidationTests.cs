@@ -22,6 +22,7 @@ public class AppConfigValidationTests
         Assert.AreEqual("初期化完了", config.Prepare.BootValidationText);
         Assert.AreEqual(5, config.Prepare.SequentialMoveToStartKeyDelayBaseMs);
         Assert.AreEqual(1, config.Prepare.DeleteKeyDelayBaseMs);
+        Assert.AreEqual(20, config.Prepare.ClearInputMaxPasses);
         Assert.IsTrue(config.Ui.CompositePrimeAtValidationEnabled);
         Assert.IsFalse(config.Ui.CompositePrimeBeforeTextFocusWhenUnprimedEnabled);
         Assert.IsFalse(config.Ui.CompositeRecoveryClickOnStartTimeoutRetryEnabled);
@@ -76,6 +77,7 @@ public class AppConfigValidationTests
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.PostTypeWaitMinMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.SequentialMoveToStartKeyDelayBaseMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.DeleteKeyDelayBaseMs = -1));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.ClearInputMaxPasses = 0));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Ui.PlayPreShortcutDelayMs = -1));
     }
 
@@ -181,6 +183,7 @@ public class AppConfigValidationTests
             config.Prepare.PostTypeWaitMinMs = 0;
             config.Prepare.SequentialMoveToStartKeyDelayBaseMs = 0;
             config.Prepare.DeleteKeyDelayBaseMs = 0;
+            config.Prepare.ClearInputMaxPasses = 1;
             config.Ui.PlayPreShortcutDelayMs = 0;
         });
     }

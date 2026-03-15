@@ -141,6 +141,92 @@ public class UiControllerTests
     }
 
     [TestMethod]
+    public void IsCollectTextCandidateTarget_UsesAllowedControlTypeAndStrictEmptyName()
+    {
+        // 候補条件は型と空文字名のみを許可
+        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", ControlType.Edit, string.Empty));
+        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", ControlType.Document, string.Empty));
+        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", ControlType.Text, string.Empty));
+
+        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", ControlType.Button, string.Empty));
+        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", ControlType.Edit, "name"));
+        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", ControlType.Edit, " "));
+        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", ControlType.Edit, null));
+    }
+
+    [TestMethod]
+    public void EstimateVisibleBlockCount_EmptyTextInput_IsCounted()
+    {
+        // 空文字入力欄も候補数として数える
+        int count = ReflectionTestHelper.RunInSta(() =>
+        {
+            using Form form = new Form
+            {
+                Text = "",
+                Width = 400,
+                Height = 200
+            };
+            using TextBox textBox = new TextBox
+            {
+                Name = string.Empty,
+                AccessibleName = string.Empty,
+                Text = string.Empty,
+                Left = 20,
+                Top = 20,
+                Width = 200
+            };
+
+            form.Controls.Add(textBox);
+            form.Show();
+            Application.DoEvents();
+
+            return (int)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "EstimateVisibleBlockCount", form.Handle);
+        });
+
+        Assert.IsTrue(count >= 1, $"count={count}");
+    }
+
+    [TestMethod]
+    public void IsCompositeClearCompleted_RequiresSingleInputBox()
+    {
+        // 完全削除判定は入力欄1件を必須
+        ReadInputResult cleared = ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA);
+        ReadInputResult hasText = ReadInputResult.Ok("a", 1, ReadInputSource.PrimaryUiA);
+        ReadInputResult failed = ReadInputResult.Fail(ReadInputSource.Exception, string.Empty, 0);
+
+        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCompositeClearCompleted", cleared, 1));
+        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCompositeClearCompleted", cleared, 2));
+        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCompositeClearCompleted", hasText, 1));
+        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCompositeClearCompleted", failed, 1));
+    }
+
+    [TestMethod]
+    public void ComputeCompositeDeleteSteps_AddsInputBoxCount()
+    {
+        // 削除ステップは文字数と入力欄数を加算
+        ReadInputResult ok = ReadInputResult.Ok("abc", 3, ReadInputSource.PrimaryUiA);
+        ReadInputResult negative = ReadInputResult.Ok(string.Empty, -1, ReadInputSource.PrimaryUiA);
+        ReadInputResult failed = ReadInputResult.Fail(ReadInputSource.Exception, string.Empty, 5);
+
+        Assert.AreEqual(15, (int)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ComputeCompositeDeleteSteps", ok, 2));
+        Assert.AreEqual(12, (int)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ComputeCompositeDeleteSteps", negative, 2));
+        Assert.AreEqual(12, (int)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ComputeCompositeDeleteSteps", failed, 2));
+    }
+
+    [TestMethod]
+    public void ComputeNonCompositeDeleteSteps_AddsInputBoxCountAndKeepsMinimum()
+    {
+        // 非複合削除は入力欄件数を加算し最小値を維持
+        ReadInputResult ok = ReadInputResult.Ok("abc", 3, ReadInputSource.PrimaryUiA);
+        ReadInputResult negative = ReadInputResult.Ok(string.Empty, -1, ReadInputSource.PrimaryUiA);
+        ReadInputResult failed = ReadInputResult.Fail(ReadInputSource.Exception, string.Empty, 5);
+
+        Assert.AreEqual(18, (int)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ComputeNonCompositeDeleteSteps", ok, 5));
+        Assert.AreEqual(11, (int)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ComputeNonCompositeDeleteSteps", negative, 1));
+        Assert.AreEqual(14, (int)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ComputeNonCompositeDeleteSteps", failed, 4));
+    }
+
+    [TestMethod]
     public void TypeText_DoesNotSendEnterWhenDisabled()
     {
         // 設定無効時はEnter送信なし

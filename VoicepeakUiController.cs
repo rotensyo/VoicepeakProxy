@@ -11,7 +11,6 @@ namespace VoicepeakProxyCore;
 // VOICEPEAKのUI操作を担当
 internal sealed class VoicepeakUiController : IVoicepeakUiController
 {
-    private const int CompositeClearInputMaxPasses = 20;
     private const uint SmtoAbortIfHung = 0x0002;
     private const uint WmKeyDown = 0x0100;
     private const uint WmKeyUp = 0x0101;
@@ -191,48 +190,44 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     // 入力欄をクリア
     public bool ClearInput(Process process, IntPtr mainHwnd, int actionDelayMs, bool allowCompositePrimeBeforeTextFocusWhenUnprimed)
     {
+        int clearInputMaxPasses = Math.Max(1, _prepare.ClearInputMaxPasses);
         bool compositeMoveToStart = IsCompositeMoveToStartShortcut(_ui.MoveToStartShortcut);
         if (compositeMoveToStart)
         {
-            for (int pass = 0; pass < CompositeClearInputMaxPasses; pass++)
+            for (int pass = 0; pass < clearInputMaxPasses; pass++)
             {
-                ReadInputResult read = ReadInputTextDetailed(mainHwnd);
-                if (read.Success && read.TotalLength == 0)
+                ClearInputState before = ReadClearInputState(mainHwnd);
+                if (IsClearCompleted(before.Read, before.VisibleBlockCount))
                 {
                     return true;
                 }
 
-                int visibleBlockCount = EstimateVisibleBlockCount(mainHwnd);
-                int pairCount = Math.Max(1, visibleBlockCount + 1);
-                int deleteSteps = read.Success ? Math.Max(0, read.TotalLength) : 0;
+                int pairCount = Math.Max(1, before.VisibleBlockCount + 1);
+                int deleteSteps = ComputeCompositeDeleteSteps(before.Read, before.VisibleBlockCount);
                 if (!RunCompositeClearCycle(mainHwnd, pairCount, deleteSteps))
                 {
                     return false;
                 }
 
-                ReadInputResult after = ReadInputTextDetailed(mainHwnd);
-                if (after.Success && after.TotalLength == 0)
+                ClearInputState after = ReadClearInputState(mainHwnd);
+                if (IsClearCompleted(after.Read, after.VisibleBlockCount))
                 {
                     return true;
                 }
             }
 
-            ReadInputResult finalReadComposite = ReadInputTextDetailed(mainHwnd);
-            _log.Warn("clear_input_incomplete " +
-                $"success={finalReadComposite.Success} totalLength={finalReadComposite.TotalLength} source={finalReadComposite.Source}");
-            return finalReadComposite.Success && finalReadComposite.TotalLength == 0;
+            return LogIncompleteClearInputAndReturnResult(ReadClearInputState(mainHwnd));
         }
 
-        for (int pass = 0; pass < 3; pass++)
+        for (int pass = 0; pass < clearInputMaxPasses; pass++)
         {
-            ReadInputResult read = ReadInputTextDetailed(mainHwnd);
-            int baseLength = read.Success ? read.TotalLength : 0;
-            if (baseLength < 0)
+            ClearInputState before = ReadClearInputState(mainHwnd);
+            if (IsClearCompleted(before.Read, before.VisibleBlockCount))
             {
-                baseLength = 0;
+                return true;
             }
 
-            int clearSteps = Math.Max(30, baseLength + 30);
+            int clearSteps = ComputeNonCompositeDeleteSteps(before.Read, before.VisibleBlockCount);
             for (int i = 0; i < clearSteps; i++)
             {
                 if (!PressDelete(mainHwnd))
@@ -241,8 +236,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 }
             }
 
-            ReadInputResult after = ReadInputTextDetailed(mainHwnd);
-            if (after.Success && after.TotalLength == 0)
+            ClearInputState after = ReadClearInputState(mainHwnd);
+            if (IsClearCompleted(after.Read, after.VisibleBlockCount))
             {
                 return true;
             }
@@ -253,10 +248,46 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             }
         }
 
-        ReadInputResult finalRead = ReadInputTextDetailed(mainHwnd);
+        return LogIncompleteClearInputAndReturnResult(ReadClearInputState(mainHwnd));
+    }
+
+    // 完全削除判定を共通化
+    internal static bool IsClearCompleted(ReadInputResult read, int visibleBlockCount)
+    {
+        return read.Success && read.TotalLength == 0 && visibleBlockCount == 1;
+    }
+
+    internal static bool IsCompositeClearCompleted(ReadInputResult read, int visibleBlockCount)
+    {
+        return IsClearCompleted(read, visibleBlockCount);
+    }
+
+    private bool LogIncompleteClearInputAndReturnResult(ClearInputState state)
+    {
         _log.Warn("clear_input_incomplete " +
-            $"success={finalRead.Success} totalLength={finalRead.TotalLength} source={finalRead.Source}");
-        return finalRead.Success && finalRead.TotalLength == 0;
+            $"success={state.Read.Success} totalLength={state.Read.TotalLength} source={state.Read.Source} visibleBlockCount={state.VisibleBlockCount}");
+        return IsClearCompleted(state.Read, state.VisibleBlockCount);
+    }
+
+    private ClearInputState ReadClearInputState(IntPtr mainHwnd)
+    {
+        ReadInputResult read = ReadInputTextDetailed(mainHwnd);
+        int visibleBlockCount = EstimateVisibleBlockCount(mainHwnd);
+        return new ClearInputState(read, visibleBlockCount);
+    }
+
+    internal static int ComputeCompositeDeleteSteps(ReadInputResult read, int visibleBlockCount)
+    {
+        int baseLength = read.Success ? Math.Max(0, read.TotalLength) : 0;
+        int inputBoxCount = Math.Max(0, visibleBlockCount);
+        return baseLength + inputBoxCount + 10;
+    }
+
+    internal static int ComputeNonCompositeDeleteSteps(ReadInputResult read, int visibleBlockCount)
+    {
+        int baseLength = read.Success ? Math.Max(0, read.TotalLength) : 0;
+        int inputBoxCount = Math.Max(0, visibleBlockCount);
+        return Math.Max(10, baseLength + 10 + inputBoxCount);
     }
 
     private bool RunCompositeClearCycle(IntPtr mainHwnd, int pairCount, int deleteSteps)
@@ -319,25 +350,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         {
             AutomationElement root = AutomationElement.FromHandle(mainHwnd);
             List<TextCandidateInfo> candidates = CollectTextCandidates(root, maxCount: 200);
-            int count = 0;
-            for (int i = 0; i < candidates.Count; i++)
-            {
-                AutomationElement element = candidates[i].Element;
-                if (element == null || element.Current.ControlType != ControlType.Edit)
-                {
-                    continue;
-                }
-
-                string text = NormalizeForLength(TryGetElementTextOrWindowTextSafe(element));
-                if (string.IsNullOrWhiteSpace(text))
-                {
-                    continue;
-                }
-
-                count++;
-            }
-
-            return count;
+            return candidates.Count;
         }
         catch
         {
@@ -817,16 +830,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return true;
     }
 
-    private static bool PostCtrlUpFixedRaw(IntPtr hWnd)
-    {
-        bool ok = true;
-        ok &= PostMessage(hWnd, WmKeyDown, new IntPtr((int)VirtualKey.Control), new IntPtr(0x001D0001));
-        ok &= PostMessage(hWnd, WmKeyDown, new IntPtr((int)VirtualKey.Up), new IntPtr(0x01480001));
-        ok &= PostMessage(hWnd, WmKeyUp, new IntPtr((int)VirtualKey.Up), new IntPtr(unchecked((int)0xC1480001)));
-        ok &= PostMessage(hWnd, WmKeyUp, new IntPtr((int)VirtualKey.Control), new IntPtr(unchecked((int)0xC01D0001)));
-        return ok;
-    }
-
     private static IntPtr MakeLParam(int low, int high)
     {
         int combined = (high << 16) | (low & 0xFFFF);
@@ -864,12 +867,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             for (int i = 0; i < candidates.Count; i++)
             {
                 AutomationElement e = candidates[i];
-                var r = e.Current.BoundingRectangle;
-                if (r.IsEmpty)
-                {
-                    continue;
-                }
-
                 string t = NormalizeForLength(TryGetElementTextOrWindowTextSafe(e));
                 if (t.Length == 0)
                 {
@@ -939,41 +936,29 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
 
         ControlType controlType = element.Current.ControlType;
-        if (IsExcludedControlType(controlType))
-        {
-            return false;
-        }
-
-        bool textLike = controlType == ControlType.Edit
-                        || controlType == ControlType.Document
-                        || controlType == ControlType.Text
-                        || HasTextLikePattern(element);
-        if (!textLike || IsExcludedName(element.Current.Name))
+        string name = element.Current.Name;
+        if (!IsCollectTextCandidateTarget(controlType, name))
         {
             return false;
         }
 
         var rect = element.Current.BoundingRectangle;
-        bool visible = !rect.IsEmpty && rect.Width > 10 && rect.Height > 10;
-        if (!visible)
-        {
-            return false;
-        }
-
-        string text = TryGetElementTextOrWindowTextSafe(element);
         double score = rect.Width * rect.Height;
         if (controlType == ControlType.Edit)
         {
             score += 10000;
         }
 
-        if (!string.IsNullOrWhiteSpace(text))
-        {
-            score += 1000000;
-        }
-
         candidate = new TextCandidateInfo(element, score);
         return true;
+    }
+
+    internal static bool IsCollectTextCandidateTarget(ControlType controlType, string name)
+    {
+        bool allowedControlType = controlType == ControlType.Edit
+                                  || controlType == ControlType.Document
+                                  || controlType == ControlType.Text;
+        return allowedControlType && name != null && name.Length == 0;
     }
 
     internal static bool IsExcludedControlType(ControlType controlType)
@@ -1524,6 +1509,18 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         {
             Element = element;
             Score = score;
+        }
+    }
+
+    private readonly struct ClearInputState
+    {
+        public ReadInputResult Read { get; }
+        public int VisibleBlockCount { get; }
+
+        public ClearInputState(ReadInputResult read, int visibleBlockCount)
+        {
+            Read = read;
+            VisibleBlockCount = visibleBlockCount;
         }
     }
 

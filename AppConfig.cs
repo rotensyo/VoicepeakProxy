@@ -51,6 +51,7 @@ public sealed class PrepareConfig
     public int PostTypeWaitMinMs { get; set; } = 100;
     public int SequentialMoveToStartKeyDelayBaseMs { get; set; } = 5;
     public int DeleteKeyDelayBaseMs { get; set; } = 1;
+    public int ClearInputMaxPasses { get; set; } = 20;
 }
 
 // UI操作関連設定
@@ -189,6 +190,11 @@ internal static class AppConfigValidator
         if (config.Prepare.DeleteKeyDelayBaseMs < 0)
         {
             throw new InvalidOperationException("prepare.deleteKeyDelayBaseMs は 0 以上で指定してください");
+        }
+
+        if (config.Prepare.ClearInputMaxPasses <= 0)
+        {
+            throw new InvalidOperationException("prepare.clearInputMaxPasses は 1 以上で指定してください");
         }
 
         if (config.Ui.PlayPreShortcutDelayMs < 0)
