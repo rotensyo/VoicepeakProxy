@@ -11,6 +11,7 @@ namespace VoicepeakProxyCore;
 // VOICEPEAKのUI操作を担当
 internal sealed class VoicepeakUiController : IVoicepeakUiController
 {
+    private const int CompositeClearInputMaxPasses = 20;
     private const uint SmtoAbortIfHung = 0x0002;
     private const uint WmKeyDown = 0x0100;
     private const uint WmKeyUp = 0x0101;
@@ -34,6 +35,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     };
 
     private readonly UiConfig _ui;
+    private readonly PrepareConfig _prepare;
     private readonly DebugConfig _debug;
     private readonly Dictionary<char, List<SentenceBreakTrigger>> _sentenceBreakTriggerIndex;
     private readonly AppLogger _log;
@@ -41,16 +43,28 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private readonly object _inputPrimeGate = new object();
     private int _primedProcessId;
     private IntPtr _primedMainHwnd;
+    private int _lastInjectedEnterCount;
 
     // UI設定とロガーを保持
     public VoicepeakUiController(UiConfig ui, DebugConfig debug, AppLogger log)
-        : this(ui, debug, log, new DefaultVoicepeakProcessApi())
+        : this(ui, new PrepareConfig(), debug, log, new DefaultVoicepeakProcessApi())
+    {
+    }
+
+    public VoicepeakUiController(UiConfig ui, PrepareConfig prepare, DebugConfig debug, AppLogger log)
+        : this(ui, prepare, debug, log, new DefaultVoicepeakProcessApi())
     {
     }
 
     internal VoicepeakUiController(UiConfig ui, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
+        : this(ui, new PrepareConfig(), debug, log, processApi)
+    {
+    }
+
+    internal VoicepeakUiController(UiConfig ui, PrepareConfig prepare, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
     {
         _ui = ui;
+        _prepare = prepare ?? new PrepareConfig();
         _debug = debug ?? new DebugConfig();
         _log = log;
         _processApi = processApi ?? new DefaultVoicepeakProcessApi();
@@ -177,6 +191,38 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     // 入力欄をクリア
     public bool ClearInput(Process process, IntPtr mainHwnd, int actionDelayMs, bool allowCompositePrimeBeforeTextFocusWhenUnprimed)
     {
+        bool compositeMoveToStart = IsCompositeMoveToStartShortcut(_ui.MoveToStartShortcut);
+        if (compositeMoveToStart)
+        {
+            for (int pass = 0; pass < CompositeClearInputMaxPasses; pass++)
+            {
+                ReadInputResult read = ReadInputTextDetailed(mainHwnd);
+                if (read.Success && read.TotalLength == 0)
+                {
+                    return true;
+                }
+
+                int visibleBlockCount = EstimateVisibleBlockCount(mainHwnd);
+                int pairCount = Math.Max(1, visibleBlockCount + 1);
+                int deleteSteps = read.Success ? Math.Max(0, read.TotalLength) : 0;
+                if (!RunCompositeClearCycle(mainHwnd, pairCount, deleteSteps))
+                {
+                    return false;
+                }
+
+                ReadInputResult after = ReadInputTextDetailed(mainHwnd);
+                if (after.Success && after.TotalLength == 0)
+                {
+                    return true;
+                }
+            }
+
+            ReadInputResult finalReadComposite = ReadInputTextDetailed(mainHwnd);
+            _log.Warn("clear_input_incomplete " +
+                $"success={finalReadComposite.Success} totalLength={finalReadComposite.TotalLength} source={finalReadComposite.Source}");
+            return finalReadComposite.Success && finalReadComposite.TotalLength == 0;
+        }
+
         for (int pass = 0; pass < 3; pass++)
         {
             ReadInputResult read = ReadInputTextDetailed(mainHwnd);
@@ -189,7 +235,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             int clearSteps = Math.Max(30, baseLength + 30);
             for (int i = 0; i < clearSteps; i++)
             {
-                if (!SendKey(mainHwnd, VirtualKey.Delete))
+                if (!PressDelete(mainHwnd))
                 {
                     return false;
                 }
@@ -213,11 +259,98 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return finalRead.Success && finalRead.TotalLength == 0;
     }
 
+    private bool RunCompositeClearCycle(IntPtr mainHwnd, int pairCount, int deleteSteps)
+    {
+        if (!KillFocus(mainHwnd))
+        {
+            return false;
+        }
+
+        Thread.Sleep(10);
+        if (!FocusInputForKeyboardIfNeeded(mainHwnd))
+        {
+            return false;
+        }
+
+        int actualPairs = Math.Max(1, pairCount);
+        for (int i = 0; i < actualPairs; i++)
+        {
+            if (!SendKey(mainHwnd, VirtualKey.PageUp))
+            {
+                return false;
+            }
+
+            if (_prepare.SequentialMoveToStartKeyDelayBaseMs > 0)
+            {
+                Thread.Sleep(_prepare.SequentialMoveToStartKeyDelayBaseMs);
+            }
+
+            if (!SendKey(mainHwnd, VirtualKey.Up))
+            {
+                return false;
+            }
+
+            if (_prepare.SequentialMoveToStartKeyDelayBaseMs > 0)
+            {
+                Thread.Sleep(_prepare.SequentialMoveToStartKeyDelayBaseMs);
+            }
+        }
+
+        int actualDeletes = Math.Max(0, deleteSteps);
+        for (int i = 0; i < actualDeletes; i++)
+        {
+            if (!PressDelete(mainHwnd))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static int EstimateVisibleBlockCount(IntPtr mainHwnd)
+    {
+        if (mainHwnd == IntPtr.Zero)
+        {
+            return 0;
+        }
+
+        try
+        {
+            AutomationElement root = AutomationElement.FromHandle(mainHwnd);
+            List<TextCandidateInfo> candidates = CollectTextCandidates(root, maxCount: 200);
+            int count = 0;
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                AutomationElement element = candidates[i].Element;
+                if (element == null || element.Current.ControlType != ControlType.Edit)
+                {
+                    continue;
+                }
+
+                string text = NormalizeForLength(TryGetElementTextOrWindowTextSafe(element));
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    continue;
+                }
+
+                count++;
+            }
+
+            return count;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
     // 文字列を1文字ずつ送信
     public bool TypeText(IntPtr mainHwnd, string text, int charDelayMs)
     {
         string send = text ?? string.Empty;
         HashSet<int> enterPositions = ComputeSentenceBreakEnterPositions(send);
+        int injectedEnterCount = 0;
         for (int i = 0; i < send.Length; i++)
         {
             char c = send[i];
@@ -240,12 +373,16 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                     return false;
                 }
 
+                injectedEnterCount++;
+
                 if (charDelayMs > 0)
                 {
                     Thread.Sleep(charDelayMs);
                 }
             }
         }
+
+        _lastInjectedEnterCount = injectedEnterCount;
 
         return true;
     }
@@ -277,7 +414,21 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return SendShortcut(mainHwnd, _ui.MoveToStartShortcut);
     }
 
-    public bool PressDelete(IntPtr mainHwnd) => SendKey(mainHwnd, VirtualKey.Delete);
+    public bool PressDelete(IntPtr mainHwnd)
+    {
+        bool sent = SendKey(mainHwnd, VirtualKey.Delete);
+        if (!sent)
+        {
+            return false;
+        }
+
+        if (_prepare.DeleteKeyDelayBaseMs > 0)
+        {
+            Thread.Sleep(_prepare.DeleteKeyDelayBaseMs);
+        }
+
+        return true;
+    }
 
     internal bool KillFocus(IntPtr mainHwnd)
     {
@@ -432,6 +583,17 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         sent |= SendWindowMessage(voicePeakHwnd, WmSetFocus, IntPtr.Zero, IntPtr.Zero);
         Thread.Sleep(30);
         return sent;
+    }
+
+    private bool PrimeKeyboardInputForComposite(IntPtr mainHwnd)
+    {
+        if (!KillFocus(mainHwnd))
+        {
+            return false;
+        }
+
+        Thread.Sleep(10);
+        return FocusInputForKeyboardIfNeeded(mainHwnd);
     }
 
     private bool TryPrimeInputContextWithForeground(Process process, IntPtr mainHwnd)
@@ -605,7 +767,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return sent;
     }
 
-    private static bool SendCompositeMoveToStart(IntPtr hwnd, ShortcutSpec spec)
+    private bool SendCompositeMoveToStart(IntPtr hwnd, ShortcutSpec spec)
     {
         if (hwnd == IntPtr.Zero)
         {
@@ -614,10 +776,45 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
         if (spec.IsCtrlUpOnly)
         {
-            return PostCtrlUpFixedRaw(hwnd);
+            if (!PrimeKeyboardInputForComposite(hwnd))
+            {
+                return false;
+            }
+
+            int pairCount = Math.Max(1, _lastInjectedEnterCount + 1);
+            return SendCompositePageUpUpPairs(hwnd, pairCount);
         }
 
         return false;
+    }
+
+    private bool SendCompositePageUpUpPairs(IntPtr mainHwnd, int pairCount)
+    {
+        int actualPairs = Math.Max(1, pairCount);
+        for (int i = 0; i < actualPairs; i++)
+        {
+            if (!SendKey(mainHwnd, VirtualKey.PageUp))
+            {
+                return false;
+            }
+
+            if (_prepare.SequentialMoveToStartKeyDelayBaseMs > 0)
+            {
+                Thread.Sleep(_prepare.SequentialMoveToStartKeyDelayBaseMs);
+            }
+
+            if (!SendKey(mainHwnd, VirtualKey.Up))
+            {
+                return false;
+            }
+
+            if (_prepare.SequentialMoveToStartKeyDelayBaseMs > 0)
+            {
+                Thread.Sleep(_prepare.SequentialMoveToStartKeyDelayBaseMs);
+            }
+        }
+
+        return true;
     }
 
     private static bool PostCtrlUpFixedRaw(IntPtr hWnd)
@@ -1081,6 +1278,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         Return = 0x0D,
         Delete = 0x2E,
         Space = 0x20,
+        PageUp = 0x21,
         F1 = 0x70,
         F2 = 0x71,
         F3 = 0x72,

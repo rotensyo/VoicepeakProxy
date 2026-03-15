@@ -58,7 +58,7 @@ public static class VoicepeakOneShot
             request,
             log,
             validation,
-            new VoicepeakUiController(config.Ui, config.Debug, log),
+            new VoicepeakUiController(config.Ui, config.Prepare, config.Debug, log),
             new AudioSessionReader(log));
     }
 

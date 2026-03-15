@@ -294,6 +294,34 @@ public class ExecutionLogicTests
     }
 
     [TestMethod]
+    public void MonitorSpeaking_InterruptRequested_WithCompositeShortcut_PressesPlayThenMovesToStart()
+    {
+        // 複合経路では停止してから先頭移動
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
+        FakeAudioSessionReader audio = new FakeAudioSessionReader();
+        bool callbackCalled = false;
+        AppConfig config = CreateMonitorConfig();
+        config.Ui.MoveToStartShortcut = "Ctrl+Up";
+
+        SpeakMonitorResult result = JobExecutionCore.MonitorSpeaking(
+            config,
+            ui,
+            audio,
+            Process.GetCurrentProcess(),
+            IntPtr.Zero,
+            new AppLogger(new TestLogger()),
+            () => false,
+            () => true,
+            () => callbackCalled = true);
+
+        Assert.AreEqual(SpeakMonitorKind.Interrupted, result.Kind);
+        Assert.IsTrue(callbackCalled);
+        Assert.AreEqual(1, ui.PressPlayCalls);
+        Assert.AreEqual(1, ui.MoveToStartCalls);
+        Assert.IsTrue(ui.CallLog.IndexOf("press_play") < ui.CallLog.IndexOf("move_to_start"));
+    }
+
+    [TestMethod]
     public void MonitorSpeaking_ProcessLost_ReturnsProcessLost()
     {
         // プロセス消失を返却
@@ -388,6 +416,34 @@ public class ExecutionLogicTests
 
         Assert.AreEqual(SpeakMonitorKind.MaxDuration, result.Kind);
         Assert.AreEqual(1, ui.MoveToStartCalls);
+    }
+
+    [TestMethod]
+    public void MonitorSpeaking_MaxDuration_WithCompositeShortcut_PressesPlayThenMovesToStart()
+    {
+        // 複合経路では停止してから先頭移動
+        AppConfig config = CreateMonitorConfig();
+        config.Ui.MoveToStartShortcut = "Ctrl+Up";
+        config.Audio.MaxSpeakingDurationSec = 1;
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
+        FakeAudioSessionReader audio = new FakeAudioSessionReader();
+        audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" };
+
+        SpeakMonitorResult result = JobExecutionCore.MonitorSpeaking(
+            config,
+            ui,
+            audio,
+            Process.GetCurrentProcess(),
+            IntPtr.Zero,
+            new AppLogger(new TestLogger()),
+            () => false,
+            () => false,
+            null);
+
+        Assert.AreEqual(SpeakMonitorKind.MaxDuration, result.Kind);
+        Assert.AreEqual(1, ui.PressPlayCalls);
+        Assert.AreEqual(1, ui.MoveToStartCalls);
+        Assert.IsTrue(ui.CallLog.IndexOf("press_play") < ui.CallLog.IndexOf("move_to_start"));
     }
 
     [TestMethod]

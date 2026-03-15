@@ -259,6 +259,27 @@ public class VoicepeakEngineTests
     }
 
     [TestMethod]
+    public void BootValidate_MaxDuration_WithCompositeShortcut_PressesPlayThenMovesToStart()
+    {
+        // 複合経路では停止してから先頭移動
+        FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
+        FakeAudioSessionReader audio = new FakeAudioSessionReader();
+        audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" };
+        AppConfig config = CreateEngineConfig();
+        config.Ui.MoveToStartShortcut = "Ctrl+Up";
+        config.Audio.MaxSpeakingDurationSec = 1;
+
+        using CancellationTokenSource cts = new CancellationTokenSource();
+        VoicepeakEngine engine = new VoicepeakEngine(config, cts, new AppLogger(new TestLogger()), ui, audio, false);
+
+        bool result = engine.BootValidate(BootValidationMode.Required);
+
+        Assert.IsFalse(result);
+        Assert.AreEqual(2, ui.PressPlayCalls);
+        Assert.AreEqual(1, ui.MoveToStartCalls);
+    }
+
+    [TestMethod]
     public void RunInputValidate_ProcessNotAlive_ReturnsExpectedFailure()
     {
         // 生存確認失敗を返却

@@ -49,6 +49,8 @@ public sealed class PrepareConfig
     public int ActionDelayMs { get; set; } = 5;
     public int PostTypeWaitPerCharMs { get; set; } = 4;
     public int PostTypeWaitMinMs { get; set; } = 100;
+    public int SequentialMoveToStartKeyDelayBaseMs { get; set; } = 5;
+    public int DeleteKeyDelayBaseMs { get; set; } = 1;
 }
 
 // UI操作関連設定
@@ -177,6 +179,16 @@ internal static class AppConfigValidator
         if (config.Prepare.PostTypeWaitMinMs < 0)
         {
             throw new InvalidOperationException("prepare.postTypeWaitMinMs は 0 以上で指定してください");
+        }
+
+        if (config.Prepare.SequentialMoveToStartKeyDelayBaseMs < 0)
+        {
+            throw new InvalidOperationException("prepare.sequentialMoveToStartKeyDelayBaseMs は 0 以上で指定してください");
+        }
+
+        if (config.Prepare.DeleteKeyDelayBaseMs < 0)
+        {
+            throw new InvalidOperationException("prepare.deleteKeyDelayBaseMs は 0 以上で指定してください");
         }
 
         if (config.Ui.PlayPreShortcutDelayMs < 0)

@@ -36,6 +36,20 @@ internal readonly struct SpeakMonitorResult
 // 単発常駐で共有する実行ロジック
 internal static class JobExecutionCore
 {
+    // 再生中の先頭移動を文脈別に実行
+    public static bool MoveToStartDuringPlayback(AppConfig config, IVoicepeakUiController ui, IntPtr hwnd, int actionDelayMs)
+    {
+        if (VoicepeakUiController.IsCompositeMoveToStartShortcut(config.Ui.MoveToStartShortcut))
+        {
+            if (!ui.PressPlay(hwnd))
+            {
+                return false;
+            }
+        }
+
+        return ui.MoveToStart(hwnd, actionDelayMs);
+    }
+
     // セグメント入力準備を実行
     public static bool PrepareSegment(AppConfig config, IVoicepeakUiController ui, Process process, IntPtr hwnd, string text, AppLogger log, bool allowCompositePrimeBeforeTextFocusWhenUnprimed)
     {
@@ -102,7 +116,7 @@ internal static class JobExecutionCore
             if (interruptRequested())
             {
                 onInterrupt?.Invoke();
-                ui.MoveToStart(hwnd, config.Prepare.ActionDelayMs);
+                MoveToStartDuringPlayback(config, ui, hwnd, config.Prepare.ActionDelayMs);
                 return SpeakMonitorResult.Interrupted();
             }
 
@@ -134,7 +148,7 @@ internal static class JobExecutionCore
                 long maxMs = config.Audio.MaxSpeakingDurationSec * 1000L;
                 if ((now - speakingStartedAt) > maxMs)
                 {
-                    ui.MoveToStart(hwnd, config.Prepare.ActionDelayMs);
+                    MoveToStartDuringPlayback(config, ui, hwnd, config.Prepare.ActionDelayMs);
                     return SpeakMonitorResult.MaxDuration();
                 }
             }

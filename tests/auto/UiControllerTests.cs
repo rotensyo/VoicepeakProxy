@@ -12,7 +12,11 @@ namespace VoicepeakProxyCore.Tests;
 public class UiControllerTests
 {
     private const int WmKeyDown = 0x0100;
+    private const int WmKeyUp = 0x0101;
     private const int VkReturn = 0x0D;
+    private const int VkDelete = 0x2E;
+    private const int VkPageUp = 0x21;
+    private const int VkUp = 0x26;
 
     [TestMethod]
     public void IsValidShortcut_AcceptsSupportedFormats()
@@ -309,6 +313,27 @@ public class UiControllerTests
     }
 
     [TestMethod]
+    public void PressPlay_CompositeShortcut_DoesNotPrimeFocusBeforeSpace()
+    {
+        // Space停止はKillFocusのみでフォーカス投入しない
+        var messages = ReflectionTestHelper.RunInSta(() =>
+        {
+            UiConfig ui = new UiConfig { PlayShortcut = "Space", PlayPreShortcutDelayMs = 0, MoveToStartShortcut = "Ctrl+Up" };
+            using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
+            VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
+
+            bool result = controller.PressPlay(window.Handle);
+            Assert.IsTrue(result);
+            return window.Messages.ToArray();
+        });
+
+        Assert.IsTrue(messages.Any(m => m.Msg == 0x0008));
+        Assert.IsFalse(messages.Any(m => m.Msg == 0x0006));
+        Assert.IsFalse(messages.Any(m => m.Msg == 0x0007));
+        Assert.IsTrue(messages.Any(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == 0x20));
+    }
+
+    [TestMethod]
     public void MoveToStart_SendsConfiguredShortcutKey()
     {
         // 先頭移動ショートカットを送信
@@ -329,6 +354,35 @@ public class UiControllerTests
     }
 
     [TestMethod]
+    public void MoveToStart_CompositeShortcut_UsesPageUpAndUpByInjectedEnterCountPlusOne()
+    {
+        // 複合先頭移動はEnter回数+1だけPageUpとUpを送信
+        var messages = ReflectionTestHelper.RunInSta(() =>
+        {
+            UiConfig ui = new UiConfig
+            {
+                MoveToStartShortcut = "Ctrl+Up",
+                SendEnterAfterSentenceBreak = true
+            };
+            using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
+            VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
+
+            Assert.IsTrue(controller.TypeText(window.Handle, "A。B。C", 0));
+            window.Messages.Clear();
+
+            Assert.IsTrue(controller.MoveToStart(window.Handle, 0));
+            return window.Messages.ToArray();
+        });
+
+        Assert.IsTrue(messages.Any(m => m.Msg == 0x0008));
+        Assert.IsTrue(messages.Any(m => m.Msg == 0x0007));
+        Assert.AreEqual(3, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkPageUp));
+        Assert.AreEqual(3, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkPageUp));
+        Assert.AreEqual(3, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkUp));
+        Assert.AreEqual(3, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkUp));
+    }
+
+    [TestMethod]
     public void PressDelete_SendsExpectedKey()
     {
         // deleteキー送信を確認
@@ -342,6 +396,32 @@ public class UiControllerTests
         });
 
         Assert.IsTrue(messages.Any(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == 0x2E));
+    }
+
+    [TestMethod]
+    public void RunCompositeClearCycle_SendsPageUpUpAndDelete()
+    {
+        // 複合削除サイクルはPageUpとUpの後にDeleteを送信
+        var messages = ReflectionTestHelper.RunInSta(() =>
+        {
+            object controller = ReflectionTestHelper.CreateVoicepeakUiController(
+                new UiConfig { MoveToStartShortcut = "Ctrl+Up" },
+                new DebugConfig(),
+                new TestLogger());
+
+            using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
+            bool ok = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "RunCompositeClearCycle", window.Handle, 2, 3);
+            Assert.IsTrue(ok);
+            return window.Messages.ToArray();
+        });
+
+        Assert.IsTrue(messages.Any(m => m.Msg == 0x0008));
+        Assert.AreEqual(2, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkPageUp));
+        Assert.AreEqual(2, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkPageUp));
+        Assert.AreEqual(2, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkUp));
+        Assert.AreEqual(2, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkUp));
+        Assert.AreEqual(3, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkDelete));
+        Assert.AreEqual(3, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkDelete));
     }
 
     [TestMethod]

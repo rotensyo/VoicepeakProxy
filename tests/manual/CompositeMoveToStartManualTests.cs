@@ -53,6 +53,82 @@ public class CompositeMoveToStartManualTests
         Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
     }
 
+    [TestMethod]
+    [TestCategory("Manual")]
+    public void CtrlUpMoveToStart_ClearInput_UsesPageUpUpAndDeleteLoop()
+    {
+        // UI安定化待機
+        PauseForUiStabilization();
+
+        AppConfig config = CreateManualConfig();
+        MessageBox.Show(
+            "VOICEPEAK入力欄へ複数ブロックの既存文字列を入れた状態でOKを押してください。\n" +
+            "実行後に既存文字列が削除され、新しい読み上げ文字列のみになることを目視確認してください。",
+            "VoicepeakProxyCore Manual Test",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Information);
+
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnce(
+            config,
+            new SpeakOnceRequest { Text = "削除処理確認用の単発読み上げです。" },
+            new ConsoleAppLogger());
+
+        MessageBox.Show(
+            "削除処理でPageUpとUpの逐次入力後にDelete連打が実行され、旧文字列が消えていることを確認してください。",
+            "VoicepeakProxyCore Manual Test",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Information);
+
+        Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
+    }
+
+    [TestMethod]
+    [TestCategory("Manual")]
+    public void CtrlUpMoveToStart_InterruptPlayback_StopsThenClearsInput()
+    {
+        // UI安定化待機
+        PauseForUiStabilization();
+
+        AppConfig config = CreateManualConfig();
+        using VoicepeakRuntime runtime = VoicepeakRuntime.Start(config, new ConsoleAppLogger());
+
+        MessageBox.Show(
+            "再生中割込みを確認します。\n" +
+            "OK後に少なくとも3秒以上再生される長文を再生し、その後で割込みジョブを投入します。\n" +
+            "再生中はSpaceで停止した後にフォーカス投入と削除処理が走ることを目視確認してください。",
+            "VoicepeakProxyCore Manual Test",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Information);
+
+        EnqueueResult first = runtime.Enqueue(new SpeakRequest
+        {
+            Text = "これは再生中割込み確認用の長文です。ゆっくり読み上げられていることを確認してください。これは再生中割込み確認用の長文です。3秒以上の再生時間を確保するために文章量を増やしています。",
+            Mode = EnqueueMode.Queue,
+            Interrupt = false
+        });
+
+        Thread.Sleep(3000);
+
+        EnqueueResult second = runtime.Enqueue(new SpeakRequest
+        {
+            Text = "割込み後の確認読み上げです。",
+            Mode = EnqueueMode.Next,
+            Interrupt = true
+        });
+
+        Thread.Sleep(3000);
+
+        MessageBox.Show(
+            "再生中に停止してから削除処理が実行されることを確認できたらOKを押してください。",
+            "VoicepeakProxyCore Manual Test",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Information);
+
+        Assert.AreEqual(EnqueueStatus.Accepted, first.Status);
+        Assert.AreEqual(EnqueueStatus.Accepted, second.Status);
+        Assert.IsFalse(runtime.IsShutdownRequested);
+    }
+
     private static AppConfig CreateManualConfig()
     {
         // 手動確認向け設定

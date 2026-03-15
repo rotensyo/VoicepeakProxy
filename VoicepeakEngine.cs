@@ -51,7 +51,7 @@ internal sealed class VoicepeakEngine : IDisposable
         _config = config;
         _appCts = appCts;
         _log = log;
-        _ui = ui ?? new VoicepeakUiController(config.Ui, config.Debug, _log);
+        _ui = ui ?? new VoicepeakUiController(config.Ui, config.Prepare, config.Debug, _log);
         _audio = audio ?? new AudioSessionReader(_log);
         _worker = null;
         if (startWorker)
@@ -203,7 +203,7 @@ internal sealed class VoicepeakEngine : IDisposable
                         if ((now - speakingStartedAt) > maxMs)
                         {
                             _log.Error("起動時動作チェック失敗: 音声の終了が確認できませんでした。");
-                            _ui.MoveToStart(hwnd, _config.Prepare.ActionDelayMs);
+                            JobExecutionCore.MoveToStartDuringPlayback(_config, _ui, hwnd, _config.Prepare.ActionDelayMs);
                             return mode == BootValidationMode.Optional;
                         }
                     }

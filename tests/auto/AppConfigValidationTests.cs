@@ -20,6 +20,8 @@ public class AppConfigValidationTests
         Assert.AreEqual(0, config.Audio.StartConfirmMaxRetries);
         Assert.AreEqual(300, config.Audio.StopConfirmMs);
         Assert.AreEqual("初期化完了", config.Prepare.BootValidationText);
+        Assert.AreEqual(5, config.Prepare.SequentialMoveToStartKeyDelayBaseMs);
+        Assert.AreEqual(1, config.Prepare.DeleteKeyDelayBaseMs);
         Assert.IsTrue(config.Ui.CompositePrimeAtValidationEnabled);
         Assert.IsFalse(config.Ui.CompositePrimeBeforeTextFocusWhenUnprimedEnabled);
         Assert.IsFalse(config.Ui.CompositeRecoveryClickOnStartTimeoutRetryEnabled);
@@ -72,6 +74,8 @@ public class AppConfigValidationTests
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.BootValidationRetryIntervalMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.PostTypeWaitPerCharMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.PostTypeWaitMinMs = -1));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.SequentialMoveToStartKeyDelayBaseMs = -1));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.DeleteKeyDelayBaseMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Ui.PlayPreShortcutDelayMs = -1));
     }
 
@@ -175,6 +179,8 @@ public class AppConfigValidationTests
             config.Prepare.BootValidationRetryIntervalMs = 0;
             config.Prepare.PostTypeWaitPerCharMs = 0;
             config.Prepare.PostTypeWaitMinMs = 0;
+            config.Prepare.SequentialMoveToStartKeyDelayBaseMs = 0;
+            config.Prepare.DeleteKeyDelayBaseMs = 0;
             config.Ui.PlayPreShortcutDelayMs = 0;
         });
     }
