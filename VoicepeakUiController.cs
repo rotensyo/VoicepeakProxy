@@ -59,6 +59,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         _log = log;
         _processApi = processApi ?? new DefaultVoicepeakProcessApi();
         _sentenceBreakTriggerIndex = BuildSentenceBreakTriggerIndex(ui);
+        WarnIfMoveToStartShortcutWillUseSequentialFallback(_ui.MoveToStartShortcut);
     }
 
     // 対象プロセスとメインウィンドウを解決
@@ -182,7 +183,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     public bool ClearInput(Process process, IntPtr mainHwnd, int actionDelayMs, bool allowCompositePrimeBeforeTextFocusWhenUnprimed)
     {
         int clearInputMaxPasses = Math.Max(1, _prepare.ClearInputMaxPasses);
-        bool compositeMoveToStart = IsCompositeMoveToStartShortcut(_ui.MoveToStartShortcut);
+        bool compositeMoveToStart = UsesSequentialMoveToStartFallback(_ui.MoveToStartShortcut);
         if (compositeMoveToStart)
         {
             for (int pass = 0; pass < clearInputMaxPasses; pass++)
@@ -410,12 +411,12 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     public bool MoveToStart(IntPtr mainHwnd, int actionDelayMs)
     {
         SleepActionDelay(actionDelayMs);
-        if (ShortcutSpec.TryParseCompositeMoveToStart(_ui.MoveToStartShortcut, out ShortcutSpec compositeSpec))
+        if (IsFunctionKeyMoveToStartShortcut(_ui.MoveToStartShortcut))
         {
-            return SendCompositeMoveToStart(mainHwnd, compositeSpec);
+            return SendShortcut(mainHwnd, _ui.MoveToStartShortcut);
         }
 
-        return SendShortcut(mainHwnd, _ui.MoveToStartShortcut);
+        return SendCompositeMoveToStart(mainHwnd);
     }
 
     public bool PressDelete(IntPtr mainHwnd)
@@ -446,12 +447,17 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
     internal static bool IsValidMoveToStartShortcut(string raw)
     {
-        return ShortcutSpec.TryParse(raw, out _) || ShortcutSpec.TryParseCompositeMoveToStart(raw, out _);
+        return !string.IsNullOrWhiteSpace(raw);
     }
 
-    internal static bool IsCompositeMoveToStartShortcut(string raw)
+    internal static bool IsFunctionKeyMoveToStartShortcut(string raw)
     {
-        return ShortcutSpec.TryParseCompositeMoveToStart(raw, out _);
+        return ShortcutSpec.TryParse(raw, out ShortcutSpec spec) && spec.IsFunctionKeyOnly;
+    }
+
+    private static bool UsesSequentialMoveToStartFallback(string raw)
+    {
+        return !IsFunctionKeyMoveToStartShortcut(raw);
     }
 
     public ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd)
@@ -557,7 +563,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
     private bool FocusInputForKeyboardIfNeeded(IntPtr mainHwnd)
     {
-        if (!IsCompositeMoveToStartShortcut(_ui.MoveToStartShortcut))
+        if (!UsesSequentialMoveToStartFallback(_ui.MoveToStartShortcut))
         {
             return true;
         }
@@ -643,7 +649,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
     public bool ShouldAttemptPrimeInputContext(Process process, IntPtr mainHwnd, InputContextPrimeReason reason)
     {
-        if (!IsCompositeMoveToStartShortcut(_ui.MoveToStartShortcut))
+        if (!UsesSequentialMoveToStartFallback(_ui.MoveToStartShortcut))
         {
             return false;
         }
@@ -771,25 +777,35 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return sent;
     }
 
-    private bool SendCompositeMoveToStart(IntPtr hwnd, ShortcutSpec spec)
+    private bool SendCompositeMoveToStart(IntPtr hwnd)
     {
         if (hwnd == IntPtr.Zero)
         {
             return false;
         }
 
-        if (spec.IsCtrlUpOnly)
+        if (!PrimeKeyboardInputForComposite(hwnd))
         {
-            if (!PrimeKeyboardInputForComposite(hwnd))
-            {
-                return false;
-            }
-
-            int pairCount = Math.Max(1, _lastInjectedEnterCount + 1);
-            return SendCompositePageUpUpPairs(hwnd, pairCount);
+            return false;
         }
 
-        return false;
+        int pairCount = Math.Max(1, _lastInjectedEnterCount + 1);
+        return SendCompositePageUpUpPairs(hwnd, pairCount);
+    }
+
+    private void WarnIfMoveToStartShortcutWillUseSequentialFallback(string shortcut)
+    {
+        if (IsFunctionKeyMoveToStartShortcut(shortcut))
+        {
+            return;
+        }
+
+        if (ShortcutSpec.TryParse(shortcut, out _) || ShortcutSpec.TryParseCompositeMoveToStart(shortcut, out _))
+        {
+            return;
+        }
+
+        _log.Warn($"move_to_start_shortcut_unrecognized_fallback_to_pageup value={SanitizeForLog(shortcut)}");
     }
 
     private bool SendCompositePageUpUpPairs(IntPtr mainHwnd, int pairCount)
@@ -1321,6 +1337,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         public bool Alt { get; set; }
         public VirtualKey Key { get; set; }
         public bool IsCtrlUpOnly => Control && !Shift && !Alt && Key == VirtualKey.Up;
+        public bool IsFunctionKeyOnly => !Control && !Shift && !Alt && Key >= VirtualKey.F1 && Key <= VirtualKey.F12;
 
         public static bool TryParse(string raw, out ShortcutSpec spec)
         {

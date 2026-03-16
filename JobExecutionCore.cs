@@ -39,7 +39,7 @@ internal static class JobExecutionCore
     // 再生中の先頭移動を文脈別に実行
     public static bool MoveToStartDuringPlayback(AppConfig config, IVoicepeakUiController ui, IntPtr hwnd, int actionDelayMs)
     {
-        if (VoicepeakUiController.IsCompositeMoveToStartShortcut(config.Ui.MoveToStartShortcut))
+        if (!VoicepeakUiController.IsFunctionKeyMoveToStartShortcut(config.Ui.MoveToStartShortcut))
         {
             if (!ui.PressPlay(hwnd))
             {

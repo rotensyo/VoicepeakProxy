@@ -23,6 +23,7 @@ public class AppConfigValidationTests
         Assert.AreEqual(5, config.Prepare.SequentialMoveToStartKeyDelayBaseMs);
         Assert.AreEqual(1, config.Prepare.DeleteKeyDelayBaseMs);
         Assert.AreEqual(20, config.Prepare.ClearInputMaxPasses);
+        Assert.AreEqual("Ctrl+Up", config.Ui.MoveToStartShortcut);
         Assert.IsTrue(config.Ui.CompositePrimeAtValidationEnabled);
         Assert.IsFalse(config.Ui.CompositePrimeBeforeTextFocusWhenUnprimedEnabled);
         Assert.IsFalse(config.Ui.CompositeRecoveryClickOnStartTimeoutRetryEnabled);
@@ -82,11 +83,11 @@ public class AppConfigValidationTests
     }
 
     [TestMethod]
-    public void Validate_InvalidShortcut_Throws()
+    public void Validate_BlankMoveToStartShortcut_Throws()
     {
-        // 無効ショートカットを拒否
+        // 先頭移動設定の空白を拒否
         InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
-            ValidateWith(config => config.Ui.MoveToStartShortcut = "Delete"));
+            ValidateWith(config => config.Ui.MoveToStartShortcut = "   "));
 
         StringAssert.Contains(ex.Message, "ui.moveToStartShortcut");
     }

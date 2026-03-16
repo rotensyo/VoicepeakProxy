@@ -48,26 +48,32 @@ public class UiControllerTests
     }
 
     [TestMethod]
-    public void IsValidMoveToStartShortcut_AcceptsCtrlUp()
+    public void IsValidMoveToStartShortcut_AllowsAnyNonBlankValue()
     {
-        // 先頭移動専用でCtrl+Upを許可
+        // 先頭移動設定は非空文字列を許可
         Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsValidMoveToStartShortcut", "Ctrl+Up"));
-        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsValidMoveToStartShortcut", "Alt+Up"));
+        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsValidMoveToStartShortcut", "Alt+Up"));
+        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsValidMoveToStartShortcut", "Delete"));
+        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsValidMoveToStartShortcut", ""));
+        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsValidMoveToStartShortcut", "   "));
+        Assert.IsFalse(VoicepeakUiController.IsValidMoveToStartShortcut(null));
     }
 
     [TestMethod]
-    public void IsCompositeMoveToStartShortcut_ReturnsExpectedValues()
+    public void IsFunctionKeyMoveToStartShortcut_ReturnsExpectedValues()
     {
-        // 複合先頭移動だけを識別
-        Assert.IsTrue(VoicepeakUiController.IsCompositeMoveToStartShortcut("Ctrl+Up"));
-        Assert.IsFalse(VoicepeakUiController.IsCompositeMoveToStartShortcut("Home"));
+        // Fキー系のみ独自ルート対象
+        Assert.IsTrue(VoicepeakUiController.IsFunctionKeyMoveToStartShortcut("F3"));
+        Assert.IsFalse(VoicepeakUiController.IsFunctionKeyMoveToStartShortcut("Ctrl+Up"));
+        Assert.IsFalse(VoicepeakUiController.IsFunctionKeyMoveToStartShortcut("Home"));
+        Assert.IsFalse(VoicepeakUiController.IsFunctionKeyMoveToStartShortcut("Delete"));
     }
 
     [TestMethod]
-    public void ShouldAttemptPrimeInputContext_NonCompositeShortcut_ReturnsFalse()
+    public void ShouldAttemptPrimeInputContext_FunctionShortcut_ReturnsFalse()
     {
-        // 単一ショートカットではprimeしない
-        VoicepeakUiController controller = CreateController(new UiConfig { MoveToStartShortcut = "Home" }, new FakeVoicepeakProcessApi());
+        // Fキー独自ルートではprimeしない
+        VoicepeakUiController controller = CreateController(new UiConfig { MoveToStartShortcut = "F3" }, new FakeVoicepeakProcessApi());
         Process process = Process.GetCurrentProcess();
         IntPtr hwnd = new IntPtr(123);
 
@@ -432,14 +438,14 @@ public class UiControllerTests
     }
 
     [TestMethod]
-    public void MoveToStart_SendsConfiguredShortcutKey()
+    public void MoveToStart_FunctionShortcut_SendsConfiguredShortcutKey()
     {
-        // 先頭移動ショートカットを送信
+        // Fキー独自ルートは設定ショートカットを送信
         var messages = ReflectionTestHelper.RunInSta(() =>
         {
             UiConfig ui = new UiConfig
             {
-                MoveToStartShortcut = "Home"
+                MoveToStartShortcut = "F3"
             };
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
             VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
@@ -448,7 +454,7 @@ public class UiControllerTests
             return window.Messages.ToArray();
         });
 
-        Assert.IsTrue(messages.Any(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == 0x24));
+        Assert.IsTrue(messages.Any(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkF3));
     }
 
     [TestMethod]

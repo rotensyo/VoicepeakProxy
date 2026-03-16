@@ -171,13 +171,13 @@ public class VoicepeakEngineTests
     }
 
     [TestMethod]
-    public void BootValidate_SingleShortcut_DoesNotCallTryPrimeInputContext()
+    public void BootValidate_FunctionShortcut_DoesNotCallTryPrimeInputContext()
     {
-        // 単一ショートカットではprimeしない
+        // Fキー独自ルートではprimeしない
         FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
         ui.ReadInputHandler = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA);
         AppConfig config = CreateEngineConfig();
-        config.Ui.MoveToStartShortcut = "Home";
+        config.Ui.MoveToStartShortcut = "F3";
         config.Prepare.BootValidationText = string.Empty;
 
         using CancellationTokenSource cts = new CancellationTokenSource();

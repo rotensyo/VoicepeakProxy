@@ -101,7 +101,7 @@ public class VoicepeakEngineExecuteJobTests
     }
 
     [TestMethod]
-    public void ExecuteJob_StartTimeoutRetry_SingleShortcut_DoesNotCallTryPrimeInputContext()
+    public void ExecuteJob_StartTimeoutRetry_FunctionShortcut_DoesNotCallTryPrimeInputContext()
     {
         TestLogger logger = new TestLogger();
         FakeVoicepeakUiController ui = CreateResolvedUi();
@@ -113,7 +113,7 @@ public class VoicepeakEngineExecuteJobTests
         audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
         AppConfig config = CreateConfig();
-        config.Ui.MoveToStartShortcut = "Home";
+        config.Ui.MoveToStartShortcut = "F3";
         config.Ui.CompositeRecoveryClickOnStartTimeoutRetryEnabled = true;
         config.Audio.StartConfirmWindowMs = 1;
         config.Audio.StartConfirmMaxRetries = 1;

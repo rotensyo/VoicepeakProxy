@@ -57,7 +57,7 @@ public sealed class PrepareConfig
 // UI操作関連設定
 public sealed class UiConfig
 {
-    public string MoveToStartShortcut { get; set; } = "F3";
+    public string MoveToStartShortcut { get; set; } = "Ctrl+Up";
     public string PlayShortcut { get; set; } = "Space";
     public int PlayPreShortcutDelayMs { get; set; } = 60;
     public bool CompositePrimeAtValidationEnabled { get; set; } = true;
@@ -204,7 +204,7 @@ internal static class AppConfigValidator
 
         if (!VoicepeakUiController.IsValidMoveToStartShortcut(config.Ui.MoveToStartShortcut))
         {
-            throw new InvalidOperationException("ui.moveToStartShortcut の形式が不正です（例: F3, Home, Ctrl+Up）");
+            throw new InvalidOperationException("ui.moveToStartShortcut は null/空文字/空白にできません");
         }
 
         if (!VoicepeakUiController.IsValidShortcut(config.Ui.PlayShortcut))
