@@ -14,7 +14,7 @@
 
 ## 単発実行の流れ
 
-1. `VoicepeakOneShot.SpeakOnce(...)`
+1. `VoicepeakOneShot.SpeakOnceWait(...)`
 2. 設定バリデーション
 3. `voicepeak.exe`と対象ウィンドウ解決
 4. 1ジョブを同期実行

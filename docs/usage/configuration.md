@@ -50,6 +50,12 @@
   - 文字入力後の待機時間算出に使う倍率です
 - `PostTypeWaitMinMs` (`default: 100`)
   - 文字入力後待機の最小値です
+- `SequentialMoveToStartKeyDelayBaseMs` (`default: 5`)
+  - 逐次`PageUp`→`Up`経路でのキー間待機です
+- `DeleteKeyDelayBaseMs` (`default: 1`)
+  - `Delete`1回ごとの待機です
+- `ClearInputMaxPasses` (`default: 20`)
+  - 入力クリア処理の最大試行回数です
 
 ## `UiConfig`
 
@@ -63,7 +69,7 @@
   - `MoveToStartShortcut`が`F1-F12`以外の時だけ使います
   - 未prime時に文字入力欄フォーカス直前のprimeクリックを許可します
   - 常駐ループと起動時Validationで評価します
-  - `VoicepeakOneShot.SpeakOnce`では評価しません
+  - `VoicepeakOneShot.SpeakOnceWait`では評価しません
 - `CompositeRecoveryClickOnStartTimeoutRetryEnabled` (`default: false`)
   - `MoveToStartShortcut`が`F1-F12`以外の時だけ使います
   - `StartTimeout`再試行前の修正クリックを1回だけ許可します
@@ -75,6 +81,7 @@
 - `MoveToStartShortcut`はnull/空文字/空白以外を設定してください
 - `F1-F12`はショートカット経路、それ以外は逐次`PageUp`→`Up`経路で処理されます
 - 上記3つの`Composite...`設定は`MoveToStartShortcut`が`F1-F12`以外の時だけ評価されます
+- 非Fキー値が標準ショートカットとして解釈不能でも、逐次`PageUp`→`Up`へフォールバックします
 - `SentenceBreakTriggers`は複数文字指定に対応し、最長一致を優先します
 
 ## `TextTransformConfig`
@@ -82,6 +89,13 @@
 - `ReplaceRules`
   - 上から順に1回ずつ適用します
   - `[[pause:NNN]]`には適用しません
+
+### `ReplaceRule`
+
+- `From`
+  - 置換対象文字列です
+- `To`
+  - 置換後文字列です
 
 例:
 
@@ -92,6 +106,12 @@ config.TextTransform.ReplaceRules.Add(new ReplaceRule
     To = "。、。"
 });
 ```
+
+## `DebugConfig`
+
+- `LogTextCandidates` (`default: false`)
+  - 入力欄候補収集の詳細ログを出力します
+  - `ReadInputTextDetailed(...)`で候補一覧と推定情報のログを有効化します
 
 ## `ValidationConfig`
 
@@ -126,11 +146,12 @@ config.TextTransform.ReplaceRules.Add(new ReplaceRule
 
 - `config`と各セクションが`null`でないこと
 - 数値設定が許容範囲にあること
-- ショートカット文字列が有効形式であること
+- `MoveToStartShortcut`がnull/空文字/空白でないこと
+- `PlayShortcut`が有効形式であること
 - `SentenceBreakTriggers`が`null`でなく、各要素が空文字でないこと
 - `TextTransform.ReplaceRules`が`null`でないこと
 
-サポートしている主なショートカット形式です。
+`PlayShortcut`でサポートしている主な形式です。
 
 - `F3`
 - `Ctrl+F4`
@@ -138,7 +159,7 @@ config.TextTransform.ReplaceRules.Add(new ReplaceRule
 - `Home`
 - `End`
 
-`Delete`や`Enter`はショートカット設定値としてサポートしていません。
+`Delete`や`Enter`は`PlayShortcut`設定値としてサポートしていません。
 
 ## 例: C#で直接設定
 

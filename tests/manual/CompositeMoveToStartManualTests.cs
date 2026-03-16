@@ -32,14 +32,14 @@ public class CompositeMoveToStartManualTests
 
     [TestMethod]
     [TestCategory("Manual")]
-    public void CtrlUpMoveToStart_SpeakOnce_CompletesSuccessfully()
+    public void CtrlUpMoveToStart_SpeakOnceWait_CompletesSuccessfully()
     {
         // UI安定化待機
         PauseForUiStabilization();
 
         // 単発読み上げを実行
         AppConfig config = CreateManualConfig();
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnce(
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWait(
             config,
             new SpeakOnceRequest { Text = "目視確認用の単発読み上げです。" },
             new ConsoleAppLogger());
@@ -68,7 +68,7 @@ public class CompositeMoveToStartManualTests
             MessageBoxButtons.OK,
             MessageBoxIcon.Information);
 
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnce(
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWait(
             config,
             new SpeakOnceRequest { Text = "削除処理確認用の単発読み上げです。" },
             new ConsoleAppLogger());

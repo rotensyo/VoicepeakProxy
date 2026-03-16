@@ -39,7 +39,7 @@ public sealed class SpeakOnceRequest
 public static class VoicepeakOneShot
 {
     // 単発実行
-    public static SpeakOnceResult SpeakOnce(
+    public static SpeakOnceResult SpeakOnceWait(
         AppConfig config,
         SpeakOnceRequest request,
         IAppLogger logger = null)
@@ -53,7 +53,7 @@ public static class VoicepeakOneShot
         AppLogger log = new AppLogger(logger ?? new ConsoleAppLogger());
 
         RequestValidationMode validation = config.Validation.RequestValidation;
-        return SpeakOnceCore(
+        return SpeakOnceWaitCore(
             config,
             request,
             log,
@@ -63,7 +63,7 @@ public static class VoicepeakOneShot
     }
 
     // 依存を差し替えて単発実行
-    internal static SpeakOnceResult SpeakOnceCore(
+    internal static SpeakOnceResult SpeakOnceWaitCore(
         AppConfig config,
         SpeakOnceRequest request,
         AppLogger log,

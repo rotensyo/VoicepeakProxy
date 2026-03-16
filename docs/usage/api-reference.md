@@ -36,7 +36,7 @@
 
 ## 単発実行 API
 
-### `VoicepeakOneShot.SpeakOnce(AppConfig config, SpeakOnceRequest request, IAppLogger logger = null)`
+### `VoicepeakOneShot.SpeakOnceWait(AppConfig config, SpeakOnceRequest request, IAppLogger logger = null)`
 
 - 1ジョブだけ同期実行します
 - ワーカーループは起動しません
