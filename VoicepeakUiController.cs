@@ -590,6 +590,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             sent |= SendWindowMessage(voicePeakHwnd, WmActivate, new IntPtr(2), IntPtr.Zero);
         }
 
+        sent |= SendWindowMessage(voicePeakHwnd, WmKillFocus, IntPtr.Zero, IntPtr.Zero);
+        Thread.Sleep(10);
         sent |= SendWindowMessage(voicePeakHwnd, WmSetFocus, IntPtr.Zero, IntPtr.Zero);
         Thread.Sleep(30);
         return sent;

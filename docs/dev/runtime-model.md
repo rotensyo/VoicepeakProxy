@@ -63,7 +63,15 @@ stateDiagram-v2
 
 - `Audio.StartConfirmWindowMs`内に発話開始が検知できない場合は`StartTimeout`になります
 - `Audio.StartConfirmMaxRetries`が残っていれば、`MoveToStart`→`PressPlay`→開始確認を再試行します
-- この再試行は常駐実行、単発実行、起動時バリデーションに適用されます
+- この再試行は常駐実行、`SpeakOnceWait`、起動時バリデーションに適用されます
+- `SpeakOnce`は開始確認専用のため再試行を行いません
+
+## 非F系フォーカス順序
+
+- 対象: `Ui.MoveToStartShortcut`が`F1-F12`以外の経路
+- `FocusInputForKeyboardIfNeeded(...)`では`WM_SETFOCUS`の前に`WM_KILLFOCUS`を送信します
+- 送信順序は`WM_ACTIVATE`→`WM_KILLFOCUS`→`WM_SETFOCUS`です
+- 背景: 既に存在しない入力ブロックへ`SETFOCUS`済みの状態で、`KILLFOCUS`なしに再度`SETFOCUS`すると不具合が発生するためです
 
 ## 関連ドキュメント
 
