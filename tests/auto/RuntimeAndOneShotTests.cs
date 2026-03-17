@@ -84,6 +84,21 @@ public class RuntimeAndOneShotTests
     }
 
     [TestMethod]
+    public void SpeakOnce_NullConfig_Throws()
+    {
+        Assert.ThrowsException<ArgumentNullException>(() => VoicepeakOneShot.SpeakOnce(null, new SpeakOnceRequest()));
+    }
+
+    [TestMethod]
+    public void SpeakOnce_NullRequest_ReturnsInvalidRequest()
+    {
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnce(new AppConfig(), null, new TestLogger());
+
+        Assert.AreEqual(SpeakOnceStatus.InvalidRequest, result.Status);
+        StringAssert.Contains(result.ErrorMessage, "request は null");
+    }
+
+    [TestMethod]
     public void Logger_IsIsolatedPerRuntimeInstance()
     {
         AppConfig config = CreateRuntimeConfig();

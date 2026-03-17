@@ -117,6 +117,40 @@ public class VoicepeakOneShotCoreTests
         Assert.AreEqual(0, ui.TryPrimeInputContextCalls);
     }
 
+    [TestMethod]
+    public void SpeakOnceCore_Success_ReturnsCompleted_WhenStartConfirmed()
+    {
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        FakeAudioSessionReader audio = new FakeAudioSessionReader();
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" });
+        audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" };
+        AppConfig config = CreateConfig();
+        config.Audio.StartConfirmWindowMs = 200;
+
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), RequestValidationMode.Strict, ui, audio);
+
+        Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
+        Assert.AreEqual(1, result.SegmentsExecuted);
+        Assert.AreEqual(1, ui.PressPlayCalls);
+    }
+
+    [TestMethod]
+    public void SpeakOnceCore_StartTimeout_DoesNotRetryEvenWhenRetryConfigured()
+    {
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        FakeAudioSessionReader audio = new FakeAudioSessionReader();
+        audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
+        AppConfig config = CreateConfig();
+        config.Audio.StartConfirmWindowMs = 1;
+        config.Audio.StartConfirmMaxRetries = 3;
+
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), RequestValidationMode.Strict, ui, audio);
+
+        Assert.AreEqual(SpeakOnceStatus.StartConfirmTimeout, result.Status);
+        Assert.AreEqual(1, ui.PressPlayCalls);
+    }
+
     private static AppConfig CreateConfig()
     {
         AppConfig config = new AppConfig();

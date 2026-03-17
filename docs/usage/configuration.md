@@ -69,7 +69,7 @@
   - `MoveToStartShortcut`が`F1-F12`以外の時だけ使います
   - 未prime時に文字入力欄フォーカス直前のprimeクリックを許可します
   - 常駐ループと起動時Validationで評価します
-  - `VoicepeakOneShot.SpeakOnceWait`では評価しません
+  - `VoicepeakOneShot.SpeakOnce`/`VoicepeakOneShot.SpeakOnceWait`では評価しません
 - `CompositeRecoveryClickOnStartTimeoutRetryEnabled` (`default: false`)
   - `MoveToStartShortcut`が`F1-F12`以外の時だけ使います
   - `StartTimeout`再試行前の修正クリックを1回だけ許可します
