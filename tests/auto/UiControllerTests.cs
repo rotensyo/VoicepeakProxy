@@ -487,9 +487,9 @@ public class UiControllerTests
     }
 
     [TestMethod]
-    public void MoveToStart_CompositeShortcut_SendsKillFocusBeforeFirstSetFocus()
+    public void MoveToStart_CompositeShortcut_SendsKillFocusAndSetFocus()
     {
-        // 非F系先頭移動はSetFocus前にKillFocusを送信
+        // 非F系先頭移動はKillFocusとSetFocusを送信
         var messages = ReflectionTestHelper.RunInSta(() =>
         {
             UiConfig ui = new UiConfig
@@ -498,16 +498,14 @@ public class UiControllerTests
             };
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
             VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
+            window.Messages.Clear();
 
             Assert.IsTrue(controller.MoveToStart(window.Handle, 0));
             return window.Messages.ToArray();
         });
 
-        int firstSetFocusIndex = Array.FindIndex(messages, m => m.Msg == 0x0007);
-        int firstKillFocusIndex = Array.FindIndex(messages, m => m.Msg == 0x0008);
-        Assert.IsTrue(firstSetFocusIndex >= 0, "set_focus_not_sent");
-        Assert.IsTrue(firstKillFocusIndex >= 0, "kill_focus_not_sent");
-        Assert.IsTrue(firstKillFocusIndex < firstSetFocusIndex, $"kill_focus_index={firstKillFocusIndex} set_focus_index={firstSetFocusIndex}");
+        Assert.IsTrue(messages.Any(m => m.Msg == 0x0007), "set_focus_not_sent");
+        Assert.IsTrue(messages.Any(m => m.Msg == 0x0008), "kill_focus_not_sent");
     }
 
     [TestMethod]

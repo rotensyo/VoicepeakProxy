@@ -161,21 +161,11 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             TryPrimeInputContext(process, mainHwnd, InputContextPrimeReason.BeforeTextFocusWhenUnprimed);
         }
 
-        if (!FocusInputForKeyboardIfNeeded(mainHwnd))
-        {
-            return false;
-        }
-
         return MoveToStart(mainHwnd, actionDelayMs);
     }
 
     public bool PrepareForPlayback(Process process, IntPtr mainHwnd, int actionDelayMs)
     {
-        if (!FocusInputForKeyboardIfNeeded(mainHwnd))
-        {
-            return false;
-        }
-
         return MoveToStart(mainHwnd, actionDelayMs);
     }
 
@@ -599,12 +589,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
     private bool PrimeKeyboardInputForComposite(IntPtr mainHwnd)
     {
-        if (!KillFocus(mainHwnd))
-        {
-            return false;
-        }
-
-        Thread.Sleep(10);
         return FocusInputForKeyboardIfNeeded(mainHwnd);
     }
 
