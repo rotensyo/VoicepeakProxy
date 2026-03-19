@@ -81,6 +81,8 @@
 - `NNN`はミリ秒整数です
 - 負値は`0`扱いです
 - `[[pause:NNN]]`自体には文字列置換を適用しません
+- `VoicepeakOneShot.SpeakOnce`では`[[pause:NNN]]`を除去して1回再生として扱います
+- `VoicepeakOneShot.SpeakOnceWait`と常駐実行では従来どおりpauseとして解釈します
 
 例:
 

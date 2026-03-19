@@ -81,7 +81,7 @@ public static class VoicepeakOneShot
 
             SpeakRequest runtimeRequest = new SpeakRequest
             {
-                Text = request.Text,
+                Text = PauseTokenParser.StripTokens(request.Text),
                 Mode = EnqueueMode.Queue,
                 Interrupt = false
             };

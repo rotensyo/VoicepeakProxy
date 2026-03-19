@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace VoicepeakProxyCore;
@@ -45,11 +46,50 @@ internal sealed class Segment
     public int PausePreMs { get; set; }
 }
 
-// リクエストを内部ジョブへ変換
-internal static class JobCompiler
+// pauseトークン解析を共通化
+internal static class PauseTokenParser
 {
     private static readonly Regex PauseRegex = new Regex(@"\[\[pause:(-?\d+)\]\]", RegexOptions.Compiled);
 
+    // pauseトークン一致を列挙
+    internal static MatchCollection Matches(string input)
+    {
+        return PauseRegex.Matches(input ?? string.Empty);
+    }
+
+    // pause値を0以上へ正規化
+    internal static int NormalizePauseValue(string raw)
+    {
+        int pauseValue = int.Parse(raw);
+        return pauseValue < 0 ? 0 : pauseValue;
+    }
+
+    // pauseトークンを除去した文字列を返す
+    internal static string StripTokens(string input)
+    {
+        string source = input ?? string.Empty;
+        MatchCollection matches = Matches(source);
+        if (matches.Count == 0)
+        {
+            return source;
+        }
+
+        StringBuilder builder = new StringBuilder(source.Length);
+        int index = 0;
+        foreach (Match m in matches)
+        {
+            builder.Append(source, index, m.Index - index);
+            index = m.Index + m.Length;
+        }
+
+        builder.Append(source, index, source.Length - index);
+        return builder.ToString();
+    }
+}
+
+// リクエストを内部ジョブへ変換
+internal static class JobCompiler
+{
     // 入力内容を検証しながらジョブ化
     public static Job Compile(SpeakRequest req, AppConfig config, RequestValidationMode validationMode)
     {
@@ -91,7 +131,7 @@ internal static class JobCompiler
         int index = 0;
         int pendingPause = 0;
 
-        foreach (Match m in PauseRegex.Matches(input))
+        foreach (Match m in PauseTokenParser.Matches(input))
         {
             // pause制御は置換対象から除外
             string chunk = ApplyReplaceRules(input.Substring(index, m.Index - index), config.TextTransform.ReplaceRules);
@@ -105,11 +145,7 @@ internal static class JobCompiler
                 pendingPause = 0;
             }
 
-            int pauseValue = int.Parse(m.Groups[1].Value);
-            if (pauseValue < 0)
-            {
-                pauseValue = 0;
-            }
+            int pauseValue = PauseTokenParser.NormalizePauseValue(m.Groups[1].Value);
 
             pendingPause += pauseValue;
             index = m.Index + m.Length;
