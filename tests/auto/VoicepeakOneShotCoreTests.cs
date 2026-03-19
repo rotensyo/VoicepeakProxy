@@ -60,7 +60,7 @@ public class VoicepeakOneShotCoreTests
         audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
         AppConfig config = CreateConfig();
-        config.Audio.StartConfirmWindowMs = 1;
+        config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 1;
 
@@ -87,7 +87,7 @@ public class VoicepeakOneShotCoreTests
         AppConfig config = CreateConfig();
         config.Ui.MoveToStartShortcut = "Ctrl+Up";
         config.Ui.CompositeRecoveryClickOnStartTimeoutRetryEnabled = true;
-        config.Audio.StartConfirmWindowMs = 1;
+        config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 2;
         config.Audio.StopConfirmMs = 1;
 
@@ -126,7 +126,7 @@ public class VoicepeakOneShotCoreTests
         audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" });
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" };
         AppConfig config = CreateConfig();
-        config.Audio.StartConfirmWindowMs = 200;
+        config.Audio.StartConfirmTimeoutMs = 200;
 
         SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), RequestValidationMode.Strict, ui, audio);
 
@@ -142,7 +142,7 @@ public class VoicepeakOneShotCoreTests
         FakeAudioSessionReader audio = new FakeAudioSessionReader();
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
         AppConfig config = CreateConfig();
-        config.Audio.StartConfirmWindowMs = 1;
+        config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 3;
 
         SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), RequestValidationMode.Strict, ui, audio);
@@ -159,7 +159,7 @@ public class VoicepeakOneShotCoreTests
         audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" });
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" };
         AppConfig config = CreateConfig();
-        config.Audio.StartConfirmWindowMs = 200;
+        config.Audio.StartConfirmTimeoutMs = 200;
 
         SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(
             config,
@@ -208,7 +208,7 @@ public class VoicepeakOneShotCoreTests
     {
         AppConfig config = new AppConfig();
         config.Audio.PollIntervalMs = 1;
-        config.Audio.StartConfirmWindowMs = 10;
+        config.Audio.StartConfirmTimeoutMs = 10;
         config.Audio.StopConfirmMs = 1;
         config.Audio.MaxSpeakingDurationSec = 0;
         config.Audio.PeakThreshold = 0.5f;

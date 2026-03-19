@@ -101,7 +101,7 @@ internal static class JobExecutionCore
         Action onInterrupt)
     {
         long monitorStartAt = MonoClock.NowMs();
-        long startDeadline = monitorStartAt + config.Audio.StartConfirmWindowMs;
+        long startDeadline = monitorStartAt + config.Audio.StartConfirmTimeoutMs;
         bool startConfirmed = false;
         long speakingStartedAt = -1;
         long belowSince = -1;
@@ -227,7 +227,7 @@ internal static class JobExecutionCore
     // pause値から補正時間を差し引き
     public static int AdjustPauseByStopConfirmAndPlayDelay(AppConfig config, int pauseMs, string phase, string jobId, int segmentIndex, string nextText, AppLogger log)
     {
-        int compensation = config.Audio.StopConfirmMs + config.Ui.PlayPreShortcutDelayMs;
+        int compensation = config.Audio.StopConfirmMs + config.Ui.DelayBeforePlayShortcutMs;
         int requiredByFormulaMs = compensation;
         if (string.Equals(phase, "pre", StringComparison.Ordinal))
         {

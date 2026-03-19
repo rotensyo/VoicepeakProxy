@@ -137,7 +137,7 @@ public class CompositeMoveToStartManualTests
         config.Ui.CompositePrimeAtValidationEnabled = true;
         config.Ui.CompositePrimeBeforeTextFocusWhenUnprimedEnabled = true;
         config.Ui.CompositeRecoveryClickOnStartTimeoutRetryEnabled = true;
-        config.Audio.StartConfirmWindowMs = 2000;
+        config.Audio.StartConfirmTimeoutMs = 2000;
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 300;
         config.Audio.MaxSpeakingDurationSec = 30;

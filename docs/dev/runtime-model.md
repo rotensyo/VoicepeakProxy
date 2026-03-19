@@ -61,7 +61,7 @@ stateDiagram-v2
 
 ## 開始確認再試行
 
-- `Audio.StartConfirmWindowMs`内に発話開始が検知できない場合は`StartTimeout`になります
+- `Audio.StartConfirmTimeoutMs`内に発話開始が検知できない場合は`StartTimeout`になります
 - `Audio.StartConfirmMaxRetries`が残っていれば、`MoveToStart`→`PressPlay`→開始確認を再試行します
 - この再試行は常駐実行、`SpeakOnceWait`、起動時バリデーションに適用されます
 - `SpeakOnce`は開始確認専用のため再試行を行いません

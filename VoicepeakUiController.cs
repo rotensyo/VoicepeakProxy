@@ -186,7 +186,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
                 int pairCount = Math.Max(1, before.VisibleBlockCount + 1);
                 int deleteSteps = ComputeCompositeDeleteSteps(before.Read, before.VisibleBlockCount);
-                if (!RunCompositeClearCycle(mainHwnd, pairCount, deleteSteps))
+                if (!RunCompositeClearCycle(mainHwnd, pairCount, deleteSteps, actionDelayMs))
                 {
                     return false;
                 }
@@ -272,15 +272,9 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return Math.Max(10, baseLength + 10 + inputBoxCount);
     }
 
-    private bool RunCompositeClearCycle(IntPtr mainHwnd, int pairCount, int deleteSteps)
+    private bool RunCompositeClearCycle(IntPtr mainHwnd, int pairCount, int deleteSteps, int actionDelayMs)
     {
-        if (!KillFocus(mainHwnd))
-        {
-            return false;
-        }
-
-        Thread.Sleep(10);
-        if (!FocusInputForKeyboardIfNeeded(mainHwnd))
+        if (!FocusInputForKeyboardIfNeeded(mainHwnd, actionDelayMs))
         {
             return false;
         }
@@ -390,9 +384,9 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             return false;
         }
 
-        if (_ui.PlayPreShortcutDelayMs > 0)
+        if (_ui.DelayBeforePlayShortcutMs > 0)
         {
-            Thread.Sleep(_ui.PlayPreShortcutDelayMs);
+            Thread.Sleep(_ui.DelayBeforePlayShortcutMs);
         }
 
         return SendShortcut(mainHwnd, _ui.PlayShortcut);
@@ -406,8 +400,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             return SendShortcut(mainHwnd, _ui.MoveToStartShortcut);
         }
 
-        return SendCompositeMoveToStart(mainHwnd);
-    }
+            return SendCompositeMoveToStart(mainHwnd, actionDelayMs);
+        }
 
     public bool PressDelete(IntPtr mainHwnd)
     {
@@ -551,7 +545,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return ok != IntPtr.Zero;
     }
 
-    private bool FocusInputForKeyboardIfNeeded(IntPtr mainHwnd)
+    private bool FocusInputForKeyboardIfNeeded(IntPtr mainHwnd, int actionDelayMs)
     {
         if (!UsesSequentialMoveToStartFallback(_ui.MoveToStartShortcut))
         {
@@ -581,15 +575,15 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
 
         sent |= SendWindowMessage(voicePeakHwnd, WmKillFocus, IntPtr.Zero, IntPtr.Zero);
-        Thread.Sleep(10);
+        SleepFocusTransitionDelay(actionDelayMs);
         sent |= SendWindowMessage(voicePeakHwnd, WmSetFocus, IntPtr.Zero, IntPtr.Zero);
-        Thread.Sleep(30);
+        SleepFocusTransitionDelay(actionDelayMs);
         return sent;
     }
 
-    private bool PrimeKeyboardInputForComposite(IntPtr mainHwnd)
+    private bool PrimeKeyboardInputForComposite(IntPtr mainHwnd, int actionDelayMs)
     {
-        return FocusInputForKeyboardIfNeeded(mainHwnd);
+        return FocusInputForKeyboardIfNeeded(mainHwnd, actionDelayMs);
     }
 
     private bool TryPrimeInputContextWithForeground(Process process, IntPtr mainHwnd)
@@ -764,14 +758,14 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return sent;
     }
 
-    private bool SendCompositeMoveToStart(IntPtr hwnd)
+    private bool SendCompositeMoveToStart(IntPtr hwnd, int actionDelayMs)
     {
         if (hwnd == IntPtr.Zero)
         {
             return false;
         }
 
-        if (!PrimeKeyboardInputForComposite(hwnd))
+        if (!PrimeKeyboardInputForComposite(hwnd, actionDelayMs))
         {
             return false;
         }
@@ -1106,6 +1100,14 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     }
 
     private static void SleepActionDelay(int actionDelayMs)
+    {
+        if (actionDelayMs > 0)
+        {
+            Thread.Sleep(actionDelayMs);
+        }
+    }
+
+    private static void SleepFocusTransitionDelay(int actionDelayMs)
     {
         if (actionDelayMs > 0)
         {

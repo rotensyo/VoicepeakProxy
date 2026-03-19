@@ -16,7 +16,7 @@ public class AppConfigValidationTests
 
         Assert.AreEqual(500, config.Server.MaxQueuedJobs);
         Assert.AreEqual(50, config.Audio.PollIntervalMs);
-        Assert.AreEqual(1000, config.Audio.StartConfirmWindowMs);
+        Assert.AreEqual(1000, config.Audio.StartConfirmTimeoutMs);
         Assert.AreEqual(0, config.Audio.StartConfirmMaxRetries);
         Assert.AreEqual(300, config.Audio.StopConfirmMs);
         Assert.AreEqual("初期化完了", config.Prepare.BootValidationText);
@@ -68,7 +68,7 @@ public class AppConfigValidationTests
         // 数値境界を検証
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Server.MaxQueuedJobs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.PollIntervalMs = 0));
-        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.StartConfirmWindowMs = 0));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.StartConfirmTimeoutMs = 0));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.StartConfirmMaxRetries = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.StopConfirmMs = 0));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.ActionDelayMs = -1));
@@ -79,7 +79,7 @@ public class AppConfigValidationTests
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.SequentialMoveToStartKeyDelayBaseMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.DeleteKeyDelayBaseMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.ClearInputMaxPasses = 0));
-        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Ui.PlayPreShortcutDelayMs = -1));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Ui.DelayBeforePlayShortcutMs = -1));
     }
 
     [TestMethod]
@@ -174,7 +174,7 @@ public class AppConfigValidationTests
         {
             config.Server.MaxQueuedJobs = 0;
             config.Audio.PollIntervalMs = 1;
-            config.Audio.StartConfirmWindowMs = 1;
+            config.Audio.StartConfirmTimeoutMs = 1;
             config.Audio.StartConfirmMaxRetries = 0;
             config.Audio.StopConfirmMs = 1;
             config.Prepare.ActionDelayMs = 0;
@@ -185,7 +185,7 @@ public class AppConfigValidationTests
             config.Prepare.SequentialMoveToStartKeyDelayBaseMs = 0;
             config.Prepare.DeleteKeyDelayBaseMs = 0;
             config.Prepare.ClearInputMaxPasses = 1;
-            config.Ui.PlayPreShortcutDelayMs = 0;
+            config.Ui.DelayBeforePlayShortcutMs = 0;
         });
     }
 

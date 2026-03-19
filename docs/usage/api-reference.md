@@ -42,7 +42,7 @@
 - ワーカーループは起動しません
 - 起動時バリデーションは実行しません
 - 再生開始を確認できた時点で返ります
-- `Audio.StartConfirmWindowMs`を超過した場合は`StartConfirmTimeout`を返します
+- `Audio.StartConfirmTimeoutMs`を超過した場合は`StartConfirmTimeout`を返します
 - `config == null`は`ArgumentNullException`
 - `request == null`は`SpeakOnceStatus.InvalidRequest`として返します
 

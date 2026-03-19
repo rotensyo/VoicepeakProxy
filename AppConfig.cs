@@ -33,7 +33,7 @@ public sealed class AudioConfig
 {
     public float PeakThreshold { get; set; } = 0.000000001f;
     public int PollIntervalMs { get; set; } = 50;
-    public int StartConfirmWindowMs { get; set; } = 1000;
+    public int StartConfirmTimeoutMs { get; set; } = 1000;
     public int StartConfirmMaxRetries { get; set; } = 0;
     public int StopConfirmMs { get; set; } = 300;
     public int MaxSpeakingDurationSec { get; set; } = 300;
@@ -59,7 +59,7 @@ public sealed class UiConfig
 {
     public string MoveToStartShortcut { get; set; } = "Ctrl+Up";
     public string PlayShortcut { get; set; } = "Space";
-    public int PlayPreShortcutDelayMs { get; set; } = 60;
+    public int DelayBeforePlayShortcutMs { get; set; } = 60;
     public bool CompositePrimeAtValidationEnabled { get; set; } = true;
     public bool CompositePrimeBeforeTextFocusWhenUnprimedEnabled { get; set; } = false;
     public bool CompositeRecoveryClickOnStartTimeoutRetryEnabled { get; set; } = false;
@@ -137,9 +137,9 @@ internal static class AppConfigValidator
             throw new InvalidOperationException("audio.pollIntervalMs は 1 以上で指定してください");
         }
 
-        if (config.Audio.StartConfirmWindowMs <= 0)
+        if (config.Audio.StartConfirmTimeoutMs <= 0)
         {
-            throw new InvalidOperationException("audio.startConfirmWindowMs は 1 以上で指定してください");
+            throw new InvalidOperationException("audio.startConfirmTimeoutMs は 1 以上で指定してください");
         }
 
         if (config.Audio.StartConfirmMaxRetries < 0)
@@ -197,9 +197,9 @@ internal static class AppConfigValidator
             throw new InvalidOperationException("prepare.clearInputMaxPasses は 1 以上で指定してください");
         }
 
-        if (config.Ui.PlayPreShortcutDelayMs < 0)
+        if (config.Ui.DelayBeforePlayShortcutMs < 0)
         {
-            throw new InvalidOperationException("ui.playPreShortcutDelayMs は 0 以上で指定してください");
+            throw new InvalidOperationException("ui.delayBeforePlayShortcutMs は 0 以上で指定してください");
         }
 
         if (!VoicepeakUiController.IsValidMoveToStartShortcut(config.Ui.MoveToStartShortcut))

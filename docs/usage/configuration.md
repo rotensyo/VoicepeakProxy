@@ -23,12 +23,12 @@
   - 発話中判定に使うピーク閾値です
 - `PollIntervalMs` (`default: 50`)
   - 音声監視ポーリング間隔です
-- `StartConfirmWindowMs` (`default: 1000`)
+- `StartConfirmTimeoutMs` (`default: 1000`)
   - 再生押下後、この時間内に発話開始を検知できないと`StartConfirmTimeout`扱いになります
 - `StartConfirmMaxRetries` (`default: 0`)
-  - `StartConfirmWindowMs`超過時の再生再試行回数です
+- `StartConfirmTimeoutMs`超過時の再生再試行回数です
   - 再試行時は`MoveToStart`→`PressPlay`→開始確認をやり直します
-  - `VoicepeakOneShot.SpeakOnce`では再試行せず、`StartConfirmWindowMs`超過で即`StartConfirmTimeout`になります
+- `VoicepeakOneShot.SpeakOnce`では再試行せず、`StartConfirmTimeoutMs`超過で即`StartConfirmTimeout`になります
 - `StopConfirmMs` (`default: 300`)
   - 発話開始後、この時間だけ閾値未満が続いたら終了と判定します
 - `MaxSpeakingDurationSec` (`default: 300`)
@@ -62,7 +62,7 @@
 
 - `MoveToStartShortcut` (`default: "Ctrl+Up"`)
 - `PlayShortcut` (`default: "Space"`)
-- `PlayPreShortcutDelayMs` (`default: 60`)
+- `DelayBeforePlayShortcutMs` (`default: 60`)
 - `CompositePrimeAtValidationEnabled` (`default: true`)
   - `MoveToStartShortcut`が`F1-F12`以外の時だけ使います
   - 起動時バリデーションでprimeクリックを許可します
@@ -179,7 +179,7 @@ var config = new AppConfig
     {
         MoveToStartShortcut = "Ctrl+Up",
         PlayShortcut = "Space",
-        PlayPreShortcutDelayMs = 60,
+        DelayBeforePlayShortcutMs = 60,
         CompositePrimeAtValidationEnabled = true,
         CompositePrimeBeforeTextFocusWhenUnprimedEnabled = false,
         CompositeRecoveryClickOnStartTimeoutRetryEnabled = false,

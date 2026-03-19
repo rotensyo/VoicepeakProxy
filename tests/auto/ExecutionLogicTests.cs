@@ -59,7 +59,7 @@ public class ExecutionLogicTests
         // 補正後下限と警告を検証
         AppConfig config = new AppConfig();
         config.Audio.StopConfirmMs = 300;
-        config.Ui.PlayPreShortcutDelayMs = 60;
+        config.Ui.DelayBeforePlayShortcutMs = 60;
         config.Prepare.CharDelayBaseMs = 1;
         config.Prepare.PostTypeWaitPerCharMs = 4;
         config.Prepare.PostTypeWaitMinMs = 100;
@@ -86,7 +86,7 @@ public class ExecutionLogicTests
         // trailingは入力待機を加算しない
         AppConfig config = new AppConfig();
         config.Audio.StopConfirmMs = 30;
-        config.Ui.PlayPreShortcutDelayMs = 20;
+        config.Ui.DelayBeforePlayShortcutMs = 20;
         TestLogger logger = new TestLogger();
 
         int actual = JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(config, 120, "trailing", "job-1", 0, null, new AppLogger(logger));
@@ -350,7 +350,7 @@ public class ExecutionLogicTests
     {
         // 開始確認失敗を返却
         AppConfig config = CreateMonitorConfig();
-        config.Audio.StartConfirmWindowMs = 1;
+        config.Audio.StartConfirmTimeoutMs = 1;
         FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
         FakeAudioSessionReader audio = new FakeAudioSessionReader();
 
@@ -373,7 +373,7 @@ public class ExecutionLogicTests
     {
         // 開始前待機は最大発話時間に含めない
         AppConfig config = CreateMonitorConfig();
-        config.Audio.StartConfirmWindowMs = 1100;
+        config.Audio.StartConfirmTimeoutMs = 1100;
         config.Audio.MaxSpeakingDurationSec = 1;
         FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
         FakeAudioSessionReader audio = new FakeAudioSessionReader();
@@ -505,7 +505,7 @@ public class ExecutionLogicTests
             Audio =
             {
                 PollIntervalMs = 1,
-                StartConfirmWindowMs = 10,
+                StartConfirmTimeoutMs = 10,
                 StopConfirmMs = 1,
                 PeakThreshold = 0.5f,
                 MaxSpeakingDurationSec = 0

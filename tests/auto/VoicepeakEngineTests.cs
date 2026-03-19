@@ -113,7 +113,7 @@ public class VoicepeakEngineTests
         FakeAudioSessionReader audio = new FakeAudioSessionReader();
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
         AppConfig config = CreateEngineConfig();
-        config.Audio.StartConfirmWindowMs = 1;
+        config.Audio.StartConfirmTimeoutMs = 1;
 
         using CancellationTokenSource cts = new CancellationTokenSource();
         VoicepeakEngine engine = new VoicepeakEngine(config, cts, new AppLogger(new TestLogger()), ui, audio, false);
@@ -136,7 +136,7 @@ public class VoicepeakEngineTests
         audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
         AppConfig config = CreateEngineConfig();
-        config.Audio.StartConfirmWindowMs = 1;
+        config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 1;
 
@@ -206,7 +206,7 @@ public class VoicepeakEngineTests
         config.Ui.MoveToStartShortcut = "Ctrl+Up";
         config.Ui.CompositePrimeAtValidationEnabled = false;
         config.Ui.CompositeRecoveryClickOnStartTimeoutRetryEnabled = true;
-        config.Audio.StartConfirmWindowMs = 1;
+        config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 1;
 
@@ -227,7 +227,7 @@ public class VoicepeakEngineTests
         FakeAudioSessionReader audio = new FakeAudioSessionReader();
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
         AppConfig config = CreateEngineConfig();
-        config.Audio.StartConfirmWindowMs = 1100;
+        config.Audio.StartConfirmTimeoutMs = 1100;
         config.Audio.MaxSpeakingDurationSec = 1;
 
         using CancellationTokenSource cts = new CancellationTokenSource();
@@ -494,7 +494,7 @@ public class VoicepeakEngineTests
         config.Prepare.BootValidationMaxRetries = 0;
         config.Prepare.BootValidationRetryIntervalMs = 0;
         config.Audio.PollIntervalMs = 1;
-        config.Audio.StartConfirmWindowMs = 10;
+        config.Audio.StartConfirmTimeoutMs = 10;
         config.Audio.StopConfirmMs = 1;
         config.Audio.MaxSpeakingDurationSec = 0;
         config.Audio.PeakThreshold = 0.5f;

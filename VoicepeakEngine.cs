@@ -152,7 +152,7 @@ internal sealed class VoicepeakEngine : IDisposable
             }
 
             long monitorStartAt = MonoClock.NowMs();
-            long startDeadline = monitorStartAt + _config.Audio.StartConfirmWindowMs;
+            long startDeadline = monitorStartAt + _config.Audio.StartConfirmTimeoutMs;
             bool started = false;
             long speakingStartedAt = -1;
             long belowSince = -1;

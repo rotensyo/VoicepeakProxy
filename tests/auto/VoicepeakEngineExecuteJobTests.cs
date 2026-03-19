@@ -56,7 +56,7 @@ public class VoicepeakEngineExecuteJobTests
         audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
         AppConfig config = CreateConfig();
-        config.Audio.StartConfirmWindowMs = 1;
+        config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 1;
 
@@ -87,7 +87,7 @@ public class VoicepeakEngineExecuteJobTests
         AppConfig config = CreateConfig();
         config.Ui.MoveToStartShortcut = "Ctrl+Up";
         config.Ui.CompositeRecoveryClickOnStartTimeoutRetryEnabled = true;
-        config.Audio.StartConfirmWindowMs = 1;
+        config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 2;
         config.Audio.StopConfirmMs = 1;
 
@@ -115,7 +115,7 @@ public class VoicepeakEngineExecuteJobTests
         AppConfig config = CreateConfig();
         config.Ui.MoveToStartShortcut = "F3";
         config.Ui.CompositeRecoveryClickOnStartTimeoutRetryEnabled = true;
-        config.Audio.StartConfirmWindowMs = 1;
+        config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 1;
 
@@ -163,7 +163,7 @@ public class VoicepeakEngineExecuteJobTests
     {
         AppConfig config = new AppConfig();
         config.Audio.PollIntervalMs = 1;
-        config.Audio.StartConfirmWindowMs = 10;
+        config.Audio.StartConfirmTimeoutMs = 10;
         config.Audio.StopConfirmMs = 1;
         config.Audio.PeakThreshold = 0.5f;
         config.Audio.MaxSpeakingDurationSec = 0;

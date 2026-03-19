@@ -403,7 +403,7 @@ public class UiControllerTests
         // 再生前にフォーカス解除してショートカット送信
         var messages = ReflectionTestHelper.RunInSta(() =>
         {
-            UiConfig ui = new UiConfig { PlayShortcut = "Space", PlayPreShortcutDelayMs = 0 };
+            UiConfig ui = new UiConfig { PlayShortcut = "Space", DelayBeforePlayShortcutMs = 0 };
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
             VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
 
@@ -422,7 +422,7 @@ public class UiControllerTests
         // Space停止はKillFocusのみでフォーカス投入しない
         var messages = ReflectionTestHelper.RunInSta(() =>
         {
-            UiConfig ui = new UiConfig { PlayShortcut = "Space", PlayPreShortcutDelayMs = 0, MoveToStartShortcut = "Ctrl+Up" };
+            UiConfig ui = new UiConfig { PlayShortcut = "Space", DelayBeforePlayShortcutMs = 0, MoveToStartShortcut = "Ctrl+Up" };
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
             VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
 
@@ -536,7 +536,7 @@ public class UiControllerTests
                 new TestLogger());
 
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
-            bool ok = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "RunCompositeClearCycle", window.Handle, 2, 3);
+            bool ok = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "RunCompositeClearCycle", window.Handle, 2, 3, 0);
             Assert.IsTrue(ok);
             return window.Messages.ToArray();
         });

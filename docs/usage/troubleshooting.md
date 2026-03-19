@@ -45,7 +45,7 @@
 
 - 再生開始がピーク監視で確認できていません
 - `Audio.PeakThreshold`を見直してください
-- `Audio.StartConfirmWindowMs`を見直してください
+- `Audio.StartConfirmTimeoutMs`を見直してください
 - 必要に応じて`Audio.StartConfirmMaxRetries`を増やしてください
 - `MoveToStartShortcut`が`F1-F12`以外の時は`Ui.CompositeRecoveryClickOnStartTimeoutRetryEnabled`も検討してください
 

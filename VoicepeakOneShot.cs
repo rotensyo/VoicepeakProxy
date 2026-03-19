@@ -387,7 +387,7 @@ public static class VoicepeakOneShot
         Process process,
         AppLogger log)
     {
-        long startDeadline = MonoClock.NowMs() + config.Audio.StartConfirmWindowMs;
+        long startDeadline = MonoClock.NowMs() + config.Audio.StartConfirmTimeoutMs;
         while (true)
         {
             if (!ui.IsAlive(process))
