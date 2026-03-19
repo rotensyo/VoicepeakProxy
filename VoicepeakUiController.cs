@@ -747,8 +747,9 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             return false;
         }
 
+        // クリック位置、入力欄のヘッダを避けるため中央下寄りをクリックする
         int screenX = (int)(rect.Left + (rect.Width / 2.0));
-        int screenY = (int)(rect.Top + (rect.Height / 2.0));
+        int screenY = (int)(rect.Top + (rect.Height / 3.0 * 2.0));
         POINT point = new POINT { X = screenX, Y = screenY };
         if (!ScreenToClient(mainHwnd, ref point))
         {

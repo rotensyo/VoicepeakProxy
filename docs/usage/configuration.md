@@ -28,6 +28,7 @@
 - `StartConfirmMaxRetries` (`default: 0`)
   - `StartConfirmWindowMs`超過時の再生再試行回数です
   - 再試行時は`MoveToStart`→`PressPlay`→開始確認をやり直します
+  - `VoicepeakOneShot.SpeakOnce`では再試行せず、`StartConfirmWindowMs`超過で即`StartConfirmTimeout`になります
 - `StopConfirmMs` (`default: 300`)
   - 発話開始後、この時間だけ閾値未満が続いたら終了と判定します
 - `MaxSpeakingDurationSec` (`default: 300`)
