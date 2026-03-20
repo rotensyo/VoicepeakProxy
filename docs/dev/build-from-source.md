@@ -16,18 +16,18 @@ dotnet build
 
 主な生成物です。
 
-- `bin/Debug/net48/VoicepeakProxyCore.dll`
+- `core-dll/bin/Debug/net48/VoicepeakProxyCore.dll`
 
 ## テスト
 
 ```powershell
-dotnet test tests/auto/VoicepeakProxyCore.Tests.csproj
+dotnet test core-dll/tests/auto/VoicepeakProxyCore.Tests.csproj
 ```
 
 手動テストは別プロジェクトです。
 
 ```powershell
-dotnet test tests/manual/VoicepeakProxyCore.ManualTests.csproj
+dotnet test core-dll/tests/manual/VoicepeakProxyCore.ManualTests.csproj
 ```
 
 ## 主な依存関係

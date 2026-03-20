@@ -3,11 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VoicepeakProxyCore", "VoicepeakProxyCore.csproj", "{18CDD6F3-4165-4B6C-8E06-6329AE287AC1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VoicepeakProxyCore", "core-dll\VoicepeakProxyCore.csproj", "{18CDD6F3-4165-4B6C-8E06-6329AE287AC1}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{463D0F08-5DD8-C769-3205-FDA43DB3A7BB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VoicepeakProxyCore.ManualTests", "tests\manual\VoicepeakProxyCore.ManualTests.csproj", "{012E17C6-955C-42FD-B476-600A26E3307B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VoicepeakProxyCore.ManualTests", "core-dll\tests\manual\VoicepeakProxyCore.ManualTests.csproj", "{012E17C6-955C-42FD-B476-600A26E3307B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
