@@ -60,9 +60,9 @@ public sealed class UiConfig
     public string MoveToStartShortcut { get; set; } = "Ctrl+Up";
     public string PlayShortcut { get; set; } = "Space";
     public int DelayBeforePlayShortcutMs { get; set; } = 60;
-    public bool CompositePrimeAtValidationEnabled { get; set; } = true;
-    public bool CompositePrimeBeforeTextFocusWhenUnprimedEnabled { get; set; } = false;
-    public bool CompositeRecoveryClickOnStartTimeoutRetryEnabled { get; set; } = false;
+    public bool ClickAtValidationEnabled { get; set; } = true;
+    public bool ClickBeforeTextFocusWhenUninitializedEnabled { get; set; } = false;
+    public bool ClickOnStartTimeoutRetryEnabled { get; set; } = false;
     public bool SendEnterAfterSentenceBreak { get; set; } = false;
     public List<string> SentenceBreakTriggers { get; set; } = new List<string> { "。", "！", "？", "!", "?" };
 }

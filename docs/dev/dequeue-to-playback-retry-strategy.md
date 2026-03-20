@@ -58,9 +58,9 @@
 
 - `MoveToStart`は複合専用経路(`SendCompositeMoveToStart`)を使います。
 - クリック注入は明示設定された契機でのみ行います。
-  - `CompositePrimeAtValidationEnabled`
-  - `CompositePrimeBeforeTextFocusWhenUnprimedEnabled`
-  - `CompositeRecoveryClickOnStartTimeoutRetryEnabled`
+  - `ClickAtValidationEnabled`
+  - `ClickBeforeTextFocusWhenUninitializedEnabled`
+  - `ClickOnStartTimeoutRetryEnabled`
 - `PrepareForTextInput`では、未primeかつ設定有効時だけ文字入力欄フォーカス直前でprimeを試みます。
 - `PrepareForPlayback`では通常primeせず、キーボードフォーカス再付与とCtrl+Up送信だけを行います。
 - prime状態はプロセスIDとメインHWNDの組で保持します。

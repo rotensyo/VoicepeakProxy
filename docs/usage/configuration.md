@@ -63,15 +63,15 @@
 - `MoveToStartShortcut` (`default: "Ctrl+Up"`)
 - `PlayShortcut` (`default: "Space"`)
 - `DelayBeforePlayShortcutMs` (`default: 60`)
-- `CompositePrimeAtValidationEnabled` (`default: true`)
+- `ClickAtValidationEnabled` (`default: true`)
   - `MoveToStartShortcut`が`F1-F12`以外の時だけ使います
   - 起動時バリデーションでprimeクリックを許可します
-- `CompositePrimeBeforeTextFocusWhenUnprimedEnabled` (`default: false`)
+- `ClickBeforeTextFocusWhenUninitializedEnabled` (`default: false`)
   - `MoveToStartShortcut`が`F1-F12`以外の時だけ使います
   - 未prime時に文字入力欄フォーカス直前のprimeクリックを許可します
   - 常駐ループと起動時Validationで評価します
   - `VoicepeakOneShot.SpeakOnce`/`VoicepeakOneShot.SpeakOnceWait`では評価しません
-- `CompositeRecoveryClickOnStartTimeoutRetryEnabled` (`default: false`)
+- `ClickOnStartTimeoutRetryEnabled` (`default: false`)
   - `MoveToStartShortcut`が`F1-F12`以外の時だけ使います
   - `StartTimeout`再試行前の修正クリックを1回だけ許可します
 - `SendEnterAfterSentenceBreak` (`default: false`)
@@ -180,9 +180,9 @@ var config = new AppConfig
         MoveToStartShortcut = "Ctrl+Up",
         PlayShortcut = "Space",
         DelayBeforePlayShortcutMs = 60,
-        CompositePrimeAtValidationEnabled = true,
-        CompositePrimeBeforeTextFocusWhenUnprimedEnabled = false,
-        CompositeRecoveryClickOnStartTimeoutRetryEnabled = false,
+        ClickAtValidationEnabled = true,
+        ClickBeforeTextFocusWhenUninitializedEnabled = false,
+        ClickOnStartTimeoutRetryEnabled = false,
         SendEnterAfterSentenceBreak = true,
         SentenceBreakTriggers = new System.Collections.Generic.List<string> { "。", "。、。" }
     }

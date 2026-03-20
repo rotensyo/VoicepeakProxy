@@ -24,9 +24,9 @@ public class AppConfigValidationTests
         Assert.AreEqual(1, config.Prepare.DeleteKeyDelayBaseMs);
         Assert.AreEqual(20, config.Prepare.ClearInputMaxPasses);
         Assert.AreEqual("Ctrl+Up", config.Ui.MoveToStartShortcut);
-        Assert.IsTrue(config.Ui.CompositePrimeAtValidationEnabled);
-        Assert.IsFalse(config.Ui.CompositePrimeBeforeTextFocusWhenUnprimedEnabled);
-        Assert.IsFalse(config.Ui.CompositeRecoveryClickOnStartTimeoutRetryEnabled);
+        Assert.IsTrue(config.Ui.ClickAtValidationEnabled);
+        Assert.IsFalse(config.Ui.ClickBeforeTextFocusWhenUninitializedEnabled);
+        Assert.IsFalse(config.Ui.ClickOnStartTimeoutRetryEnabled);
         CollectionAssert.AreEqual(new[] { "。", "！", "？", "!", "?" }, config.Ui.SentenceBreakTriggers);
         Assert.AreEqual(BootValidationMode.Required, config.Validation.BootValidation);
         Assert.AreEqual(RequestValidationMode.Strict, config.Validation.RequestValidation);

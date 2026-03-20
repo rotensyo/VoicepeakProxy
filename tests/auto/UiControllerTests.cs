@@ -89,7 +89,7 @@ public class UiControllerTests
         UiConfig ui = new UiConfig
         {
             MoveToStartShortcut = "Ctrl+Up",
-            CompositePrimeBeforeTextFocusWhenUnprimedEnabled = true
+            ClickBeforeTextFocusWhenUninitializedEnabled = true
         };
         VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
         Process process = Process.GetCurrentProcess();
@@ -110,12 +110,12 @@ public class UiControllerTests
         UiConfig disabled = new UiConfig
         {
             MoveToStartShortcut = "Ctrl+Up",
-            CompositeRecoveryClickOnStartTimeoutRetryEnabled = false
+            ClickOnStartTimeoutRetryEnabled = false
         };
         UiConfig enabled = new UiConfig
         {
             MoveToStartShortcut = "Ctrl+Up",
-            CompositeRecoveryClickOnStartTimeoutRetryEnabled = true
+            ClickOnStartTimeoutRetryEnabled = true
         };
         Process process = Process.GetCurrentProcess();
         IntPtr hwnd = new IntPtr(123);

@@ -204,8 +204,8 @@ public class VoicepeakEngineTests
         ui.ShouldAttemptPrimeInputContextHandler = (_, _, reason) => reason == InputContextPrimeReason.StartTimeoutRetry;
         AppConfig config = CreateEngineConfig();
         config.Ui.MoveToStartShortcut = "Ctrl+Up";
-        config.Ui.CompositePrimeAtValidationEnabled = false;
-        config.Ui.CompositeRecoveryClickOnStartTimeoutRetryEnabled = true;
+        config.Ui.ClickAtValidationEnabled = false;
+        config.Ui.ClickOnStartTimeoutRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 1;

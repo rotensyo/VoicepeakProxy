@@ -637,11 +637,11 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         switch (reason)
         {
             case InputContextPrimeReason.Validation:
-                return _ui.CompositePrimeAtValidationEnabled && !IsInputContextPrimed(process, mainHwnd);
+                return _ui.ClickAtValidationEnabled && !IsInputContextPrimed(process, mainHwnd);
             case InputContextPrimeReason.BeforeTextFocusWhenUnprimed:
-                return _ui.CompositePrimeBeforeTextFocusWhenUnprimedEnabled && !IsInputContextPrimed(process, mainHwnd);
+                return _ui.ClickBeforeTextFocusWhenUninitializedEnabled && !IsInputContextPrimed(process, mainHwnd);
             case InputContextPrimeReason.StartTimeoutRetry:
-                return _ui.CompositeRecoveryClickOnStartTimeoutRetryEnabled;
+                return _ui.ClickOnStartTimeoutRetryEnabled;
             default:
                 return false;
         }

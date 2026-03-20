@@ -134,9 +134,9 @@ public class CompositeMoveToStartManualTests
         // 手動確認向け設定
         AppConfig config = new AppConfig();
         config.Ui.MoveToStartShortcut = "Ctrl+Up";
-        config.Ui.CompositePrimeAtValidationEnabled = true;
-        config.Ui.CompositePrimeBeforeTextFocusWhenUnprimedEnabled = true;
-        config.Ui.CompositeRecoveryClickOnStartTimeoutRetryEnabled = true;
+        config.Ui.ClickAtValidationEnabled = true;
+        config.Ui.ClickBeforeTextFocusWhenUninitializedEnabled = true;
+        config.Ui.ClickOnStartTimeoutRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 2000;
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 300;
