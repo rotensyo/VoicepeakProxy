@@ -303,14 +303,14 @@ public static class VoicepeakOneShot
                 if (!ui.PrepareForPlayback(process, hwnd, config.Prepare.ActionDelayMs))
                 {
                     log.Warn($"job_dropped jobId={job.JobId} reason=move_to_start_failed");
-                    ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, false);
+                    JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, false, killFocusAfterClear: false);
                     return new SpeakOnceResult { Status = SpeakOnceStatus.MoveToStartFailed, SegmentsExecuted = executed };
                 }
 
                 if (!ui.PressPlay(hwnd))
                 {
                     log.Warn($"job_dropped jobId={job.JobId} reason=play_failed");
-                    ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, false);
+                    JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, false, killFocusAfterClear: false);
                     return new SpeakOnceResult { Status = SpeakOnceStatus.PlayFailed, SegmentsExecuted = executed };
                 }
 
@@ -353,7 +353,7 @@ public static class VoicepeakOneShot
 
                     log.Error("monitor_timeout reason=start_confirm");
                     log.Warn($"job_dropped jobId={job.JobId} reason=start_confirm_failed");
-                    ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, false);
+                    JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, false, killFocusAfterClear: false);
                     return new SpeakOnceResult { Status = SpeakOnceStatus.StartConfirmTimeout, SegmentsExecuted = executed };
                 }
 
@@ -361,7 +361,7 @@ public static class VoicepeakOneShot
                 {
                     log.Error("monitor_timeout reason=max_duration");
                     log.Warn($"job_dropped jobId={job.JobId} reason=max_speaking_duration");
-                    ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, false);
+                    JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, false, killFocusAfterClear: false);
                     return new SpeakOnceResult { Status = SpeakOnceStatus.MaxSpeakingDurationExceeded, SegmentsExecuted = executed };
                 }
 

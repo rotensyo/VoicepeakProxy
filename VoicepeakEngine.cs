@@ -373,7 +373,7 @@ internal sealed class VoicepeakEngine : IDisposable
             if (!prepared)
             {
                 DropJob(job, "prepare_failed");
-                _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true);
+                JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: false);
                 return;
             }
 
@@ -381,7 +381,6 @@ internal sealed class VoicepeakEngine : IDisposable
             {
                 _log.Info("interrupt_applied state=ExecutingInputValidate");
                 DropJob(job, "interrupt");
-                _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true);
                 return;
             }
 
@@ -399,7 +398,6 @@ internal sealed class VoicepeakEngine : IDisposable
                 ConsumeInterruptIfAny(log: false);
                 _log.Info("interrupt_applied state=ExecutingPrePlayWait");
                 DropJob(job, "interrupt");
-                _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true);
                 return;
             }
 
@@ -415,14 +413,14 @@ internal sealed class VoicepeakEngine : IDisposable
                 if (!_ui.PrepareForPlayback(process, hwnd, _config.Prepare.ActionDelayMs))
                 {
                     DropJob(job, "move_to_start_failed");
-                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true);
+                    JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: false);
                     return;
                 }
 
                 if (!_ui.PressPlay(hwnd))
                 {
                     DropJob(job, "play_failed");
-                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true);
+                    JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: false);
                     return;
                 }
 
@@ -475,7 +473,6 @@ internal sealed class VoicepeakEngine : IDisposable
                 {
                     _log.Info("interrupt_applied state=Speaking");
                     DropJob(job, "interrupt");
-                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true);
                     return;
                 }
 
@@ -490,7 +487,7 @@ internal sealed class VoicepeakEngine : IDisposable
 
                     _log.Error("monitor_timeout reason=start_confirm");
                     DropJob(job, "start_confirm_failed");
-                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true);
+                    JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: false);
                     return;
                 }
 
@@ -498,7 +495,7 @@ internal sealed class VoicepeakEngine : IDisposable
                 {
                     _log.Error("monitor_timeout reason=max_duration");
                     DropJob(job, "max_speaking_duration");
-                    _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true);
+                    JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: false);
                     return;
                 }
 
@@ -510,6 +507,8 @@ internal sealed class VoicepeakEngine : IDisposable
                 }
             }
         }
+
+        JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: true);
     }
 
 

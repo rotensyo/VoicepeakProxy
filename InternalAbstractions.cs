@@ -27,6 +27,7 @@ internal interface IVoicepeakUiController
     bool PressPlay(IntPtr mainHwnd);
     bool MoveToStart(IntPtr mainHwnd, int actionDelayMs);
     bool PressDelete(IntPtr mainHwnd);
+    bool KillFocus(IntPtr mainHwnd);
     ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd);
 }
 

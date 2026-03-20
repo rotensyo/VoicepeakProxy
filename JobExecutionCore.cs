@@ -201,6 +201,27 @@ internal static class JobExecutionCore
         return true;
     }
 
+    // job終了時の入力欄クリアを共通化
+    public static void FinalizeJobInput(
+        AppConfig config,
+        IVoicepeakUiController ui,
+        Process process,
+        IntPtr hwnd,
+        bool allowCompositePrimeBeforeTextFocusWhenUnprimed,
+        bool killFocusAfterClear)
+    {
+        if (ui == null || process == null || hwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed);
+        if (killFocusAfterClear)
+        {
+            ui.KillFocus(hwnd);
+        }
+    }
+
     // 入力後待機時間を算出
     public static int ComputePostTypeWaitMs(string text, int perCharMs, int minMs)
     {

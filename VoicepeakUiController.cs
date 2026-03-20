@@ -419,7 +419,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return true;
     }
 
-    internal bool KillFocus(IntPtr mainHwnd)
+    public bool KillFocus(IntPtr mainHwnd)
     {
         return SendWindowMessage(mainHwnd, WmKillFocus, IntPtr.Zero, IntPtr.Zero);
     }

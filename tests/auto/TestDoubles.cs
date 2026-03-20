@@ -16,6 +16,7 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
     public Func<IntPtr, bool> PressPlayHandler { get; set; } = _ => true;
     public Func<IntPtr, int, bool> MoveToStartHandler { get; set; } = (_, _) => true;
     public Func<IntPtr, bool> PressDeleteHandler { get; set; } = _ => true;
+    public Func<IntPtr, bool> KillFocusHandler { get; set; } = _ => true;
     public Func<IntPtr, ReadInputResult> ReadInputHandler { get; set; }
         = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA);
     public Func<int, (bool Success, Process Process, IntPtr Hwnd)> ResolveByPidHandler { get; set; }
@@ -35,6 +36,7 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
     public int PressPlayCalls { get; private set; }
     public int MoveToStartCalls { get; private set; }
     public int PressDeleteCalls { get; private set; }
+    public int KillFocusCalls { get; private set; }
 
     public bool TryResolveTarget(out Process process, out IntPtr mainHwnd)
     {
@@ -117,6 +119,13 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
         PressDeleteCalls++;
         CallLog.Add("press_delete");
         return PressDeleteHandler(mainHwnd);
+    }
+
+    public bool KillFocus(IntPtr mainHwnd)
+    {
+        KillFocusCalls++;
+        CallLog.Add("kill_focus");
+        return KillFocusHandler(mainHwnd);
     }
 
     public ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd) => ReadInputHandler(mainHwnd);

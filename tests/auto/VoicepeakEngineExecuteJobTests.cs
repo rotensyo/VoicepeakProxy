@@ -41,6 +41,7 @@ public class VoicepeakEngineExecuteJobTests
 
         Assert.IsTrue(logger.WarnMessages.Exists(m => m.Contains("reason=prepare_failed")));
         Assert.IsTrue(ui.ClearInputCalls >= 1);
+        Assert.AreEqual(0, ui.KillFocusCalls);
     }
 
     [TestMethod]
@@ -66,6 +67,8 @@ public class VoicepeakEngineExecuteJobTests
         ReflectionTestHelper.InvokeCoreInstance(engine, "ExecuteJob", CreateJob("hello"));
 
         Assert.AreEqual(2, ui.PressPlayCalls);
+        Assert.IsTrue(ui.ClearInputCalls >= 2);
+        Assert.AreEqual(1, ui.KillFocusCalls);
         Assert.IsFalse(logger.WarnMessages.Exists(m => m.Contains("reason=start_confirm_failed")));
     }
 
