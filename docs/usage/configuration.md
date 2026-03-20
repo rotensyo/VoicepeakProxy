@@ -75,7 +75,11 @@
   - `MoveToStartShortcut`が`F1-F12`以外の時だけ使います
   - `StartTimeout`再試行前の修正クリックを1回だけ許可します
 - `SendEnterAfterSentenceBreak` (`default: false`)
+  - trueに指定すると、`SentenceBreakTriggers`で指定した文字列の後にEnterを入れ、入力ブロックを分割します。
 - `SentenceBreakTriggers` (`default: ["。", "！", "？", "!", "?"]`)
+  - `SendEnterAfterSentenceBreak`での分割対象となる文字列です。
+  - 1文字である必要はなく、例えば`replaceRules`で"。"を"。　。"に置換する場合、"。　。"を分割対象として指定できます。
+  - "!?"のように分割対象文字列が連続した場合、まとめて1つの区切り文字とみなします。
 
 重要です。
 
@@ -104,7 +108,7 @@
 config.TextTransform.ReplaceRules.Add(new ReplaceRule
 {
     From = "。",
-    To = "。、。"
+    To = "。　。"
 });
 ```
 

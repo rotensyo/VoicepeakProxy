@@ -48,7 +48,7 @@
 
 ## 先頭移動キー別の構造
 
-### 単体系(F1-F12/Home/End)
+### 単体系(F1-F12)
 
 - `MoveToStart`は通常ショートカット送信(`SendShortcut`)を使います。
 - `PrepareForTextInput`と`PrepareForPlayback`は、追加のprime処理を行いません。

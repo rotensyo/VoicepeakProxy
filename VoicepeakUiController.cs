@@ -1258,36 +1258,49 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         int index = 0;
         while (index < text.Length)
         {
-            if (!_sentenceBreakTriggerIndex.TryGetValue(text[index], out List<SentenceBreakTrigger> candidates))
+            SentenceBreakTrigger firstMatched = FindLongestSentenceBreakTrigger(text, index);
+            if (firstMatched == null)
             {
                 index++;
                 continue;
             }
 
-            SentenceBreakTrigger matched = null;
-            for (int i = 0; i < candidates.Count; i++)
+            int runEnd = index + firstMatched.Text.Length;
+            while (runEnd < text.Length)
             {
-                SentenceBreakTrigger candidate = candidates[i];
-                if (!MatchesTrigger(text, index, candidate.Text))
+                SentenceBreakTrigger nextMatched = FindLongestSentenceBreakTrigger(text, runEnd);
+                if (nextMatched == null)
                 {
-                    continue;
+                    break;
                 }
 
-                matched = candidate;
-                break;
+                runEnd += nextMatched.Text.Length;
             }
 
-            if (matched == null)
-            {
-                index++;
-                continue;
-            }
-
-            positions.Add(index + matched.Text.Length - 1);
-            index += matched.Text.Length;
+            positions.Add(runEnd - 1);
+            index = runEnd;
         }
 
         return positions;
+    }
+
+    private SentenceBreakTrigger FindLongestSentenceBreakTrigger(string text, int index)
+    {
+        if (!_sentenceBreakTriggerIndex.TryGetValue(text[index], out List<SentenceBreakTrigger> candidates))
+        {
+            return null;
+        }
+
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            SentenceBreakTrigger candidate = candidates[i];
+            if (MatchesTrigger(text, index, candidate.Text))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
     }
 
     // 指定位置でトークン一致を確認

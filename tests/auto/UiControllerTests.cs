@@ -318,6 +318,57 @@ public class UiControllerTests
     }
 
     [TestMethod]
+    public void TypeText_ConsecutiveSameTriggers_AreTreatedAsSingleBreak()
+    {
+        // 連続する同一トリガーは1回の区切りとして扱う
+        int enterCount = ReflectionTestHelper.RunInSta(() =>
+        {
+            UiConfig ui = new UiConfig
+            {
+                SendEnterAfterSentenceBreak = true
+            };
+            ui.SentenceBreakTriggers.Clear();
+            ui.SentenceBreakTriggers.Add("。");
+
+            TestLogger logger = new TestLogger();
+            object controller = ReflectionTestHelper.CreateVoicepeakUiController(ui, new DebugConfig(), logger);
+            using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
+
+            bool result = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "TypeText", window.Handle, "A。。。B", 0);
+            Assert.IsTrue(result);
+            return window.Messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkReturn);
+        });
+
+        Assert.AreEqual(1, enterCount);
+    }
+
+    [TestMethod]
+    public void TypeText_ConsecutiveDifferentTriggers_AreTreatedAsSingleBreak()
+    {
+        // 連続する複合トリガー列も1回の区切りとして扱う
+        int enterCount = ReflectionTestHelper.RunInSta(() =>
+        {
+            UiConfig ui = new UiConfig
+            {
+                SendEnterAfterSentenceBreak = true
+            };
+            ui.SentenceBreakTriggers.Clear();
+            ui.SentenceBreakTriggers.Add("!");
+            ui.SentenceBreakTriggers.Add("?");
+
+            TestLogger logger = new TestLogger();
+            object controller = ReflectionTestHelper.CreateVoicepeakUiController(ui, new DebugConfig(), logger);
+            using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
+
+            bool result = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "TypeText", window.Handle, "A!?B", 0);
+            Assert.IsTrue(result);
+            return window.Messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkReturn);
+        });
+
+        Assert.AreEqual(1, enterCount);
+    }
+
+    [TestMethod]
     public void GetVoicepeakProcessCount_UsesProcessApi()
     {
         // プロセス数をAPIから取得
