@@ -1,26 +1,40 @@
 # VoicepeakProxyCore
 
-`VoicepeakProxyCore`は、VOICEPEAKをUI自動操作で制御する`.NET Framework 4.8`向けDLLです。
+`VoicepeakProxyCore`は、VOICEPEAKをUI自動操作で制御するWindows環境向けDLLです。
 
 - 常駐ランタイムを起動し、複数の発話要求をキュー処理できます
-- ワーカーループを起動せず、1回だけ同期実行する単発APIを使えます
-- `[[pause:NNN]]`記法、文字列置換、割り込み、音声ピーク監視に対応します
+- 常駐ランタイムを起動せず、1回だけ同期実行する単発APIを実行できます
+- 初期化以外でウィンドウフォーカスを奪わず、VOICEPEAKが他のウィンドウの背面にあっても実行可能です
 
 ## 前提条件
-
 - Windows環境であること
 - `.NET Framework 4.8`実行環境があること
 - `voicepeak.exe`が起動していること
-- VOICEPEAK側のショートカット設定が`AppConfig.Ui`と一致していること
+- config内のショートカット設定がVOICEPEAK側と一致していること
 - VOICEPEAKが1プロセスだけ起動していること
 
-重要な制約です。
+## 注意点
+- 本DLLはVOICEPEAKのUI構造に依存し、UI仕様やショートカット設定が変わると動作しなくなる可能性があります
+- 先頭移動ショートカットが**F1-F12以外**の場合、発話時点で最後にクリックされたウィンドウ内要素が文字入力欄である必要があります。
+  - 通常は初期化時にクリック操作を行いますが、初期化をスキップする場合や途中で感情パラメータを調整した場合などは、手動で文字入力欄を一度クリックしてから発話を再実行してください。
+  - 先頭移動ショートカットをF1-F12にした場合はこの操作が不要になります。
 
-- 先頭移動ショートカットは`F1-F12`または`Ctrl+Up`を使用してください
-- 本DLLはVOICEPEAKのUI構造に依存します
-- UI仕様やショートカット設定が変わると動作しなくなる可能性があります
 
 ## 最短利用例
+
+### 単発実行
+
+```csharp
+using VoicepeakProxyCore;
+
+var config = new AppConfig();
+
+SpeakOnceResult result = VoicepeakOneShot.SpeakOnce(
+    config,
+    new SpeakOnceRequest { Text = "こんにちは。テストです。" });
+
+Console.WriteLine($"status={result.Status} ok={result.Succeeded} segments={result.SegmentsExecuted}");
+```
 
 ### 常駐ランタイム
 
@@ -40,22 +54,8 @@ EnqueueResult result = runtime.Enqueue(new SpeakRequest
 Console.WriteLine($"status={result.Status} jobId={result.JobId} error={result.ErrorMessage}");
 ```
 
-### 単発実行
-
-```csharp
-using VoicepeakProxyCore;
-
-var config = new AppConfig();
-
-SpeakOnceResult result = VoicepeakOneShot.SpeakOnce(
-    config,
-    new SpeakOnceRequest { Text = "単発読み上げです。" });
-
-Console.WriteLine($"status={result.Status} ok={result.Succeeded} segments={result.SegmentsExecuted}");
-```
-
 ## 公開API概要
-
+### 常駐実行用
 - `VoicepeakRuntime.Start(AppConfig config, IAppLogger logger = null)`
   - 常駐ランタイムを起動します
   - 設定検証と起動時バリデーションを行います
@@ -66,12 +66,16 @@ Console.WriteLine($"status={result.Status} ok={result.Succeeded} segments={resul
   - 新規受理を停止します
 - `VoicepeakRuntime.Dispose()`
   - ランタイムを破棄します
+
+### 単発実行用
 - `VoicepeakOneShot.SpeakOnce(AppConfig config, SpeakOnceRequest request, IAppLogger logger = null)`
-  - 1回だけ同期実行します
+  - 1回だけ実行し、発話の開始を確認したら即完了とします。
+  - 戻り値は`SpeakOnceResult`です
+- `VoicepeakOneShot.SpeakOnceWait(AppConfig config, SpeakOnceRequest request, IAppLogger logger = null)`
+  - 1回だけ実行し、発話終了まで待機してから完了します。
   - 戻り値は`SpeakOnceResult`です
 
-例外方針の要点です。
-
+### 例外
 - `config == null`は`ArgumentNullException`
 - 常駐ランタイムの`request == null`は`ArgumentNullException`
 - `Stop()`後の`Enqueue(...)`は`InvalidOperationException`

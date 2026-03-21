@@ -1,8 +1,8 @@
 # Configuration
 
-`VoicepeakProxyCore`は設定ファイル読込機能を持ちません。ホスト側で値を読み込み、`AppConfig`へ詰めてDLLへ渡します。
+`VoicepeakProxyCore`は設定ファイル読込機能を持ちません。ホスト側で値を読み込み、`AppConfig`に固めてDLLへ渡す想定です。
 
-## `AppConfig`構造
+## AppConfig 構造
 
 - `Server: ServerConfig`
 - `Audio: AudioConfig`
@@ -12,29 +12,29 @@
 - `Debug: DebugConfig`
 - `Validation: ValidationConfig`
 
-## `ServerConfig`
+## ServerConfig
 
 - `MaxQueuedJobs` (`default: 500`)
   - 常駐ランタイムの待機キュー上限です
 
-## `AudioConfig`
+## AudioConfig
 
 - `PeakThreshold` (`default: 1e-9f`)
-  - 発話中判定に使うピーク閾値です
+  - 発話中判定に使う音量の閾値です
 - `PollIntervalMs` (`default: 50`)
-  - 音声監視ポーリング間隔です
+  - 音声監視を行う間隔です
 - `StartConfirmTimeoutMs` (`default: 1000`)
-  - 再生押下後、この時間内に発話開始を検知できないと`StartConfirmTimeout`扱いになります
+  - 再生押下後、この時間内に発話開始を検知できないと失敗とし、`StartConfirmTimeout`扱いにします
 - `StartConfirmMaxRetries` (`default: 0`)
-- `StartConfirmTimeoutMs`超過時の再生再試行回数です
+  - `StartConfirmTimeoutMs`超過時の再試行回数です
   - 再試行時は`MoveToStart`→`PressPlay`→開始確認をやり直します
-- `VoicepeakOneShot.SpeakOnce`では再試行せず、`StartConfirmTimeoutMs`超過で即`StartConfirmTimeout`になります
+  - `VoicepeakOneShot.SpeakOnce`では再試行せず、`StartConfirmTimeoutMs`超過で即`StartConfirmTimeout`になります
 - `StopConfirmMs` (`default: 300`)
   - 発話開始後、この時間だけ閾値未満が続いたら終了と判定します
 - `MaxSpeakingDurationSec` (`default: 300`)
   - 発話開始後、この秒数を超えても終了しない場合はエラーとします
 
-## `PrepareConfig`
+## PrepareConfig
 
 - `BootValidationText` (`default: "初期化完了"`)
   - 起動時バリデーションで入力/再生する文字列です
@@ -45,51 +45,54 @@
   - 起動時入力検証の再試行待機時間です
 - `CharDelayBaseMs` (`default: 1`)
   - 文字入力時の1文字ごとのディレイです
+  - より高速化したい場合は0にすると最速で入力されます
 - `ActionDelayMs` (`default: 5`)
-  - UIアクション時の待機です
+  - UIアクション時の待機時間です
 - `PostTypeWaitPerCharMs` (`default: 4`)
   - 文字入力後の待機時間算出に使う倍率です
+  - 文字入力まで完了して再生に失敗する場合は値を増やし、待機時間を伸ばしてみてください
 - `PostTypeWaitMinMs` (`default: 100`)
-  - 文字入力後待機の最小値です
+  - 文字入力後待機時間の最小値です
+  - 短文で文字入力まで完了して再生に失敗する場合は値を増やし、待機時間を伸ばしてみてください
 - `SequentialMoveToStartKeyDelayBaseMs` (`default: 5`)
   - 逐次`PageUp`→`Up`経路でのキー間待機です
 - `DeleteKeyDelayBaseMs` (`default: 1`)
   - `Delete`1回ごとの待機です
+  - より高速化したい場合は0にすると最速でDeleteされます
 - `ClearInputMaxPasses` (`default: 20`)
   - 入力クリア処理の最大試行回数です
 
-## `UiConfig`
+## UiConfig
 
 - `MoveToStartShortcut` (`default: "Ctrl+Up"`)
+  - 先頭移動のショートカットです
+  - VOICEPEAKの設定値と同じものを指定してください
+  - F1-F12のいずれかを指定した場合、より高速かつ安定な方式で実行されます
 - `PlayShortcut` (`default: "Space"`)
+  - 再生ショートカットです
+  - VOICEPEAKの設定値と同じものを指定してください
 - `DelayBeforePlayShortcutMs` (`default: 60`)
+  - 再生ボタンを押す前の待機時間です
 - `ClickAtValidationEnabled` (`default: true`)
-  - `MoveToStartShortcut`が`F1-F12`以外の時だけ使います
-  - 起動時バリデーションでprimeクリックを許可します
+  - 起動時バリデーションで初期化のためのウィンドウフォーカス奪取と入力欄クリックを許可します
+  - `MoveToStartShortcut`が`F1-F12`以外の場合だけ使用されます
 - `ClickBeforeTextFocusWhenUninitializedEnabled` (`default: false`)
-  - `MoveToStartShortcut`が`F1-F12`以外の時だけ使います
-  - 未prime時に文字入力欄フォーカス直前のprimeクリックを許可します
-  - 常駐ループと起動時Validationで評価します
-  - `VoicepeakOneShot.SpeakOnce`/`VoicepeakOneShot.SpeakOnceWait`では評価しません
+  - 初期化クリックが未実行の場合に文字入力欄フォーカス直前のウィンドウフォーカス奪取とクリックを許可します
+  - `MoveToStartShortcut`が`F1-F12`以外の場合だけ使用されます
+  - `VoicepeakOneShot.SpeakOnce`/`VoicepeakOneShot.SpeakOnceWait`では使用されません
 - `ClickOnStartTimeoutRetryEnabled` (`default: false`)
-  - `MoveToStartShortcut`が`F1-F12`以外の時だけ使います
-  - `StartTimeout`再試行前の修正クリックを1回だけ許可します
+  - `StartTimeout`時に一度だけウィンドウフォーカス奪取とクリックを許可します
+  - `MoveToStartShortcut`が`F1-F12`以外の場合だけ使用されます
 - `SendEnterAfterSentenceBreak` (`default: false`)
-  - trueに指定すると、`SentenceBreakTriggers`で指定した文字列の後にEnterを入れ、入力ブロックを分割します。
+  - trueに指定すると、`SentenceBreakTriggers`で指定した文字列の後にEnterを入れ、VOICEPEAKの入力ブロックを分割します。
 - `SentenceBreakTriggers` (`default: ["。", "！", "？", "!", "?"]`)
   - `SendEnterAfterSentenceBreak`での分割対象となる文字列です。
-  - 1文字である必要はなく、例えば`replaceRules`で"。"を"。　。"に置換する場合、"。　。"を分割対象として指定できます。
+  - 区切り文字は1文字である必要はなく、例えば`replaceRules`で"。"を"。　。"に置換する場合は"。　。"を分割対象として指定できます。
   - "!?"のように分割対象文字列が連続した場合、まとめて1つの区切り文字とみなします。
+  - 分割文字列は最長のものを優先します。
 
-重要です。
 
-- `MoveToStartShortcut`はnull/空文字/空白以外を設定してください
-- `F1-F12`はショートカット経路、それ以外は逐次`PageUp`→`Up`経路で処理されます
-- 上記3つの`Composite...`設定は`MoveToStartShortcut`が`F1-F12`以外の時だけ評価されます
-- 非Fキー値が標準ショートカットとして解釈不能でも、逐次`PageUp`→`Up`へフォールバックします
-- `SentenceBreakTriggers`は複数文字指定に対応し、最長一致を優先します
-
-## `TextTransformConfig`
+## TextTransformConfig
 
 - `ReplaceRules`
   - 上から順に1回ずつ適用します
@@ -112,18 +115,18 @@ config.TextTransform.ReplaceRules.Add(new ReplaceRule
 });
 ```
 
-## `DebugConfig`
+## DebugConfig
 
 - `LogTextCandidates` (`default: false`)
   - 入力欄候補収集の詳細ログを出力します
   - `ReadInputTextDetailed(...)`で候補一覧と推定情報のログを有効化します
 
-## `ValidationConfig`
+## ValidationConfig
 
 - `BootValidation` (`default: Required`)
 - `RequestValidation` (`default: Strict`)
 
-### `BootValidationMode`
+### BootValidationMode
 
 - `Required`
   - 起動時バリデーション失敗で`Start(...)`が例外になります
@@ -143,11 +146,9 @@ config.TextTransform.ReplaceRules.Add(new ReplaceRule
 
 常駐ランタイムと単発実行の両方で`config.Validation.RequestValidation`を使用します。
 
-## 設定バリデーション
+## configバリデーション
 
-起動時に`AppConfigValidator`で主要な設定不正を検出します。
-
-主な検証内容です。
+起動時に下記のような主要な設定不正を検出します。
 
 - `config`と各セクションが`null`でないこと
 - 数値設定が許容範囲にあること
@@ -166,7 +167,7 @@ config.TextTransform.ReplaceRules.Add(new ReplaceRule
 
 `Delete`や`Enter`は`PlayShortcut`設定値としてサポートしていません。
 
-## 例: C#で直接設定
+## 使用例: C#で直接設定
 
 ```csharp
 var config = new AppConfig

@@ -80,9 +80,10 @@
 
 - `NNN`はミリ秒整数です
 - 負値は`0`扱いです
+- 指定した時間が文字削除・入力等の時間より短い場合、完了次第即発話を開始します
 - `[[pause:NNN]]`自体には文字列置換を適用しません
-- `VoicepeakOneShot.SpeakOnce`では`[[pause:NNN]]`を除去して1回再生として扱います
-- `VoicepeakOneShot.SpeakOnceWait`と常駐実行では従来どおりpauseとして解釈します
+- `VoicepeakOneShot.SpeakOnce`では`[[pause:NNN]]`を除去し、1回の再生として扱います
+- `VoicepeakOneShot.SpeakOnceWait`と常駐実行では従来通りpauseとして解釈します
 
 例:
 
