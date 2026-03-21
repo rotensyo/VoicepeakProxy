@@ -35,9 +35,247 @@ public sealed class SpeakOnceRequest
     public string Text { get; set; }
 }
 
+// 単発入力検証結果
+public enum ValidateInputOnceStatus
+{
+    Completed,
+    InvalidRequest,
+    ProcessNotFound,
+    MultipleProcesses,
+    TargetNotFound,
+    PrepareFailed,
+    MoveToStartFailed,
+    PlayFailed,
+    StartConfirmTimeout,
+    MaxSpeakingDurationExceeded,
+    ClearInputFailed,
+    TypeTextFailed,
+    ReadInputFailed,
+    TextMismatch,
+    ProcessLost
+}
+
+// 単発入力検証結果
+public sealed class ValidateInputOnceResult
+{
+    public ValidateInputOnceStatus Status { get; set; }
+    public string ErrorMessage { get; set; } = string.Empty;
+    public string ActualText { get; set; } = string.Empty;
+    public bool Succeeded => Status == ValidateInputOnceStatus.Completed;
+}
+
+// 単発入力削除結果
+public enum ClearInputOnceStatus
+{
+    Completed,
+    ProcessNotFound,
+    MultipleProcesses,
+    TargetNotFound,
+    ClearInputFailed,
+    ProcessLost
+}
+
+// 単発入力削除結果
+public sealed class ClearInputOnceResult
+{
+    public ClearInputOnceStatus Status { get; set; }
+    public string ErrorMessage { get; set; } = string.Empty;
+    public bool Succeeded => Status == ClearInputOnceStatus.Completed;
+}
+
 // 単発実行APIの公開窓口
 public static class VoicepeakOneShot
 {
+    // 単発入力検証
+    public static ValidateInputOnceResult ValidateInputOnce(
+        AppConfig config,
+        IAppLogger logger = null)
+    {
+        if (config == null)
+        {
+            throw new ArgumentNullException(nameof(config));
+        }
+
+        AppConfigValidator.Validate(config);
+        AppLogger log = new AppLogger(logger ?? new ConsoleAppLogger());
+
+        return ValidateInputOnceCore(
+            config,
+            log,
+            new VoicepeakUiController(config.Ui, config.Prepare, config.Debug, log),
+            new AudioSessionReader(log));
+    }
+
+    // 依存を差し替えて単発入力検証
+    internal static ValidateInputOnceResult ValidateInputOnceCore(
+        AppConfig config,
+        AppLogger log,
+        IVoicepeakUiController ui,
+        IAudioSessionReader audio)
+    {
+        string targetText = config.Prepare.BootValidationText ?? string.Empty;
+
+        int processCount = ui.GetVoicepeakProcessCount();
+        if (processCount <= 0)
+        {
+            log.Error("voicepeak.exe が起動していません。");
+            return new ValidateInputOnceResult { Status = ValidateInputOnceStatus.ProcessNotFound };
+        }
+
+        if (processCount > 1)
+        {
+            log.Error($"voicepeak.exe が複数起動しています。1つだけ起動してください。（検出数: {processCount}）");
+            return new ValidateInputOnceResult { Status = ValidateInputOnceStatus.MultipleProcesses };
+        }
+
+        if (!ui.TryResolveTarget(out Process process, out IntPtr hwnd))
+        {
+            log.Error("対象ウィンドウを取得できませんでした。アプリの状態を確認してください。");
+            return new ValidateInputOnceResult { Status = ValidateInputOnceStatus.TargetNotFound };
+        }
+
+        if (ui.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.Validation))
+        {
+            ui.TryPrimeInputContext(process, hwnd, InputContextPrimeReason.Validation);
+        }
+
+        BootValidationRunResult run = JobExecutionCore.RunBootValidationFlow(
+            config,
+            ui,
+            audio,
+            process,
+            hwnd,
+            log,
+            targetText);
+        if (run.Kind == BootValidationRunKind.Completed)
+        {
+            return new ValidateInputOnceResult
+            {
+                Status = ValidateInputOnceStatus.Completed,
+                ActualText = run.InputValidate.ActualText
+            };
+        }
+
+        if (run.Kind == BootValidationRunKind.InputValidationFailed)
+        {
+            return new ValidateInputOnceResult
+            {
+                Status = MapValidateInputOnceStatus(run.InputValidate.Reason),
+                ErrorMessage = $"reason={run.InputValidate.Reason} cause={run.InputValidate.Cause}",
+                ActualText = run.InputValidate.ActualText
+            };
+        }
+
+        if (run.Kind == BootValidationRunKind.MoveToStartFailed)
+        {
+            return new ValidateInputOnceResult
+            {
+                Status = ValidateInputOnceStatus.MoveToStartFailed,
+                ErrorMessage = "reason=move_to_start_failed"
+            };
+        }
+
+        if (run.Kind == BootValidationRunKind.PlayFailed)
+        {
+            return new ValidateInputOnceResult
+            {
+                Status = ValidateInputOnceStatus.PlayFailed,
+                ErrorMessage = "reason=play_failed"
+            };
+        }
+
+        if (run.Kind == BootValidationRunKind.StartConfirmTimeout)
+        {
+            return new ValidateInputOnceResult
+            {
+                Status = ValidateInputOnceStatus.StartConfirmTimeout,
+                ErrorMessage = "reason=start_confirm_failed"
+            };
+        }
+
+        if (run.Kind == BootValidationRunKind.MaxDuration)
+        {
+            return new ValidateInputOnceResult
+            {
+                Status = ValidateInputOnceStatus.MaxSpeakingDurationExceeded,
+                ErrorMessage = "reason=max_speaking_duration"
+            };
+        }
+
+        if (run.Kind == BootValidationRunKind.ProcessLost)
+        {
+            return new ValidateInputOnceResult
+            {
+                Status = ValidateInputOnceStatus.ProcessLost,
+                ErrorMessage = "reason=process_lost"
+            };
+        }
+
+        return new ValidateInputOnceResult
+        {
+            Status = ValidateInputOnceStatus.InvalidRequest,
+            ErrorMessage = "reason=unknown"
+        };
+    }
+
+    // 単発入力削除
+    public static ClearInputOnceResult ClearInputOnce(
+        AppConfig config,
+        IAppLogger logger = null)
+    {
+        if (config == null)
+        {
+            throw new ArgumentNullException(nameof(config));
+        }
+
+        AppConfigValidator.Validate(config);
+        AppLogger log = new AppLogger(logger ?? new ConsoleAppLogger());
+
+        return ClearInputOnceCore(
+            config,
+            log,
+            new VoicepeakUiController(config.Ui, config.Prepare, config.Debug, log));
+    }
+
+    // 依存を差し替えて単発入力削除
+    internal static ClearInputOnceResult ClearInputOnceCore(
+        AppConfig config,
+        AppLogger log,
+        IVoicepeakUiController ui)
+    {
+        int processCount = ui.GetVoicepeakProcessCount();
+        if (processCount <= 0)
+        {
+            log.Error("voicepeak.exe が起動していません。");
+            return new ClearInputOnceResult { Status = ClearInputOnceStatus.ProcessNotFound };
+        }
+
+        if (processCount > 1)
+        {
+            log.Error($"voicepeak.exe が複数起動しています。1つだけ起動してください。（検出数: {processCount}）");
+            return new ClearInputOnceResult { Status = ClearInputOnceStatus.MultipleProcesses };
+        }
+
+        if (!ui.TryResolveTarget(out Process process, out IntPtr hwnd))
+        {
+            log.Error("対象ウィンドウを取得できませんでした。アプリの状態を確認してください。");
+            return new ClearInputOnceResult { Status = ClearInputOnceStatus.TargetNotFound };
+        }
+
+        if (!ui.IsAlive(process))
+        {
+            log.Error("対象プロセスが終了したため処理を中断しました。");
+            return new ClearInputOnceResult { Status = ClearInputOnceStatus.ProcessLost };
+        }
+
+        if (!ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, false))
+        {
+            return new ClearInputOnceResult { Status = ClearInputOnceStatus.ClearInputFailed };
+        }
+
+        return new ClearInputOnceResult { Status = ClearInputOnceStatus.Completed };
+    }
+
     // 単発実行
     public static SpeakOnceResult SpeakOnce(
         AppConfig config,
@@ -417,6 +655,21 @@ public static class VoicepeakOneShot
         Confirmed,
         Timeout,
         ProcessLost
+    }
+
+    // 入力検証失敗理由を公開ステータスへ変換
+    private static ValidateInputOnceStatus MapValidateInputOnceStatus(string reason)
+    {
+        return reason switch
+        {
+            "process_not_alive" => ValidateInputOnceStatus.ProcessLost,
+            "move_to_start_failed" => ValidateInputOnceStatus.PrepareFailed,
+            "clear_input_failed" => ValidateInputOnceStatus.ClearInputFailed,
+            "type_text_failed" => ValidateInputOnceStatus.TypeTextFailed,
+            "read_input_failed" => ValidateInputOnceStatus.ReadInputFailed,
+            "text_mismatch" => ValidateInputOnceStatus.TextMismatch,
+            _ => ValidateInputOnceStatus.InvalidRequest
+        };
     }
 
 }

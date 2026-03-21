@@ -33,6 +33,75 @@ internal readonly struct SpeakMonitorResult
     public static SpeakMonitorResult ProcessLost() => new SpeakMonitorResult(SpeakMonitorKind.ProcessLost, 0);
 }
 
+// 入力検証結果を保持
+internal readonly struct InputValidateResult
+{
+    public bool Success { get; }
+    public string Reason { get; }
+    public string Cause { get; }
+    public string ActualText { get; }
+
+    private InputValidateResult(bool success, string reason, string cause, string actualText)
+    {
+        Success = success;
+        Reason = reason ?? string.Empty;
+        Cause = cause ?? string.Empty;
+        ActualText = actualText ?? string.Empty;
+    }
+
+    public static InputValidateResult Ok(string actualText)
+        => new InputValidateResult(true, string.Empty, string.Empty, actualText ?? string.Empty);
+
+    public static InputValidateResult Fail(string reason, string cause, string actualText)
+        => new InputValidateResult(false, reason ?? "unknown", cause ?? string.Empty, actualText ?? string.Empty);
+}
+
+// 起動時検証結果の種類
+internal enum BootValidationRunKind
+{
+    Completed,
+    InputValidationFailed,
+    MoveToStartFailed,
+    PlayFailed,
+    StartConfirmTimeout,
+    MaxDuration,
+    ProcessLost
+}
+
+// 起動時検証結果を保持
+internal readonly struct BootValidationRunResult
+{
+    public BootValidationRunKind Kind { get; }
+    public InputValidateResult InputValidate { get; }
+
+    private BootValidationRunResult(BootValidationRunKind kind, InputValidateResult inputValidate)
+    {
+        Kind = kind;
+        InputValidate = inputValidate;
+    }
+
+    public static BootValidationRunResult Completed(InputValidateResult inputValidate)
+        => new BootValidationRunResult(BootValidationRunKind.Completed, inputValidate);
+
+    public static BootValidationRunResult InputValidationFailed(InputValidateResult inputValidate)
+        => new BootValidationRunResult(BootValidationRunKind.InputValidationFailed, inputValidate);
+
+    public static BootValidationRunResult MoveToStartFailed(InputValidateResult inputValidate)
+        => new BootValidationRunResult(BootValidationRunKind.MoveToStartFailed, inputValidate);
+
+    public static BootValidationRunResult PlayFailed(InputValidateResult inputValidate)
+        => new BootValidationRunResult(BootValidationRunKind.PlayFailed, inputValidate);
+
+    public static BootValidationRunResult StartConfirmTimeout(InputValidateResult inputValidate)
+        => new BootValidationRunResult(BootValidationRunKind.StartConfirmTimeout, inputValidate);
+
+    public static BootValidationRunResult MaxDuration(InputValidateResult inputValidate)
+        => new BootValidationRunResult(BootValidationRunKind.MaxDuration, inputValidate);
+
+    public static BootValidationRunResult ProcessLost(InputValidateResult inputValidate)
+        => new BootValidationRunResult(BootValidationRunKind.ProcessLost, inputValidate);
+}
+
 // 単発常駐で共有する実行ロジック
 internal static class JobExecutionCore
 {
@@ -201,6 +270,216 @@ internal static class JobExecutionCore
         return true;
     }
 
+    // 起動時検証相当の入力と発話確認を実行
+    public static BootValidationRunResult RunBootValidationFlow(
+        AppConfig config,
+        IVoicepeakUiController ui,
+        IAudioSessionReader audio,
+        Process process,
+        IntPtr hwnd,
+        AppLogger log,
+        string targetText)
+    {
+        string target = targetText ?? string.Empty;
+        InputValidateResult bootValidate = InputValidateResult.Fail("unknown", "unknown", string.Empty);
+        bool bootInputOk = false;
+        int charDelay = config.Prepare.CharDelayBaseMs;
+
+        for (int attempt = 0; attempt <= config.Prepare.BootValidationMaxRetries; attempt++)
+        {
+            bootValidate = ValidateInputText(config, ui, process, hwnd, target, charDelay, useProbeGuardChars: true);
+            if (bootValidate.Success)
+            {
+                bootInputOk = true;
+                break;
+            }
+
+            log.Warn(
+                "boot_validation_retry_failed " +
+                $"attempt={attempt} reason={bootValidate.Reason} cause={bootValidate.Cause} " +
+                $"expected=\"{SanitizeForLog(target)}\" actual=\"{SanitizeForLog(bootValidate.ActualText)}\"");
+
+            bool hasNextAttempt = attempt < config.Prepare.BootValidationMaxRetries;
+            if (hasNextAttempt && config.Prepare.BootValidationRetryIntervalMs > 0)
+            {
+                Thread.Sleep(config.Prepare.BootValidationRetryIntervalMs);
+            }
+        }
+
+        if (!bootInputOk)
+        {
+            log.Error("boot_validation_fail " +
+                $"stage=input_validate reason={bootValidate.Reason} cause={bootValidate.Cause} " +
+                $"expected=\"{SanitizeForLog(target)}\" actual=\"{SanitizeForLog(bootValidate.ActualText)}\"");
+            return BootValidationRunResult.InputValidationFailed(bootValidate);
+        }
+
+        if (string.Equals(target, string.Empty, StringComparison.Ordinal))
+        {
+            log.Info("boot_validation_skip_speech reason=empty_boot_text");
+            log.Info("boot_validation_ok");
+            return BootValidationRunResult.Completed(bootValidate);
+        }
+
+        bool recoveryClickUsed = false;
+        for (int startAttempt = 0; startAttempt <= config.Audio.StartConfirmMaxRetries; startAttempt++)
+        {
+            if (!ui.PrepareForPlayback(process, hwnd, config.Prepare.ActionDelayMs))
+            {
+                log.Error("起動時動作チェック失敗: 先頭移動ショートカットの実行に失敗しました。");
+                return BootValidationRunResult.MoveToStartFailed(bootValidate);
+            }
+
+            if (!ui.PressPlay(hwnd))
+            {
+                log.Error("起動時動作チェック失敗: 再生ボタンの押下に失敗しました。");
+                return BootValidationRunResult.PlayFailed(bootValidate);
+            }
+
+            SpeakMonitorResult speakResult = MonitorSpeaking(
+                config,
+                ui,
+                audio,
+                process,
+                hwnd,
+                log,
+                () => false,
+                () => false,
+                null);
+
+            if (speakResult.Kind == SpeakMonitorKind.Completed)
+            {
+                ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, true);
+                log.Info("boot_validation_ok");
+                return BootValidationRunResult.Completed(bootValidate);
+            }
+
+            if (speakResult.Kind == SpeakMonitorKind.StartTimeout)
+            {
+                bool hasNextAttempt = HandleStartTimeoutRetry(config, ui, process, hwnd, startAttempt, ref recoveryClickUsed);
+                if (hasNextAttempt)
+                {
+                    log.Warn($"boot_start_confirm_retry attempt={startAttempt + 1}");
+                    continue;
+                }
+
+                log.Error("起動時動作チェック失敗: 音声の再生が確認できませんでした。");
+                return BootValidationRunResult.StartConfirmTimeout(bootValidate);
+            }
+
+            if (speakResult.Kind == SpeakMonitorKind.MaxDuration)
+            {
+                log.Error("起動時動作チェック失敗: 音声の終了が確認できませんでした。");
+                return BootValidationRunResult.MaxDuration(bootValidate);
+            }
+
+            if (speakResult.Kind == SpeakMonitorKind.ProcessLost)
+            {
+                return BootValidationRunResult.ProcessLost(bootValidate);
+            }
+        }
+
+        log.Error("起動時動作チェック失敗: 音声の再生が確認できませんでした。");
+        return BootValidationRunResult.StartConfirmTimeout(bootValidate);
+    }
+
+    // 1回分の入力検証を実行
+    public static InputValidateResult ValidateInputText(
+        AppConfig config,
+        IVoicepeakUiController ui,
+        Process process,
+        IntPtr hwnd,
+        string text,
+        int charDelay,
+        bool useProbeGuardChars)
+    {
+        if (!ui.IsAlive(process))
+        {
+            return InputValidateResult.Fail("process_not_alive", "voicepeak_process_exited_or_unavailable", string.Empty);
+        }
+
+        if (!ui.PrepareForTextInput(process, hwnd, config.Prepare.ActionDelayMs, true))
+        {
+            return InputValidateResult.Fail("move_to_start_failed", "shortcut_not_applied_or_context_mismatch", string.Empty);
+        }
+
+        if (!ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, true))
+        {
+            return InputValidateResult.Fail("clear_input_failed", "move_to_start_or_delete_not_applied", string.Empty);
+        }
+
+        string expected = InputTextNormalizer.Normalize(text);
+        string toType = useProbeGuardChars ? ("A" + expected) : expected;
+        if (!ui.TypeText(hwnd, toType, charDelay))
+        {
+            return InputValidateResult.Fail("type_text_failed", "wm_char_input_failed", string.Empty);
+        }
+
+        int postTypeWaitMs = ComputePostTypeWaitMs(expected, config.Prepare.PostTypeWaitPerCharMs, config.Prepare.PostTypeWaitMinMs);
+        if (postTypeWaitMs > 0)
+        {
+            Thread.Sleep(postTypeWaitMs);
+        }
+
+        if (useProbeGuardChars)
+        {
+            if (!ui.PrepareForTextInput(process, hwnd, config.Prepare.ActionDelayMs, true))
+            {
+                return InputValidateResult.Fail("move_to_start_failed", "shortcut_not_applied_or_context_mismatch", string.Empty);
+            }
+
+            if (!ui.PressDelete(hwnd))
+            {
+                return InputValidateResult.Fail("delete_failed", "key_message_not_applied", string.Empty);
+            }
+        }
+
+        ReadInputResult read = ui.ReadInputTextDetailed(hwnd);
+        if (!read.Success)
+        {
+            return InputValidateResult.Fail("read_input_failed", "read_input_source_" + read.Source.ToString(), string.Empty);
+        }
+
+        string actual = InputTextNormalizer.Normalize(read.Text);
+        if (!string.Equals(actual, expected, StringComparison.Ordinal))
+        {
+            return InputValidateResult.Fail("text_mismatch", BuildInputMismatchCause(expected, actual, useProbeGuardChars), actual);
+        }
+
+        return InputValidateResult.Ok(actual);
+    }
+
+    // 入力不一致の原因を分類
+    public static string BuildInputMismatchCause(string expected, string actual, bool usedProbeGuardChars)
+    {
+        string a = actual ?? string.Empty;
+        if (a.Length == 0)
+        {
+            return "actual_empty_or_read_failed";
+        }
+
+        if (usedProbeGuardChars)
+        {
+            string expectedWithGuards = "A" + (expected ?? string.Empty);
+            if (string.Equals(a, expectedWithGuards, StringComparison.Ordinal))
+            {
+                return "guard_chars_not_removed";
+            }
+
+            if (a.StartsWith("A", StringComparison.Ordinal))
+            {
+                return "leading_guard_remaining_move_to_start_or_delete_issue";
+            }
+        }
+
+        if (!string.IsNullOrEmpty(expected) && a.IndexOf(expected, StringComparison.Ordinal) >= 0)
+        {
+            return "contains_expected_but_not_exact";
+        }
+
+        return "actual_unexpected_or_target_mismatch";
+    }
+
     // job終了時の入力欄クリアを共通化
     public static void FinalizeJobInput(
         AppConfig config,
@@ -265,5 +544,16 @@ internal static class JobExecutionCore
 
         int adjusted = pauseMs - compensation;
         return adjusted > 0 ? adjusted : 0;
+    }
+
+    // ログ向けに制御文字を置換
+    private static string SanitizeForLog(string value)
+    {
+        if (value == null)
+        {
+            return string.Empty;
+        }
+
+        return value.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\"", "\\\"");
     }
 }

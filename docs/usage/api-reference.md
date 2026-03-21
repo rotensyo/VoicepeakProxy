@@ -55,6 +55,19 @@
 - `config == null`は`ArgumentNullException`
 - `request == null`は`SpeakOnceStatus.InvalidRequest`として返します
 
+### `VoicepeakOneShot.ValidateInputOnce(AppConfig config, IAppLogger logger = null)`
+
+- 入力検証と発話確認を1回だけ同期実行します
+- ワーカーループは起動しません
+- 常に`config.Prepare.BootValidationText`を検証対象に使用します
+- `config == null`は`ArgumentNullException`
+
+### `VoicepeakOneShot.ClearInputOnce(AppConfig config, IAppLogger logger = null)`
+
+- 入力欄のクリアだけを1回同期実行します
+- ワーカーループは起動しません
+- `config == null`は`ArgumentNullException`
+
 ## 入力モデル
 
 ### `SpeakRequest`
@@ -124,6 +137,46 @@
 - `PlayFailed`
 - `StartConfirmTimeout`
 - `MaxSpeakingDurationExceeded`
+- `ProcessLost`
+
+### `ValidateInputOnceResult`
+
+- `Status: ValidateInputOnceStatus`
+- `ErrorMessage: string`
+- `ActualText: string`
+- `Succeeded: bool`
+
+主な`ValidateInputOnceStatus`です。
+
+- `Completed`
+- `InvalidRequest`
+- `ProcessNotFound`
+- `MultipleProcesses`
+- `TargetNotFound`
+- `PrepareFailed`
+- `MoveToStartFailed`
+- `PlayFailed`
+- `StartConfirmTimeout`
+- `MaxSpeakingDurationExceeded`
+- `ClearInputFailed`
+- `TypeTextFailed`
+- `ReadInputFailed`
+- `TextMismatch`
+- `ProcessLost`
+
+### `ClearInputOnceResult`
+
+- `Status: ClearInputOnceStatus`
+- `ErrorMessage: string`
+- `Succeeded: bool`
+
+主な`ClearInputOnceStatus`です。
+
+- `Completed`
+- `ProcessNotFound`
+- `MultipleProcesses`
+- `TargetNotFound`
+- `ClearInputFailed`
 - `ProcessLost`
 
 ## ログ出力インターフェース

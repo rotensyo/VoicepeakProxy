@@ -95,140 +95,22 @@ internal sealed class VoicepeakEngine : IDisposable
             _ui.TryPrimeInputContext(process, hwnd, InputContextPrimeReason.Validation);
         }
 
-        string target = _config.Prepare.BootValidationText ?? string.Empty;
-        InputValidateResult bootValidate = InputValidateResult.Fail("unknown", "unknown", string.Empty);
-        bool bootInputOk = false;
-        int charDelay = _config.Prepare.CharDelayBaseMs;
-
-        for (int attempt = 0; attempt <= _config.Prepare.BootValidationMaxRetries; attempt++)
+        BootValidationRunResult result = JobExecutionCore.RunBootValidationFlow(
+            _config,
+            _ui,
+            _audio,
+            process,
+            hwnd,
+            _log,
+            _config.Prepare.BootValidationText);
+        if (result.Kind == BootValidationRunKind.Completed)
         {
-            bootValidate = RunInputValidate(process, hwnd, target, charDelay, useProbeGuardChars: true);
-            if (bootValidate.Success)
-            {
-                bootInputOk = true;
-                break;
-            }
-
-            _log.Warn(
-                "boot_validation_retry_failed " +
-                $"attempt={attempt} reason={bootValidate.Reason} cause={bootValidate.Cause} " +
-                $"expected=\"{SanitizeForLog(target)}\" actual=\"{SanitizeForLog(bootValidate.ActualText)}\"");
-
-            bool hasNextAttempt = attempt < _config.Prepare.BootValidationMaxRetries;
-            if (hasNextAttempt && _config.Prepare.BootValidationRetryIntervalMs > 0)
-            {
-                Thread.Sleep(_config.Prepare.BootValidationRetryIntervalMs);
-            }
-        }
-
-        if (!bootInputOk)
-        {
-            _log.Error("boot_validation_fail " +
-                $"stage=input_validate reason={bootValidate.Reason} cause={bootValidate.Cause} " +
-                $"expected=\"{SanitizeForLog(target)}\" actual=\"{SanitizeForLog(bootValidate.ActualText)}\"");
-            return mode == BootValidationMode.Optional;
-        }
-
-        if (string.Equals(_config.Prepare.BootValidationText, string.Empty, StringComparison.Ordinal))
-        {
-            _log.Info("boot_validation_skip_speech reason=empty_boot_text");
-            _log.Info("boot_validation_ok");
             return true;
         }
 
-        bool recoveryClickUsed = false;
-        for (int startAttempt = 0; startAttempt <= _config.Audio.StartConfirmMaxRetries; startAttempt++)
+        if (result.Kind == BootValidationRunKind.ProcessLost)
         {
-            if (!_ui.PrepareForPlayback(process, hwnd, _config.Prepare.ActionDelayMs))
-            {
-                _log.Error("起動時動作チェック失敗: 先頭移動ショートカットの実行に失敗しました。");
-                return mode == BootValidationMode.Optional;
-            }
-
-            if (!_ui.PressPlay(hwnd))
-            {
-                _log.Error("起動時動作チェック失敗: 再生ボタンの押下に失敗しました。");
-                return mode == BootValidationMode.Optional;
-            }
-
-            long monitorStartAt = MonoClock.NowMs();
-            long startDeadline = monitorStartAt + _config.Audio.StartConfirmTimeoutMs;
-            bool started = false;
-            long speakingStartedAt = -1;
-            long belowSince = -1;
-
-            while (true)
-            {
-                if (!IsProcessAlive(process))
-                {
-                    OnProcessLost();
-                    return mode == BootValidationMode.Optional;
-                }
-
-                long now = MonoClock.NowMs();
-                AudioSessionSnapshot snap = _audio.ReadPeak(process.Id);
-
-                if (!started)
-                {
-                    if (snap.Peak >= _config.Audio.PeakThreshold)
-                    {
-                        started = true;
-                        speakingStartedAt = now;
-                    }
-                    else if (now > startDeadline)
-                    {
-                        bool hasNextAttempt = startAttempt < _config.Audio.StartConfirmMaxRetries;
-                        if (hasNextAttempt)
-                        {
-                            if (!recoveryClickUsed
-                                && _ui.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.StartTimeoutRetry))
-                            {
-                                _ui.TryPrimeInputContext(process, hwnd, InputContextPrimeReason.StartTimeoutRetry);
-                                recoveryClickUsed = true;
-                            }
-
-                            _log.Warn($"boot_start_confirm_retry attempt={startAttempt + 1}");
-                            break;
-                        }
-
-                        _log.Error("起動時動作チェック失敗: 音声の再生が確認できませんでした。");
-                        return mode == BootValidationMode.Optional;
-                    }
-                }
-                else
-                {
-                    if (_config.Audio.MaxSpeakingDurationSec > 0)
-                    {
-                        long maxMs = _config.Audio.MaxSpeakingDurationSec * 1000L;
-                        if ((now - speakingStartedAt) > maxMs)
-                        {
-                            _log.Error("起動時動作チェック失敗: 音声の終了が確認できませんでした。");
-                            JobExecutionCore.MoveToStartDuringPlayback(_config, _ui, hwnd, _config.Prepare.ActionDelayMs);
-                            return mode == BootValidationMode.Optional;
-                        }
-                    }
-
-                    if (snap.Peak < _config.Audio.PeakThreshold)
-                    {
-                        if (belowSince < 0)
-                        {
-                            belowSince = now;
-                        }
-                        else if ((now - belowSince) >= _config.Audio.StopConfirmMs)
-                        {
-                            _ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true);
-                            _log.Info("boot_validation_ok");
-                            return true;
-                        }
-                    }
-                    else
-                    {
-                        belowSince = -1;
-                    }
-                }
-
-                Thread.Sleep(_config.Audio.PollIntervalMs);
-            }
+            OnProcessLost();
         }
 
         return mode == BootValidationMode.Optional;
@@ -514,61 +396,7 @@ internal sealed class VoicepeakEngine : IDisposable
 
     private InputValidateResult RunInputValidate(Process process, IntPtr hwnd, string text, int charDelay, bool useProbeGuardChars)
     {
-        if (!IsProcessAlive(process))
-        {
-            return InputValidateResult.Fail("process_not_alive", "voicepeak_process_exited_or_unavailable", string.Empty);
-        }
-
-        if (!_ui.PrepareForTextInput(process, hwnd, _config.Prepare.ActionDelayMs, true))
-        {
-            return InputValidateResult.Fail("move_to_start_failed", "shortcut_not_applied_or_context_mismatch", string.Empty);
-        }
-
-        if (!_ui.ClearInput(process, hwnd, _config.Prepare.ActionDelayMs, true))
-        {
-            return InputValidateResult.Fail("clear_input_failed", "move_to_start_or_delete_not_applied", string.Empty);
-        }
-
-        string expected = InputTextNormalizer.Normalize(text);
-        string toType = useProbeGuardChars ? ("A" + expected) : expected;
-        if (!_ui.TypeText(hwnd, toType, charDelay))
-        {
-            return InputValidateResult.Fail("type_text_failed", "wm_char_input_failed", string.Empty);
-        }
-
-        int postTypeWaitMs = ComputePostTypeWaitMs(expected, _config.Prepare.PostTypeWaitPerCharMs, _config.Prepare.PostTypeWaitMinMs);
-        if (postTypeWaitMs > 0)
-        {
-            Thread.Sleep(postTypeWaitMs);
-        }
-
-        if (useProbeGuardChars)
-        {
-            if (!_ui.PrepareForTextInput(process, hwnd, _config.Prepare.ActionDelayMs, true))
-            {
-                return InputValidateResult.Fail("move_to_start_failed", "shortcut_not_applied_or_context_mismatch", string.Empty);
-            }
-
-            if (!_ui.PressDelete(hwnd))
-            {
-                return InputValidateResult.Fail("delete_failed", "key_message_not_applied", string.Empty);
-            }
-
-        }
-
-        ReadInputResult read = _ui.ReadInputTextDetailed(hwnd);
-        if (!read.Success)
-        {
-            return InputValidateResult.Fail("read_input_failed", "read_input_source_" + read.Source.ToString(), string.Empty);
-        }
-
-        string actual = InputTextNormalizer.Normalize(read.Text);
-        if (!string.Equals(actual, expected, StringComparison.Ordinal))
-        {
-            return InputValidateResult.Fail("text_mismatch", BuildInputMismatchCause(expected, actual, useProbeGuardChars), actual);
-        }
-
-        return InputValidateResult.Ok(actual);
+        return JobExecutionCore.ValidateInputText(_config, _ui, process, hwnd, text, charDelay, useProbeGuardChars);
     }
 
     internal static int ComputePostTypeWaitMs(string text, int perCharMs, int minMs)
@@ -578,33 +406,7 @@ internal sealed class VoicepeakEngine : IDisposable
 
     internal static string BuildInputMismatchCause(string expected, string actual, bool usedProbeGuardChars)
     {
-        string a = actual ?? string.Empty;
-        if (a.Length == 0)
-        {
-            return "actual_empty_or_read_failed";
-        }
-
-        if (usedProbeGuardChars)
-        {
-            string expectedWithGuards = "A" + (expected ?? string.Empty);
-            if (string.Equals(a, expectedWithGuards, StringComparison.Ordinal))
-            {
-                return "guard_chars_not_removed";
-            }
-
-            if (a.StartsWith("A", StringComparison.Ordinal))
-            {
-                return "leading_guard_remaining_move_to_start_or_delete_issue";
-            }
-
-        }
-
-        if (!string.IsNullOrEmpty(expected) && a.IndexOf(expected, StringComparison.Ordinal) >= 0)
-        {
-            return "contains_expected_but_not_exact";
-        }
-
-        return "actual_unexpected_or_target_mismatch";
+        return JobExecutionCore.BuildInputMismatchCause(expected, actual, usedProbeGuardChars);
     }
 
     private bool TryResolveTarget(out Process process, out IntPtr hwnd)
@@ -696,38 +498,6 @@ internal sealed class VoicepeakEngine : IDisposable
     private static string EscapeForJson(string s)
     {
         return (s ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
-    }
-
-    private static string SanitizeForLog(string value)
-    {
-        if (value == null)
-        {
-            return string.Empty;
-        }
-
-        return value.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\"", "\\\"");
-    }
-
-    private readonly struct InputValidateResult
-    {
-        public bool Success { get; }
-        public string Reason { get; }
-        public string Cause { get; }
-        public string ActualText { get; }
-
-        private InputValidateResult(bool success, string reason, string cause, string actualText)
-        {
-            Success = success;
-            Reason = reason ?? string.Empty;
-            Cause = cause ?? string.Empty;
-            ActualText = actualText ?? string.Empty;
-        }
-
-        public static InputValidateResult Ok(string actualText)
-            => new InputValidateResult(true, string.Empty, string.Empty, actualText ?? string.Empty);
-
-        public static InputValidateResult Fail(string reason, string cause, string actualText)
-            => new InputValidateResult(false, reason ?? "unknown", cause ?? string.Empty, actualText ?? string.Empty);
     }
 
 }

@@ -16,7 +16,7 @@
 ## 注意点
 - 本DLLはVOICEPEAKのUI構造に依存し、UI仕様やショートカット設定が変わると動作しなくなる可能性があります
 - 先頭移動ショートカットがF1-F12以外の場合、**発話時点で最後にクリックされたウィンドウ内要素が文字入力欄**である必要があります。
-  - 通常は初期化時にクリック操作を行いますが、**起動中にウィンドウをクリックしてしまったた場合**などは、**手動で文字入力欄を一度クリック**してから発話を再実行してください。
+  - 通常は初期化時にクリック操作を行いますが、**起動中にウィンドウをクリックしてしまった場合**などは、**手動で文字入力欄を一度クリック**してから発話を再実行してください。
   - 先頭移動ショートカットをF1-F12にした場合はこの操作が不要になります。
 
 
@@ -69,11 +69,18 @@ Console.WriteLine($"status={result.Status} jobId={result.JobId} error={result.Er
 
 ### 単発実行用
 - `VoicepeakOneShot.SpeakOnce(AppConfig config, SpeakOnceRequest request, IAppLogger logger = null)`
-  - 1回だけ実行し、発話の開始を確認したら即完了とします。
+  - 発話を1回だけ実行し、発話の開始を確認したら即完了とします。
   - 戻り値は`SpeakOnceResult`です
 - `VoicepeakOneShot.SpeakOnceWait(AppConfig config, SpeakOnceRequest request, IAppLogger logger = null)`
-  - 1回だけ実行し、発話終了まで待機してから完了します。
+  - 発話を1回だけ実行し、発話終了まで待機してから完了します。
   - 戻り値は`SpeakOnceResult`です
+- `VoicepeakOneShot.ValidateInputOnce(AppConfig config, IAppLogger logger = null)`
+  - 入力検証と発話確認を1回実行します。
+  - `config.Prepare.BootValidationText`を検証文言として使用します。
+  - 戻り値は`ValidateInputOnceResult`です
+- `VoicepeakOneShot.ClearInputOnce(AppConfig config, IAppLogger logger = null)`
+  - 入力欄のクリアを1回実行します。
+  - 戻り値は`ClearInputOnceResult`です
 
 ### 例外
 - `config == null`は`ArgumentNullException`
