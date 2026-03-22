@@ -6,11 +6,11 @@
 
 - `Plugin_VoicepeakProxy/`
   - 棒読みちゃんプラグイン本体です。
-  - `TalkTaskStarted`を受けて文字列をWorkerへ転送します。
+  - `TalkTaskStarted`を受けて文字列をWorkerへ同期送信します。
   - 棒読みちゃん既定音声は常に抑止します。
 - `VoicepeakProxyWorker/`
   - 補助プロセスです。
-  - `VoicepeakOneShot.SpeakOnceWait`でVOICEPEAK読み上げを実行します。
+  - `VoicepeakOneShot.SpeakOnceWait`でVOICEPEAK読み上げを同期実行します。
 - `Shared/`
   - PluginとWorkerの共通モデルです。
 
@@ -47,10 +47,11 @@ msbuild "bouyomichan-plugin/Plugin_VoicepeakProxy/Plugin_VoicepeakProxy.csproj" 
 - `AppConfig`の各項目はタブ分割で編集できます。
 - Plugin起動時にWorkerは必ず起動し、起動時検証が成功した場合のみ受信を開始します。
 - Worker起動待機は最大30秒で、500ms間隔で受信準備完了を確認します。
+- PluginとWorkerは独自キューを持たず、棒読みちゃんのキュー順で1件ずつ処理します。
 - ログは棒読みちゃんフォルダ直下の`Plugin_VoicepeakProxy_plugin.log`と`Plugin_VoicepeakProxy_worker.log`へ出力します。
 
 ## 仕様
 
 - テキストは`ReplaceWord`優先で取得し、空の場合のみ`SourceText`を使用します。
 - 棒読みちゃん既定音声は常に抑止します。
-- Worker未接続時は送信スレッドが異常終了し、以降の送信を停止します。
+- Worker未接続時は例外を送出して処理を停止します。

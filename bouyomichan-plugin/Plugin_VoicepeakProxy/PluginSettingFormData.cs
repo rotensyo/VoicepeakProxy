@@ -169,16 +169,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("Plugin")]
-        [DisplayName("03)キュー上限")]
-        [Description("Plugin内部キューの最大件数を指定します")]
-        public int MaxQueueLength
-        {
-            get { return State.Settings.Plugin.MaxQueueLength; }
-            set { State.Settings.Plugin.MaxQueueLength = value; }
-        }
-
-        [Category("Plugin")]
-        [DisplayName("04)Worker実行ファイル")]
+        [DisplayName("03)Worker実行ファイル")]
         [Description("空の場合はPluginと同じフォルダ配下のVoicepeakProxyWorker\\VoicepeakProxyWorker.exeを使用します")]
         public string WorkerExePath
         {

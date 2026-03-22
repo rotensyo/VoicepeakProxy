@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
@@ -16,17 +15,11 @@ namespace Plugin_VoicepeakProxy
     // 棒読みちゃんとVOICEPEAKを中継
     public sealed class Plugin_VoicepeakProxy : IPlugin
     {
-        private readonly object _queueLock = new object();
-        private readonly Queue<WorkerSpeakRequest> _queue = new Queue<WorkerSpeakRequest>();
-        private readonly AutoResetEvent _queueSignal = new AutoResetEvent(false);
-
         private PluginSettingsState _settingsState;
         private PluginSettingFormData _settingFormData;
         private string _settingsPath;
         private string _logPath;
         private FileLogger _logger;
-        private Thread _senderThread;
-        private bool _running;
         private bool _stopping;
         private BouyomiChan _bouyomi;
 
@@ -66,12 +59,6 @@ namespace Plugin_VoicepeakProxy
 
             WorkerBridgeClient.EnsureWorkerStarted(_settingsState.Settings.Plugin, _settingsPath, _logger);
 
-            _running = true;
-            _senderThread = new Thread(SenderThreadMain);
-            _senderThread.IsBackground = true;
-            _senderThread.Name = "VoicepeakProxySender";
-            _senderThread.Start();
-
             if (!TryAttachTalkTaskStarted())
             {
                 _logger.Warn("talk_task_started_hook_failed");
@@ -91,14 +78,6 @@ namespace Plugin_VoicepeakProxy
             {
                 _bouyomi.TalkTaskStarted -= OnTalkTaskStarted;
                 _bouyomi = null;
-            }
-
-            _running = false;
-            _queueSignal.Set();
-            if (_senderThread != null)
-            {
-                _senderThread.Join(2000);
-                _senderThread = null;
             }
 
             if (_settingsState != null)
@@ -143,101 +122,38 @@ namespace Plugin_VoicepeakProxy
                     taskId = e.TalkTask.TaskId;
                 }
 
-                EnqueueTalk(taskId, text);
+                SendTalk(taskId, text);
             }
             catch (Exception ex)
             {
-                _logger.Error("on_talk_task_started_error", ex.Message);
-            }
-        }
-
-        // テキストをキューへ投入
-        private void EnqueueTalk(int taskId, string text)
-        {
-            PluginRuntimeConfig runtime = _settingsState.Settings.Plugin;
-            int maxQueueLength = runtime.MaxQueueLength <= 0 ? 200 : runtime.MaxQueueLength;
-
-            lock (_queueLock)
-            {
-                if (_queue.Count >= maxQueueLength)
-                {
-                    _logger.Warn("queue_overflow_drop_new taskId=" + taskId);
-                    return;
-                }
-
-                WorkerSpeakRequest request = new WorkerSpeakRequest();
-                request.Command = "speak";
-                request.TaskId = taskId;
-                request.Text = text;
-                _queue.Enqueue(request);
-
-                _logger.Info("enqueue taskId=" + taskId + " length=" + text.Length);
-            }
-
-            _queueSignal.Set();
-        }
-
-        // 送信スレッド本体
-        private void SenderThreadMain()
-        {
-            try
-            {
-                while (true)
-                {
-                    if (!_running)
-                    {
-                        break;
-                    }
-
-                    WorkerSpeakRequest request = null;
-                    lock (_queueLock)
-                    {
-                        if (_queue.Count > 0)
-                        {
-                            request = _queue.Dequeue();
-                        }
-                    }
-
-                    if (request == null)
-                    {
-                        _queueSignal.WaitOne(500);
-                        continue;
-                    }
-
-                    PluginSettingsState state = _settingsState;
-                    PluginRuntimeConfig runtime = state != null && state.Settings != null ? state.Settings.Plugin : null;
-                    if (runtime == null)
-                    {
-                        runtime = new PluginRuntimeConfig();
-                    }
-
-                    FileLogger logger = _logger;
-                    WorkerSpeakResponse response = WorkerBridgeClient.Send(
-                        runtime,
-                        request);
-                    if (!response.Accepted && logger != null)
-                    {
-                        throw new InvalidOperationException("Workerが異常終了したため、プラグインを停止しました。詳細はPlugin_VoicepeakProxy_worker.logを確認してください。 taskId=" + request.TaskId + " error=" + response.ErrorMessage);
-                    }
-                    else if (logger != null)
-                    {
-                        logger.Info("worker_accepted taskId=" + request.TaskId);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                FileLogger logger = _logger;
-                if (logger != null)
-                {
-                    logger.Error("sender_thread_fatal", ex.Message);
-                }
-
-                _running = false;
                 _stopping = true;
-                _queueSignal.Set();
+                _logger.Error("on_talk_task_started_fatal", ex.Message);
                 throw;
             }
+        }
+
+        // Workerへ発話を同期送信
+        private void SendTalk(int taskId, string text)
+        {
+            PluginSettingsState state = _settingsState;
+            PluginRuntimeConfig runtime = state != null && state.Settings != null ? state.Settings.Plugin : null;
+            if (runtime == null)
+            {
+                runtime = new PluginRuntimeConfig();
+            }
+
+            WorkerSpeakRequest request = new WorkerSpeakRequest();
+            request.Command = "speak";
+            request.TaskId = taskId;
+            request.Text = text;
+
+            WorkerSpeakResponse response = WorkerBridgeClient.Send(runtime, request);
+            if (!response.Accepted)
+            {
+                throw new InvalidOperationException("Workerが異常終了したため、プラグインを停止しました。詳細はPlugin_VoicepeakProxy_worker.logを確認してください。 taskId=" + taskId + " error=" + response.ErrorMessage);
+            }
+
+            _logger.Info("worker_accepted taskId=" + taskId + " length=" + text.Length);
         }
 
         // TalkTaskStartedから送信文字列を決定
@@ -346,7 +262,6 @@ namespace Plugin_VoicepeakProxy
             copied.PipeName = runtime.PipeName;
             copied.WorkerExePath = runtime.WorkerExePath;
             copied.PipeConnectTimeoutMs = 300;
-            copied.MaxQueueLength = runtime.MaxQueueLength;
             return copied;
         }
 
@@ -595,7 +510,6 @@ namespace Plugin_VoicepeakProxy
             copied.PipeName = runtime.PipeName;
             copied.WorkerExePath = runtime.WorkerExePath;
             copied.PipeConnectTimeoutMs = 200;
-            copied.MaxQueueLength = runtime.MaxQueueLength;
             return copied;
         }
 

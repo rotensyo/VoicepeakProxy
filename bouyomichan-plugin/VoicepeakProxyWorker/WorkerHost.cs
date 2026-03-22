@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.IO.Pipes;
 using System.Text;
@@ -17,12 +16,8 @@ internal sealed class WorkerHost
     private readonly string _settingsPath;
     private readonly WorkerFileLogger _logger;
     private readonly WorkerSettingsProvider _settingsProvider;
-    private readonly object _queueLock = new object();
-    private readonly Queue<WorkerSpeakRequest> _queue = new Queue<WorkerSpeakRequest>();
-    private readonly AutoResetEvent _queueSignal = new AutoResetEvent(false);
 
     private bool _running;
-    private Thread _consumeThread;
 
     public WorkerHost(string pipeName, string settingsPath, WorkerFileLogger logger)
     {
@@ -41,11 +36,6 @@ internal sealed class WorkerHost
         }
 
         _running = true;
-
-        _consumeThread = new Thread(ConsumeThreadMain);
-        _consumeThread.IsBackground = true;
-        _consumeThread.Name = "VoicepeakProxyWorkerConsume";
-        _consumeThread.Start();
 
         while (_running)
         {
@@ -125,7 +115,6 @@ internal sealed class WorkerHost
                     if (command == "shutdown")
                     {
                         _running = false;
-                        _queueSignal.Set();
                         WorkerSpeakResponse ok = new WorkerSpeakResponse();
                         ok.Accepted = true;
                         PipeFraming.WriteFrame(writer, serializer.Serialize(ok));
@@ -150,12 +139,8 @@ internal sealed class WorkerHost
                         return;
                     }
 
-                    WorkerSpeakResponse queued = TryEnqueue(request);
-                    if (queued.Accepted)
-                    {
-                        _logger.Info("queue_accept taskId=" + request.TaskId + " length=" + request.Text.Length);
-                    }
-                    PipeFraming.WriteFrame(writer, serializer.Serialize(queued));
+                    WorkerSpeakResponse response = ExecuteSpeak(request);
+                    PipeFraming.WriteFrame(writer, serializer.Serialize(response));
                 }
             }
         }
@@ -166,57 +151,8 @@ internal sealed class WorkerHost
         }
     }
 
-    // リクエストをキューへ投入
-    private WorkerSpeakResponse TryEnqueue(WorkerSpeakRequest request)
-    {
-        PluginSettingsFile settings = _settingsProvider.GetCurrent();
-        int maxQueue = settings.Plugin.MaxQueueLength <= 0 ? 200 : settings.Plugin.MaxQueueLength;
-
-        lock (_queueLock)
-        {
-            if (_queue.Count >= maxQueue)
-            {
-                WorkerSpeakResponse full = new WorkerSpeakResponse();
-                full.Accepted = false;
-                full.ErrorMessage = "worker_queue_full";
-                return full;
-            }
-
-            _queue.Enqueue(request);
-            _queueSignal.Set();
-        }
-
-        WorkerSpeakResponse accepted = new WorkerSpeakResponse();
-        accepted.Accepted = true;
-        return accepted;
-    }
-
-    // 実行スレッド本体
-    private void ConsumeThreadMain()
-    {
-        while (_running)
-        {
-            WorkerSpeakRequest request = null;
-            lock (_queueLock)
-            {
-                if (_queue.Count > 0)
-                {
-                    request = _queue.Dequeue();
-                }
-            }
-
-            if (request == null)
-            {
-                _queueSignal.WaitOne(500);
-                continue;
-            }
-
-            ExecuteSpeak(request);
-        }
-    }
-
     // 読み上げを実行
-    private void ExecuteSpeak(WorkerSpeakRequest request)
+    private WorkerSpeakResponse ExecuteSpeak(WorkerSpeakRequest request)
     {
         try
         {
@@ -231,14 +167,24 @@ internal sealed class WorkerHost
             if (!result.Succeeded)
             {
                 _logger.Warn("speak_failed taskId=" + request.TaskId + " status=" + result.Status + " error=" + result.ErrorMessage);
-                return;
+                WorkerSpeakResponse failed = new WorkerSpeakResponse();
+                failed.Accepted = false;
+                failed.ErrorMessage = "speak_failed status=" + result.Status + " error=" + result.ErrorMessage;
+                return failed;
             }
 
             _logger.Info("speak_ok taskId=" + request.TaskId + " segments=" + result.SegmentsExecuted);
+            WorkerSpeakResponse ok = new WorkerSpeakResponse();
+            ok.Accepted = true;
+            return ok;
         }
         catch (Exception ex)
         {
             _logger.Error("execute_speak_failed detail=" + ex.Message);
+            WorkerSpeakResponse failed = new WorkerSpeakResponse();
+            failed.Accepted = false;
+            failed.ErrorMessage = "execute_speak_failed detail=" + ex.Message;
+            return failed;
         }
     }
 
