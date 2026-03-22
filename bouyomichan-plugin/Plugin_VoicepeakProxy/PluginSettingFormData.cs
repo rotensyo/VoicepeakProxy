@@ -168,14 +168,6 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.Plugin.PipeConnectTimeoutMs = value; }
         }
 
-        [Category("Plugin")]
-        [DisplayName("03)Worker実行ファイル")]
-        [Description("空の場合はPluginと同じフォルダ配下のVoicepeakProxyWorker\\VoicepeakProxyWorker.exeを使用します")]
-        public string WorkerExePath
-        {
-            get { return State.Settings.Plugin.WorkerExePath; }
-            set { State.Settings.Plugin.WorkerExePath = value ?? string.Empty; }
-        }
     }
 
     // Server設定タブ

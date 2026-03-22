@@ -45,6 +45,8 @@ msbuild "bouyomichan-plugin/Plugin_VoicepeakProxy/Plugin_VoicepeakProxy.csproj" 
 - 初回起動時に`Plugin_VoicepeakProxy_setting.json`を自動生成します。
 - 設定画面は棒読みちゃんのプラグイン設定ボタンから開きます。
 - `AppConfig`の各項目はタブ分割で編集できます。
+- 既定のPipe名は`voicepeak_proxy_bridge`です。
+- Worker実行ファイルは`VoicepeakProxyWorker/VoicepeakProxyWorker.exe`固定で解決します。
 - Plugin起動時にWorkerは必ず起動し、起動時検証が成功した場合のみ受信を開始します。
 - Plugin起動時は既存Workerを再利用せず、新規Workerを起動します。
 - Workerは親プロセスPIDを監視し、棒読みちゃん終了時は自動終了します。

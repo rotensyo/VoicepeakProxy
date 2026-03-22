@@ -35,13 +35,11 @@ namespace BouyomiVoicepeakBridge.Shared
     public sealed class PluginRuntimeConfig
     {
         public string PipeName { get; set; }
-        public string WorkerExePath { get; set; }
         public int PipeConnectTimeoutMs { get; set; }
 
         public PluginRuntimeConfig()
         {
-            PipeName = "voicepeak_proxycore_bridge";
-            WorkerExePath = string.Empty;
+            PipeName = "voicepeak_proxy_bridge";
             PipeConnectTimeoutMs = 1500;
         }
     }

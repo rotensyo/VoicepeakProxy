@@ -24,7 +24,7 @@ namespace Plugin_VoicepeakProxy
         private bool _stopping;
         private BouyomiChan _bouyomi;
 
-        public string Name { get { return "VoicepeakProxyCore連携"; } }
+        public string Name { get { return "VoicepeakProxy"; } }
 
         public string Version { get { return "2026/03/22"; } }
 
@@ -32,8 +32,7 @@ namespace Plugin_VoicepeakProxy
         {
             get
             {
-                return "棒読みちゃんの読み上げ文字列をVOICEPEAKへ転送します。\n" +
-                       "棒読みちゃん既定音声は常に抑止し、失敗時は無音スキップします。";
+                return "棒読みちゃんの読み上げ文字列をVOICEPEAKへ転送します。";
             }
         }
 
@@ -151,10 +150,42 @@ namespace Plugin_VoicepeakProxy
             WorkerSpeakResponse response = WorkerBridgeClient.Send(runtime, request);
             if (!response.Accepted)
             {
-                throw new InvalidOperationException("Workerが異常終了したため、プラグインを停止しました。詳細はPlugin_VoicepeakProxy_worker.logを確認してください。 taskId=" + taskId + " error=" + response.ErrorMessage);
+                string reason = BuildWorkerSendFailureMessage(response.ErrorMessage);
+                throw new InvalidOperationException("Workerが異常終了したため、プラグインを停止しました。詳細はPlugin_VoicepeakProxy_worker.logを確認してください。 taskId=" + taskId + " reason=" + reason);
             }
 
             _logger.Info("worker_accepted taskId=" + taskId + " length=" + text.Length);
+        }
+
+        // Worker送信失敗理由を日本語へ変換
+        private static string BuildWorkerSendFailureMessage(string errorCode)
+        {
+            if (string.IsNullOrEmpty(errorCode))
+            {
+                return "不明なエラー";
+            }
+
+            if (string.Equals(errorCode, "pipe_connect_failed", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Workerとの接続に失敗しました";
+            }
+
+            if (string.Equals(errorCode, "pipe_io_failed", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Workerとの通信中にI/Oエラーが発生しました";
+            }
+
+            if (string.Equals(errorCode, "empty_response", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Workerからの応答が空でした";
+            }
+
+            if (string.Equals(errorCode, "invalid_response", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Workerからの応答が不正でした";
+            }
+
+            return errorCode;
         }
 
         // TalkTaskStartedから送信文字列を決定
@@ -174,7 +205,7 @@ namespace Plugin_VoicepeakProxy
             return string.Empty;
         }
 
-        // Bouyomiインスタンスへイベント購読
+        // 棒読みちゃんインスタンスへイベント購読
         private bool TryAttachTalkTaskStarted()
         {
             object formMain = Pub.FormMain;
@@ -223,7 +254,7 @@ namespace Plugin_VoicepeakProxy
         }
     }
 
-    // Worker連携の調停を提供
+    // Worker連携
     internal static class WorkerBridgeClient
     {
         // Workerの起動状態を保証
@@ -261,7 +292,6 @@ namespace Plugin_VoicepeakProxy
         {
             PluginRuntimeConfig copied = new PluginRuntimeConfig();
             copied.PipeName = runtime.PipeName;
-            copied.WorkerExePath = runtime.WorkerExePath;
             copied.PipeConnectTimeoutMs = 300;
             return copied;
         }
@@ -280,7 +310,7 @@ namespace Plugin_VoicepeakProxy
             }
 
             string basePath = ResolveBasePath();
-            string workerPath = ResolveWorkerPath(new PluginRuntimeConfig(), basePath);
+            string workerPath = ResolveWorkerPath(basePath);
             if (!File.Exists(workerPath))
             {
                 logger.Warn("worker_not_found_for_settings_init path=" + workerPath);
@@ -327,10 +357,10 @@ namespace Plugin_VoicepeakProxy
         public static void EnsureStarted(PluginRuntimeConfig runtime, string settingsPath, FileLogger logger)
         {
             string basePath = ResolveBasePath();
-            string workerPath = ResolveWorkerPath(runtime, basePath);
+            string workerPath = ResolveWorkerPath(basePath);
             if (!File.Exists(workerPath))
             {
-                throw new InvalidOperationException("worker_not_found path=" + workerPath);
+                throw new InvalidOperationException("VoicepeakProxyWorker.exeが見つかりません。 expected_path=" + workerPath);
             }
 
             TryTerminateExistingInstances(workerPath, logger);
@@ -347,7 +377,7 @@ namespace Plugin_VoicepeakProxy
             startedProcess = Process.Start(psi);
             if (startedProcess == null)
             {
-                throw new InvalidOperationException("worker_start_failed path=" + workerPath);
+                throw new InvalidOperationException("VoicepeakProxyWorker.exeの起動に失敗しました。 path=" + workerPath);
             }
 
             WorkerLifetimeManager.AssignToCurrentProcessJob(startedProcess, logger);
@@ -359,7 +389,7 @@ namespace Plugin_VoicepeakProxy
         // Worker停止を補助
         public static void TryStopWithTimeout(PluginRuntimeConfig runtime, FileLogger logger, int gracefulWaitMs)
         {
-            string workerPath = ResolveWorkerPath(runtime, ResolveBasePath());
+            string workerPath = ResolveWorkerPath(ResolveBasePath());
             string processName = Path.GetFileNameWithoutExtension(workerPath);
             int waitMs = gracefulWaitMs < 0 ? 0 : gracefulWaitMs;
             Process[] processes = Process.GetProcessesByName(processName);
@@ -455,15 +485,9 @@ namespace Plugin_VoicepeakProxy
         }
 
         // Worker実行ファイルパスを解決
-        private static string ResolveWorkerPath(PluginRuntimeConfig runtime, string basePath)
+        private static string ResolveWorkerPath(string basePath)
         {
-            string workerPath = runtime.WorkerExePath;
-            if (string.IsNullOrEmpty(workerPath))
-            {
-                workerPath = Path.Combine(Path.Combine(basePath, "VoicepeakProxyWorker"), "VoicepeakProxyWorker.exe");
-            }
-
-            return workerPath;
+            return Path.Combine(Path.Combine(basePath, "VoicepeakProxyWorker"), "VoicepeakProxyWorker.exe");
         }
 
         // Worker受信ループ開始を待機
@@ -506,7 +530,8 @@ namespace Plugin_VoicepeakProxy
                 int elapsed = unchecked(Environment.TickCount - startedAt);
                 if (elapsed >= waitMs)
                 {
-                    throw new InvalidOperationException("worker_ready_timeout error=" + response.ErrorMessage + " waitedMs=" + elapsed);
+                    string reason = BuildWorkerSendFailureMessage(response.ErrorMessage);
+                    throw new InvalidOperationException("Worker起動待機がタイムアウトしました。詳細はPlugin_VoicepeakProxy_worker.logを確認してください。 waitedMs=" + elapsed + " reason=" + reason);
                 }
 
                 Thread.Sleep(pollMs);
@@ -518,7 +543,6 @@ namespace Plugin_VoicepeakProxy
         {
             PluginRuntimeConfig copied = new PluginRuntimeConfig();
             copied.PipeName = runtime.PipeName;
-            copied.WorkerExePath = runtime.WorkerExePath;
             copied.PipeConnectTimeoutMs = 200;
             return copied;
         }
@@ -533,6 +557,38 @@ namespace Plugin_VoicepeakProxy
 
             return "Workerが起動待機中に終了しました。詳細はPlugin_VoicepeakProxy_worker.logを確認してください。 exitCode=" + exitCode;
         }
+
+        // Worker送信失敗理由を日本語へ変換
+        private static string BuildWorkerSendFailureMessage(string errorCode)
+        {
+            if (string.IsNullOrEmpty(errorCode))
+            {
+                return "不明なエラー";
+            }
+
+            if (string.Equals(errorCode, "pipe_connect_failed", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Workerとの接続に失敗しました";
+            }
+
+            if (string.Equals(errorCode, "pipe_io_failed", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Workerとの通信中にI/Oエラーが発生しました";
+            }
+
+            if (string.Equals(errorCode, "empty_response", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Workerからの応答が空でした";
+            }
+
+            if (string.Equals(errorCode, "invalid_response", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Workerからの応答が不正でした";
+            }
+
+            return errorCode;
+        }
+
     }
 
     // Worker親子連動をOS機能で管理
@@ -557,7 +613,7 @@ namespace Plugin_VoicepeakProxy
                     _jobHandle = NativeMethods.CreateJobObject(IntPtr.Zero, null);
                     if (_jobHandle == IntPtr.Zero)
                     {
-                        throw new InvalidOperationException("job_object_create_failed");
+                        throw new InvalidOperationException("Job Objectの作成に失敗しました");
                     }
 
                     JOBOBJECT_EXTENDED_LIMIT_INFORMATION info = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
@@ -575,7 +631,7 @@ namespace Plugin_VoicepeakProxy
                             (uint)length);
                         if (!configured)
                         {
-                            throw new InvalidOperationException("job_object_configure_failed");
+                            throw new InvalidOperationException("Job Objectの設定に失敗しました");
                         }
                     }
                     finally
@@ -587,7 +643,7 @@ namespace Plugin_VoicepeakProxy
                 bool assigned = NativeMethods.AssignProcessToJobObject(_jobHandle, process.Handle);
                 if (!assigned)
                 {
-                    throw new InvalidOperationException("job_object_assign_failed pid=" + process.Id);
+                    throw new InvalidOperationException("WorkerをJob Objectへ割り当てできませんでした。 pid=" + process.Id);
                 }
 
                 logger.Info("worker_job_assigned pid=" + process.Id);

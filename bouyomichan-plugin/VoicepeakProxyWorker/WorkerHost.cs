@@ -24,7 +24,7 @@ internal sealed class WorkerHost
 
     public WorkerHost(string pipeName, string settingsPath, int ownerPid, WorkerFileLogger logger)
     {
-        _pipeName = string.IsNullOrEmpty(pipeName) ? "voicepeak_proxycore_bridge" : pipeName;
+        _pipeName = string.IsNullOrEmpty(pipeName) ? "voicepeak_proxy_bridge" : pipeName;
         _settingsPath = settingsPath;
         _ownerPid = ownerPid;
         _logger = logger;

@@ -12,7 +12,7 @@ internal static class Program
     private static int Main(string[] args)
     {
         string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-        string pipeName = "voicepeak_proxycore_bridge";
+        string pipeName = "voicepeak_proxy_bridge";
         string settingsPath = Path.Combine(baseDir, "Plugin_VoicepeakProxy_setting.json");
         string logPath = Path.Combine(baseDir, "Plugin_VoicepeakProxy_worker.log");
         bool initSettingsMode = false;
@@ -93,7 +93,7 @@ internal static class Program
     // パイプ名からMutex名を生成
     private static string BuildMutexName(string pipeName)
     {
-        string source = pipeName ?? "voicepeak_proxycore_bridge";
+        string source = pipeName ?? "voicepeak_proxy_bridge";
         StringBuilder builder = new StringBuilder(source.Length);
         for (int i = 0; i < source.Length; i++)
         {
