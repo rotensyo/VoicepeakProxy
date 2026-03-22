@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
 using System.Text;
@@ -14,15 +15,18 @@ internal sealed class WorkerHost
 {
     private readonly string _pipeName;
     private readonly string _settingsPath;
+    private readonly int _ownerPid;
     private readonly WorkerFileLogger _logger;
     private readonly WorkerSettingsProvider _settingsProvider;
 
     private bool _running;
+    private Thread _ownerWatchThread;
 
-    public WorkerHost(string pipeName, string settingsPath, WorkerFileLogger logger)
+    public WorkerHost(string pipeName, string settingsPath, int ownerPid, WorkerFileLogger logger)
     {
         _pipeName = string.IsNullOrEmpty(pipeName) ? "voicepeak_proxycore_bridge" : pipeName;
         _settingsPath = settingsPath;
+        _ownerPid = ownerPid;
         _logger = logger;
         _settingsProvider = new WorkerSettingsProvider(settingsPath);
     }
@@ -36,6 +40,7 @@ internal sealed class WorkerHost
         }
 
         _running = true;
+        StartOwnerWatchThread();
 
         while (_running)
         {
@@ -43,6 +48,50 @@ internal sealed class WorkerHost
         }
 
         return true;
+    }
+
+    // 親プロセス監視スレッドを開始
+    private void StartOwnerWatchThread()
+    {
+        if (_ownerPid <= 0)
+        {
+            _logger.Warn("owner_watch_skipped ownerPid=" + _ownerPid);
+            return;
+        }
+
+        _ownerWatchThread = new Thread(OwnerWatchThreadMain);
+        _ownerWatchThread.IsBackground = true;
+        _ownerWatchThread.Name = "VoicepeakProxyWorkerOwnerWatch";
+        _ownerWatchThread.Start();
+    }
+
+    // 親プロセス終了を監視
+    private void OwnerWatchThreadMain()
+    {
+        while (_running)
+        {
+            if (!IsOwnerAlive(_ownerPid))
+            {
+                _logger.Warn("owner_process_exited ownerPid=" + _ownerPid);
+                Environment.Exit(3);
+            }
+
+            Thread.Sleep(1000);
+        }
+    }
+
+    // 親プロセスの生存を確認
+    private static bool IsOwnerAlive(int ownerPid)
+    {
+        try
+        {
+            Process owner = Process.GetProcessById(ownerPid);
+            return owner != null && !owner.HasExited;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     // 接続1件を受理

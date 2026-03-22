@@ -46,6 +46,9 @@ msbuild "bouyomichan-plugin/Plugin_VoicepeakProxy/Plugin_VoicepeakProxy.csproj" 
 - 設定画面は棒読みちゃんのプラグイン設定ボタンから開きます。
 - `AppConfig`の各項目はタブ分割で編集できます。
 - Plugin起動時にWorkerは必ず起動し、起動時検証が成功した場合のみ受信を開始します。
+- Plugin起動時は既存Workerを再利用せず、新規Workerを起動します。
+- Workerは親プロセスPIDを監視し、棒読みちゃん終了時は自動終了します。
+- Plugin側ではJob ObjectでWorkerを管理し、親プロセス異常終了時もWorkerを残しません。
 - Worker起動待機は最大30秒で、500ms間隔で受信準備完了を確認します。
 - PluginとWorkerは独自キューを持たず、棒読みちゃんのキュー順で1件ずつ処理します。
 - ログは棒読みちゃんフォルダ直下の`Plugin_VoicepeakProxy_plugin.log`と`Plugin_VoicepeakProxy_worker.log`へ出力します。

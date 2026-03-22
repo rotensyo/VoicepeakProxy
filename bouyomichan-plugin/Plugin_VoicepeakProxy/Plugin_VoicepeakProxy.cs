@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Web.Script.Serialization;
@@ -332,28 +333,25 @@ namespace Plugin_VoicepeakProxy
                 throw new InvalidOperationException("worker_not_found path=" + workerPath);
             }
 
-            Process startedProcess = null;
-            if (IsRunning(workerPath))
-            {
-                logger.Info("worker_already_running path=" + workerPath);
-            }
-            else
-            {
-                ProcessStartInfo psi = new ProcessStartInfo();
-                psi.FileName = workerPath;
-                psi.WorkingDirectory = Path.GetDirectoryName(workerPath);
-                psi.UseShellExecute = false;
-                psi.CreateNoWindow = true;
-                string logPath = Path.Combine(basePath, "Plugin_VoicepeakProxy_worker.log");
-                psi.Arguments = "--pipe \"" + runtime.PipeName + "\" --settings \"" + settingsPath + "\" --log \"" + logPath + "\"";
-                startedProcess = Process.Start(psi);
-                if (startedProcess == null)
-                {
-                    throw new InvalidOperationException("worker_start_failed path=" + workerPath);
-                }
+            TryTerminateExistingInstances(workerPath, logger);
 
-                logger.Info("worker_started path=" + workerPath + " pid=" + startedProcess.Id);
+            Process startedProcess = null;
+            int ownerPid = Process.GetCurrentProcess().Id;
+            ProcessStartInfo psi = new ProcessStartInfo();
+            psi.FileName = workerPath;
+            psi.WorkingDirectory = Path.GetDirectoryName(workerPath);
+            psi.UseShellExecute = false;
+            psi.CreateNoWindow = true;
+            string logPath = Path.Combine(basePath, "Plugin_VoicepeakProxy_worker.log");
+            psi.Arguments = "--pipe \"" + runtime.PipeName + "\" --settings \"" + settingsPath + "\" --log \"" + logPath + "\" --owner-pid " + ownerPid;
+            startedProcess = Process.Start(psi);
+            if (startedProcess == null)
+            {
+                throw new InvalidOperationException("worker_start_failed path=" + workerPath);
             }
+
+            WorkerLifetimeManager.AssignToCurrentProcessJob(startedProcess, logger);
+            logger.Info("worker_started path=" + workerPath + " pid=" + startedProcess.Id + " ownerPid=" + ownerPid);
 
             WaitForReady(runtime, startedProcess, logger, 30000, 500);
         }
@@ -408,8 +406,8 @@ namespace Plugin_VoicepeakProxy
             }
         }
 
-        // 実行中判定
-        private static bool IsRunning(string workerPath)
+        // 既存Workerを停止
+        private static void TryTerminateExistingInstances(string workerPath, FileLogger logger)
         {
             string processName = Path.GetFileNameWithoutExtension(workerPath);
             Process[] processes = Process.GetProcessesByName(processName);
@@ -418,17 +416,29 @@ namespace Plugin_VoicepeakProxy
                 Process p = processes[i];
                 try
                 {
-                    if (string.Equals(p.MainModule.FileName, workerPath, StringComparison.OrdinalIgnoreCase))
+                    bool pathMatched;
+                    try
                     {
-                        return true;
+                        pathMatched = string.Equals(p.MainModule.FileName, workerPath, StringComparison.OrdinalIgnoreCase);
                     }
+                    catch
+                    {
+                        pathMatched = true;
+                    }
+
+                    if (!pathMatched || p.HasExited)
+                    {
+                        continue;
+                    }
+
+                    p.Kill();
+                    p.WaitForExit(1000);
+                    logger.Warn("stale_worker_terminated pid=" + p.Id);
                 }
                 catch
                 {
                 }
             }
-
-            return false;
         }
 
         // 基準ディレクトリを解決
@@ -522,6 +532,123 @@ namespace Plugin_VoicepeakProxy
             }
 
             return "Workerが起動待機中に終了しました。詳細はPlugin_VoicepeakProxy_worker.logを確認してください。 exitCode=" + exitCode;
+        }
+    }
+
+    // Worker親子連動をOS機能で管理
+    internal static class WorkerLifetimeManager
+    {
+        private const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
+        private static readonly object Sync = new object();
+        private static IntPtr _jobHandle = IntPtr.Zero;
+
+        // Workerを親プロセスのJobへ割り当て
+        public static void AssignToCurrentProcessJob(Process process, FileLogger logger)
+        {
+            if (process == null)
+            {
+                throw new ArgumentNullException("process");
+            }
+
+            lock (Sync)
+            {
+                if (_jobHandle == IntPtr.Zero)
+                {
+                    _jobHandle = NativeMethods.CreateJobObject(IntPtr.Zero, null);
+                    if (_jobHandle == IntPtr.Zero)
+                    {
+                        throw new InvalidOperationException("job_object_create_failed");
+                    }
+
+                    JOBOBJECT_EXTENDED_LIMIT_INFORMATION info = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION();
+                    info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+
+                    int length = Marshal.SizeOf(typeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION));
+                    IntPtr infoPtr = Marshal.AllocHGlobal(length);
+                    try
+                    {
+                        Marshal.StructureToPtr(info, infoPtr, false);
+                        bool configured = NativeMethods.SetInformationJobObject(
+                            _jobHandle,
+                            JOBOBJECTINFOCLASS.JobObjectExtendedLimitInformation,
+                            infoPtr,
+                            (uint)length);
+                        if (!configured)
+                        {
+                            throw new InvalidOperationException("job_object_configure_failed");
+                        }
+                    }
+                    finally
+                    {
+                        Marshal.FreeHGlobal(infoPtr);
+                    }
+                }
+
+                bool assigned = NativeMethods.AssignProcessToJobObject(_jobHandle, process.Handle);
+                if (!assigned)
+                {
+                    throw new InvalidOperationException("job_object_assign_failed pid=" + process.Id);
+                }
+
+                logger.Info("worker_job_assigned pid=" + process.Id);
+            }
+        }
+
+        private enum JOBOBJECTINFOCLASS
+        {
+            JobObjectExtendedLimitInformation = 9
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JOBOBJECT_BASIC_LIMIT_INFORMATION
+        {
+            public long PerProcessUserTimeLimit;
+            public long PerJobUserTimeLimit;
+            public uint LimitFlags;
+            public UIntPtr MinimumWorkingSetSize;
+            public UIntPtr MaximumWorkingSetSize;
+            public uint ActiveProcessLimit;
+            public IntPtr Affinity;
+            public uint PriorityClass;
+            public uint SchedulingClass;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct IO_COUNTERS
+        {
+            public ulong ReadOperationCount;
+            public ulong WriteOperationCount;
+            public ulong OtherOperationCount;
+            public ulong ReadTransferCount;
+            public ulong WriteTransferCount;
+            public ulong OtherTransferCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+        {
+            public JOBOBJECT_BASIC_LIMIT_INFORMATION BasicLimitInformation;
+            public IO_COUNTERS IoInfo;
+            public UIntPtr ProcessMemoryLimit;
+            public UIntPtr JobMemoryLimit;
+            public UIntPtr PeakProcessMemoryUsed;
+            public UIntPtr PeakJobMemoryUsed;
+        }
+
+        private static class NativeMethods
+        {
+            [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+            public static extern IntPtr CreateJobObject(IntPtr jobAttributes, string name);
+
+            [DllImport("kernel32.dll", SetLastError = true)]
+            public static extern bool SetInformationJobObject(
+                IntPtr hJob,
+                JOBOBJECTINFOCLASS jobObjectInfoClass,
+                IntPtr lpJobObjectInfo,
+                uint cbJobObjectInfoLength);
+
+            [DllImport("kernel32.dll", SetLastError = true)]
+            public static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
         }
     }
 

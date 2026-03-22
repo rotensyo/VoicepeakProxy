@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -15,6 +16,7 @@ internal static class Program
         string settingsPath = Path.Combine(baseDir, "Plugin_VoicepeakProxy_setting.json");
         string logPath = Path.Combine(baseDir, "Plugin_VoicepeakProxy_worker.log");
         bool initSettingsMode = false;
+        int ownerPid = 0;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -40,6 +42,18 @@ internal static class Program
             if (string.Equals(arg, "--init-settings", StringComparison.OrdinalIgnoreCase))
             {
                 initSettingsMode = true;
+                continue;
+            }
+
+            if (string.Equals(arg, "--owner-pid", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                int parsed;
+                if (int.TryParse(args[++i], out parsed))
+                {
+                    ownerPid = parsed;
+                }
+
+                continue;
             }
 
         }
@@ -52,7 +66,7 @@ internal static class Program
                 return 0;
             }
 
-            logger.Info("worker_start pipe=" + pipeName + " settings=" + settingsPath);
+            logger.Info("worker_start pipe=" + pipeName + " settings=" + settingsPath + " ownerPid=" + ownerPid);
             string mutexName = BuildMutexName(pipeName);
             bool createdNew;
             using (Mutex mutex = new Mutex(true, mutexName, out createdNew))
@@ -63,7 +77,7 @@ internal static class Program
                     return 0;
                 }
 
-                WorkerHost host = new WorkerHost(pipeName, settingsPath, logger);
+                WorkerHost host = new WorkerHost(pipeName, settingsPath, ownerPid, logger);
                 bool runSucceeded = host.Run();
                 if (!runSucceeded)
                 {
