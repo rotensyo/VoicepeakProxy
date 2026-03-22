@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>VoicepeakProxyWorker</AssemblyName>
+    <RootNamespace>VoicepeakProxyWorker</RootNamespace>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\core-dll\VoicepeakProxyCore.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Web.Extensions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\PluginSettingsModels.cs">
+      <Link>Shared\PluginSettingsModels.cs</Link>
+    </Compile>
+    <Compile Include="..\Shared\IpcContracts.cs">
+      <Link>Shared\IpcContracts.cs</Link>
+    </Compile>
+    <Compile Include="..\Shared\PipeFraming.cs">
+      <Link>Shared\PipeFraming.cs</Link>
+    </Compile>
+    <Compile Include="..\Shared\JsonFileStore.cs">
+      <Link>Shared\JsonFileStore.cs</Link>
+    </Compile>
+  </ItemGroup>
+
+  <Target Name="CleanupLegacyTfmOutput" AfterTargets="Build">
+    <RemoveDir Directories="$(OutputPath)$(TargetFramework)" Condition="Exists('$(OutputPath)$(TargetFramework)')" />
+  </Target>
+</Project>
