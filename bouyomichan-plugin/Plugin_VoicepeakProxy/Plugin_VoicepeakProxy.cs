@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Web.Script.Serialization;
+using System.Windows.Forms;
 using FNF.BouyomiChanApp;
 using FNF.Utility;
 using BouyomiVoicepeakBridge.Shared;
@@ -16,12 +17,17 @@ namespace Plugin_VoicepeakProxy
     // 棒読みちゃんとVOICEPEAKを中継
     public sealed class Plugin_VoicepeakProxy : IPlugin
     {
+        private readonly object _workerStartSync = new object();
         private PluginSettingsState _settingsState;
         private PluginSettingFormData _settingFormData;
         private string _settingsPath;
         private string _logPath;
         private FileLogger _logger;
         private bool _stopping;
+        private bool _workerReady;
+        private bool _workerStartFailed;
+        private bool _workerStartFailureNotified;
+        private Thread _workerStartThread;
         private BouyomiChan _bouyomi;
 
         public string Name { get { return "VoicepeakProxy"; } }
@@ -57,7 +63,8 @@ namespace Plugin_VoicepeakProxy
             _settingsState.LoadFromJson();
             _settingFormData = new PluginSettingFormData(_settingsState);
 
-            WorkerBridgeClient.EnsureWorkerStarted(_settingsState.Settings.Plugin, _settingsPath, _logger);
+            PluginRuntimeConfig runtime = _settingsState.Settings.Plugin;
+            StartWorkerAsync(runtime, _settingsPath, _logger);
 
             if (!TryAttachTalkTaskStarted())
             {
@@ -80,7 +87,18 @@ namespace Plugin_VoicepeakProxy
                 _bouyomi = null;
             }
 
-            if (_settingsState != null)
+            Thread workerStartThread;
+            lock (_workerStartSync)
+            {
+                workerStartThread = _workerStartThread;
+            }
+
+            if (workerStartThread != null)
+            {
+                workerStartThread.Join(2000);
+            }
+
+            if (_settingsState != null && _workerReady)
             {
                 WorkerBridgeClient.SendShutdown(_settingsState.Settings.Plugin, _logger);
             }
@@ -122,6 +140,18 @@ namespace Plugin_VoicepeakProxy
                     taskId = e.TalkTask.TaskId;
                 }
 
+                if (_workerStartFailed)
+                {
+                    _logger.Warn("drop_after_worker_start_failed taskId=" + taskId);
+                    return;
+                }
+
+                if (!_workerReady)
+                {
+                    _logger.Warn("drop_during_worker_startup taskId=" + taskId);
+                    return;
+                }
+
                 SendTalk(taskId, text);
             }
             catch (Exception ex)
@@ -130,6 +160,71 @@ namespace Plugin_VoicepeakProxy
                 _logger.Error("on_talk_task_started_fatal", ex.Message);
                 throw;
             }
+        }
+
+        // Worker起動を非同期で開始
+        private void StartWorkerAsync(PluginRuntimeConfig runtime, string settingsPath, FileLogger logger)
+        {
+            lock (_workerStartSync)
+            {
+                _workerReady = false;
+                _workerStartFailed = false;
+                _workerStartFailureNotified = false;
+
+                _workerStartThread = new Thread(() => WorkerStartThreadMain(runtime, settingsPath, logger));
+                _workerStartThread.IsBackground = true;
+                _workerStartThread.Name = "VoicepeakProxyWorkerStart";
+                _workerStartThread.Start();
+            }
+        }
+
+        // Worker起動スレッド本体
+        private void WorkerStartThreadMain(PluginRuntimeConfig runtime, string settingsPath, FileLogger logger)
+        {
+            try
+            {
+                WorkerBridgeClient.EnsureWorkerStarted(runtime, settingsPath, logger);
+                if (_stopping)
+                {
+                    logger.Info("worker_started_during_stopping_shutdown");
+                    WorkerBridgeClient.SendShutdown(runtime, logger);
+                    return;
+                }
+
+                _workerReady = true;
+                logger.Info("worker_start_async_ok");
+            }
+            catch (Exception ex)
+            {
+                _workerStartFailed = true;
+                logger.Error("worker_start_async_failed", ex.Message);
+                NotifyWorkerStartFailure(ex.Message);
+            }
+        }
+
+        // Worker起動失敗を通知
+        private void NotifyWorkerStartFailure(string detail)
+        {
+            lock (_workerStartSync)
+            {
+                if (_workerStartFailureNotified)
+                {
+                    return;
+                }
+
+                _workerStartFailureNotified = true;
+                _stopping = true;
+            }
+
+            if (_bouyomi != null)
+            {
+                _bouyomi.TalkTaskStarted -= OnTalkTaskStarted;
+                _bouyomi = null;
+            }
+
+            string reason = string.IsNullOrEmpty(detail) ? "不明なエラー" : detail;
+            string message = "Worker起動に失敗したためプラグインを停止しました。詳細はPlugin_VoicepeakProxy_worker.logを確認してください。 reason=" + reason;
+            MessageBox.Show(message, "VoicepeakProxy", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
         // Workerへ発話を同期送信
@@ -263,19 +358,20 @@ namespace Plugin_VoicepeakProxy
             WorkerProcessManager.EnsureStarted(runtime, settingsPath, logger);
         }
 
-        // ワーカー停止を要求
+        // shutdown送信後に停止を実行
         public static void SendShutdown(PluginRuntimeConfig runtime, FileLogger logger)
         {
             PluginRuntimeConfig shutdownRuntime = CloneRuntimeForShutdown(runtime);
             WorkerSpeakRequest request = new WorkerSpeakRequest();
             request.Command = "shutdown";
             WorkerSpeakResponse response = WorkerIpcClient.TrySend(shutdownRuntime, request);
-            if (!response.Accepted)
+            bool shutdownFailed = !response.Accepted;
+            if (shutdownFailed)
             {
                 logger.Warn("worker_shutdown_request_failed error=" + response.ErrorMessage);
             }
 
-            WorkerProcessManager.TryStopWithTimeout(runtime, logger, 5000);
+            WorkerProcessManager.TryStopWithTimeout(logger, 5000, shutdownFailed);
         }
 
         // Workerへ発話要求を送信
@@ -386,57 +482,91 @@ namespace Plugin_VoicepeakProxy
             WaitForReady(runtime, startedProcess, logger, 30000, 500);
         }
 
-        // Worker停止を補助
-        public static void TryStopWithTimeout(PluginRuntimeConfig runtime, FileLogger logger, int gracefulWaitMs)
+        // 終了時にWorker停止
+        public static void TryStopWithTimeout(FileLogger logger, int gracefulWaitMs, bool forceKillWithoutWait)
         {
             string workerPath = ResolveWorkerPath(ResolveBasePath());
             string processName = Path.GetFileNameWithoutExtension(workerPath);
-            int waitMs = gracefulWaitMs < 0 ? 0 : gracefulWaitMs;
+            int waitMs = forceKillWithoutWait ? 0 : (gracefulWaitMs < 0 ? 0 : gracefulWaitMs);
             Process[] processes = Process.GetProcessesByName(processName);
+            if (processes == null || processes.Length == 0)
+            {
+                logger.Info("worker_not_running_on_shutdown");
+                return;
+            }
+
             for (int i = 0; i < processes.Length; i++)
             {
                 Process p = processes[i];
-                try
+                if (!IsTargetWorkerProcess(p, workerPath, logger))
                 {
-                    bool pathMatched = false;
-                    try
-                    {
-                        pathMatched = string.Equals(p.MainModule.FileName, workerPath, StringComparison.OrdinalIgnoreCase);
-                    }
-                    catch
-                    {
-                        pathMatched = true;
-                    }
-
-                    if (!pathMatched || p.HasExited)
-                    {
-                        continue;
-                    }
-
-                    if (waitMs > 0)
-                    {
-                        bool exited = p.WaitForExit(waitMs);
-                        if (exited)
-                        {
-                            logger.Info("worker_stopped_gracefully pid=" + p.Id);
-                            continue;
-                        }
-
-                        logger.Warn("worker_stop_timeout_force_kill pid=" + p.Id + " waitMs=" + waitMs);
-                    }
-
-                    p.Kill();
-                    p.WaitForExit(1000);
-                    logger.Info("worker_force_stopped pid=" + p.Id);
+                    continue;
                 }
-                catch (Exception ex)
-                {
-                    logger.Warn("worker_stop_failed pid=" + p.Id + " error=" + ex.Message);
-                }
+
+                TryStopWorkerProcess(p, logger, waitMs, forceKillWithoutWait);
             }
         }
 
-        // 既存Workerを停止
+        // 同梱Worker実体のみ停止対象
+        private static bool IsTargetWorkerProcess(Process process, string workerPath, FileLogger logger)
+        {
+            try
+            {
+                if (process.HasExited)
+                {
+                    return false;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+
+            try
+            {
+                return string.Equals(process.MainModule.FileName, workerPath, StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception ex)
+            {
+                logger.Warn("worker_path_probe_failed pid=" + process.Id + " error=" + ex.Message);
+                return false;
+            }
+        }
+
+        // 停止方針で単一Workerを停止
+        private static bool TryStopWorkerProcess(Process process, FileLogger logger, int waitMs, bool forceKillWithoutWait)
+        {
+            try
+            {
+                if (waitMs > 0)
+                {
+                    bool exited = process.WaitForExit(waitMs);
+                    if (exited)
+                    {
+                        logger.Info("worker_stopped_gracefully pid=" + process.Id);
+                        return true;
+                    }
+
+                    logger.Warn("worker_stop_timeout_force_kill pid=" + process.Id + " waitMs=" + waitMs);
+                }
+                else if (forceKillWithoutWait)
+                {
+                    logger.Warn("worker_shutdown_force_kill pid=" + process.Id);
+                }
+
+                process.Kill();
+                process.WaitForExit(1000);
+                logger.Info("worker_force_stopped pid=" + process.Id);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                logger.Warn("worker_stop_failed pid=" + process.Id + " error=" + ex.Message);
+                return false;
+            }
+        }
+
+        // 起動前に既存Workerを停止
         private static void TryTerminateExistingInstances(string workerPath, FileLogger logger)
         {
             string processName = Path.GetFileNameWithoutExtension(workerPath);
@@ -444,29 +574,15 @@ namespace Plugin_VoicepeakProxy
             for (int i = 0; i < processes.Length; i++)
             {
                 Process p = processes[i];
-                try
+                if (!IsTargetWorkerProcess(p, workerPath, logger))
                 {
-                    bool pathMatched;
-                    try
-                    {
-                        pathMatched = string.Equals(p.MainModule.FileName, workerPath, StringComparison.OrdinalIgnoreCase);
-                    }
-                    catch
-                    {
-                        pathMatched = true;
-                    }
-
-                    if (!pathMatched || p.HasExited)
-                    {
-                        continue;
-                    }
-
-                    p.Kill();
-                    p.WaitForExit(1000);
-                    logger.Warn("stale_worker_terminated pid=" + p.Id);
+                    continue;
                 }
-                catch
+
+                bool stopped = TryStopWorkerProcess(p, logger, 0, false);
+                if (stopped)
                 {
+                    logger.Warn("stale_worker_terminated pid=" + p.Id);
                 }
             }
         }
