@@ -17,16 +17,22 @@ namespace Plugin_VoicepeakProxy
     // 棒読みちゃんとVOICEPEAKを中継
     public sealed class Plugin_VoicepeakProxy : IPlugin
     {
+        private enum WorkerState
+        {
+            Starting,
+            Ready,
+            Failed,
+            Stopping
+        }
+
         private readonly object _workerStartSync = new object();
         private PluginSettingsState _settingsState;
         private PluginSettingFormData _settingFormData;
         private string _settingsPath;
         private string _logPath;
         private FileLogger _logger;
-        private bool _stopping;
-        private bool _workerReady;
-        private bool _workerStartFailed;
-        private bool _workerStartFailureNotified;
+        private WorkerState _workerState;
+        private string _workerStartError;
         private Thread _workerStartThread;
         private BouyomiChan _bouyomi;
 
@@ -50,7 +56,12 @@ namespace Plugin_VoicepeakProxy
         // プラグイン開始
         public void Begin()
         {
-            _stopping = false;
+            lock (_workerStartSync)
+            {
+                _workerState = WorkerState.Starting;
+                _workerStartError = string.Empty;
+            }
+
             string baseDir = ResolveBaseDirectory();
             _settingsPath = Path.Combine(baseDir, "Plugin_VoicepeakProxy_setting.json");
             _logPath = Path.Combine(baseDir, "Plugin_VoicepeakProxy_plugin.log");
@@ -79,18 +90,21 @@ namespace Plugin_VoicepeakProxy
         // プラグイン終了
         public void End()
         {
-            _stopping = true;
-
-            if (_bouyomi != null)
+            Thread workerStartThread;
+            BouyomiChan bouyomi;
+            bool shouldShutdownWorker;
+            lock (_workerStartSync)
             {
-                _bouyomi.TalkTaskStarted -= OnTalkTaskStarted;
+                shouldShutdownWorker = _workerState == WorkerState.Ready;
+                _workerState = WorkerState.Stopping;
+                workerStartThread = _workerStartThread;
+                bouyomi = _bouyomi;
                 _bouyomi = null;
             }
 
-            Thread workerStartThread;
-            lock (_workerStartSync)
+            if (bouyomi != null)
             {
-                workerStartThread = _workerStartThread;
+                bouyomi.TalkTaskStarted -= OnTalkTaskStarted;
             }
 
             if (workerStartThread != null)
@@ -98,9 +112,9 @@ namespace Plugin_VoicepeakProxy
                 workerStartThread.Join(2000);
             }
 
-            if (_settingsState != null && _workerReady)
+            if (_settingsState != null && shouldShutdownWorker)
             {
-                WorkerBridgeClient.SendShutdown(_settingsState.Settings.Plugin, _logger);
+                WorkerProcessManager.SendShutdown(_settingsState.Settings.Plugin, _logger);
             }
 
             if (_settingsState != null)
@@ -119,7 +133,13 @@ namespace Plugin_VoicepeakProxy
         {
             try
             {
-                if (_stopping)
+                WorkerState state;
+                lock (_workerStartSync)
+                {
+                    state = _workerState;
+                }
+
+                if (state == WorkerState.Stopping)
                 {
                     return;
                 }
@@ -140,13 +160,13 @@ namespace Plugin_VoicepeakProxy
                     taskId = e.TalkTask.TaskId;
                 }
 
-                if (_workerStartFailed)
+                if (state == WorkerState.Failed)
                 {
                     _logger.Warn("drop_after_worker_start_failed taskId=" + taskId);
                     return;
                 }
 
-                if (!_workerReady)
+                if (state != WorkerState.Ready)
                 {
                     _logger.Warn("drop_during_worker_startup taskId=" + taskId);
                     return;
@@ -156,7 +176,11 @@ namespace Plugin_VoicepeakProxy
             }
             catch (Exception ex)
             {
-                _stopping = true;
+                lock (_workerStartSync)
+                {
+                    _workerState = WorkerState.Stopping;
+                }
+
                 _logger.Error("on_talk_task_started_fatal", ex.Message);
                 throw;
             }
@@ -167,9 +191,8 @@ namespace Plugin_VoicepeakProxy
         {
             lock (_workerStartSync)
             {
-                _workerReady = false;
-                _workerStartFailed = false;
-                _workerStartFailureNotified = false;
+                _workerState = WorkerState.Starting;
+                _workerStartError = string.Empty;
 
                 _workerStartThread = new Thread(() => WorkerStartThreadMain(runtime, settingsPath, logger));
                 _workerStartThread.IsBackground = true;
@@ -183,20 +206,40 @@ namespace Plugin_VoicepeakProxy
         {
             try
             {
-                WorkerBridgeClient.EnsureWorkerStarted(runtime, settingsPath, logger);
-                if (_stopping)
+                WorkerProcessManager.EnsureStarted(runtime, settingsPath, logger);
+
+                bool shouldShutdown;
+                lock (_workerStartSync)
+                {
+                    shouldShutdown = _workerState == WorkerState.Stopping;
+                    if (!shouldShutdown)
+                    {
+                        _workerState = WorkerState.Ready;
+                    }
+                }
+
+                if (shouldShutdown)
                 {
                     logger.Info("worker_started_during_stopping_shutdown");
-                    WorkerBridgeClient.SendShutdown(runtime, logger);
+                    WorkerProcessManager.SendShutdown(runtime, logger);
                     return;
                 }
 
-                _workerReady = true;
                 logger.Info("worker_start_async_ok");
             }
             catch (Exception ex)
             {
-                _workerStartFailed = true;
+                lock (_workerStartSync)
+                {
+                    if (_workerState == WorkerState.Stopping)
+                    {
+                        return;
+                    }
+
+                    _workerState = WorkerState.Failed;
+                    _workerStartError = ex.Message;
+                }
+
                 logger.Error("worker_start_async_failed", ex.Message);
                 NotifyWorkerStartFailure(ex.Message);
             }
@@ -205,24 +248,22 @@ namespace Plugin_VoicepeakProxy
         // Worker起動失敗を通知
         private void NotifyWorkerStartFailure(string detail)
         {
+            BouyomiChan bouyomi;
+            string capturedReason;
             lock (_workerStartSync)
             {
-                if (_workerStartFailureNotified)
-                {
-                    return;
-                }
-
-                _workerStartFailureNotified = true;
-                _stopping = true;
-            }
-
-            if (_bouyomi != null)
-            {
-                _bouyomi.TalkTaskStarted -= OnTalkTaskStarted;
+                _workerState = WorkerState.Stopping;
+                bouyomi = _bouyomi;
                 _bouyomi = null;
+                capturedReason = _workerStartError;
             }
 
-            string reason = string.IsNullOrEmpty(detail) ? "不明なエラー" : detail;
+            if (bouyomi != null)
+            {
+                bouyomi.TalkTaskStarted -= OnTalkTaskStarted;
+            }
+
+            string reason = string.IsNullOrEmpty(detail) ? (capturedReason ?? "不明なエラー") : detail;
             string message = "Worker起動に失敗したためプラグインを停止しました。詳細はPlugin_VoicepeakProxy_worker.logを確認してください。 reason=" + reason;
             MessageBox.Show(message, "VoicepeakProxy", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
@@ -242,45 +283,14 @@ namespace Plugin_VoicepeakProxy
             request.TaskId = taskId;
             request.Text = text;
 
-            WorkerSpeakResponse response = WorkerBridgeClient.Send(runtime, request);
+            WorkerSpeakResponse response = WorkerIpcClient.TrySend(runtime, request);
             if (!response.Accepted)
             {
-                string reason = BuildWorkerSendFailureMessage(response.ErrorMessage);
+                string reason = WorkerErrorMessageMapper.Map(response.ErrorMessage);
                 throw new InvalidOperationException("Workerが異常終了したため、プラグインを停止しました。詳細はPlugin_VoicepeakProxy_worker.logを確認してください。 taskId=" + taskId + " reason=" + reason);
             }
 
             _logger.Info("worker_accepted taskId=" + taskId + " length=" + text.Length);
-        }
-
-        // Worker送信失敗理由を日本語へ変換
-        private static string BuildWorkerSendFailureMessage(string errorCode)
-        {
-            if (string.IsNullOrEmpty(errorCode))
-            {
-                return "不明なエラー";
-            }
-
-            if (string.Equals(errorCode, "pipe_connect_failed", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Workerとの接続に失敗しました";
-            }
-
-            if (string.Equals(errorCode, "pipe_io_failed", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Workerとの通信中にI/Oエラーが発生しました";
-            }
-
-            if (string.Equals(errorCode, "empty_response", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Workerからの応答が空でした";
-            }
-
-            if (string.Equals(errorCode, "invalid_response", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Workerからの応答が不正でした";
-            }
-
-            return errorCode;
         }
 
         // TalkTaskStartedから送信文字列を決定
@@ -349,15 +359,9 @@ namespace Plugin_VoicepeakProxy
         }
     }
 
-    // Worker連携
-    internal static class WorkerBridgeClient
+    // Workerプロセスの起動停止を管理
+    internal static class WorkerProcessManager
     {
-        // Workerの起動状態を保証
-        public static void EnsureWorkerStarted(PluginRuntimeConfig runtime, string settingsPath, FileLogger logger)
-        {
-            WorkerProcessManager.EnsureStarted(runtime, settingsPath, logger);
-        }
-
         // shutdown送信後に停止を実行
         public static void SendShutdown(PluginRuntimeConfig runtime, FileLogger logger)
         {
@@ -371,32 +375,9 @@ namespace Plugin_VoicepeakProxy
                 logger.Warn("worker_shutdown_request_failed error=" + response.ErrorMessage);
             }
 
-            WorkerProcessManager.TryStopWithTimeout(logger, 5000, shutdownFailed);
+            TryStopWithTimeout(logger, 5000, shutdownFailed);
         }
 
-        // Workerへ発話要求を送信
-        public static WorkerSpeakResponse Send(
-            PluginRuntimeConfig runtime,
-            WorkerSpeakRequest request)
-        {
-            WorkerSpeakResponse response = WorkerIpcClient.TrySend(runtime, request);
-            return response;
-        }
-
-        // 停止用設定を作成
-        private static PluginRuntimeConfig CloneRuntimeForShutdown(PluginRuntimeConfig runtime)
-        {
-            PluginRuntimeConfig copied = new PluginRuntimeConfig();
-            copied.PipeName = runtime.PipeName;
-            copied.PipeConnectTimeoutMs = 300;
-            return copied;
-        }
-
-    }
-
-    // Workerプロセスの起動停止を管理
-    internal static class WorkerProcessManager
-    {
         // 設定ファイルを初期化
         public static void EnsureSettingsFileInitialized(string settingsPath, FileLogger logger)
         {
@@ -606,6 +587,15 @@ namespace Plugin_VoicepeakProxy
             return Path.Combine(Path.Combine(basePath, "VoicepeakProxyWorker"), "VoicepeakProxyWorker.exe");
         }
 
+        // shutdown送信用設定を作成
+        private static PluginRuntimeConfig CloneRuntimeForShutdown(PluginRuntimeConfig runtime)
+        {
+            PluginRuntimeConfig copied = new PluginRuntimeConfig();
+            copied.PipeName = runtime.PipeName;
+            copied.PipeConnectTimeoutMs = 300;
+            return copied;
+        }
+
         // Worker受信ループ開始を待機
         private static void WaitForReady(PluginRuntimeConfig runtime, Process startedProcess, FileLogger logger, int timeoutMs, int pollIntervalMs)
         {
@@ -646,7 +636,7 @@ namespace Plugin_VoicepeakProxy
                 int elapsed = unchecked(Environment.TickCount - startedAt);
                 if (elapsed >= waitMs)
                 {
-                    string reason = BuildWorkerSendFailureMessage(response.ErrorMessage);
+                    string reason = WorkerErrorMessageMapper.Map(response.ErrorMessage);
                     throw new InvalidOperationException("Worker起動待機がタイムアウトしました。詳細はPlugin_VoicepeakProxy_worker.logを確認してください。 waitedMs=" + elapsed + " reason=" + reason);
                 }
 
@@ -674,8 +664,13 @@ namespace Plugin_VoicepeakProxy
             return "Workerが起動待機中に終了しました。詳細はPlugin_VoicepeakProxy_worker.logを確認してください。 exitCode=" + exitCode;
         }
 
-        // Worker送信失敗理由を日本語へ変換
-        private static string BuildWorkerSendFailureMessage(string errorCode)
+    }
+
+    // Worker関連エラー文言を統一
+    internal static class WorkerErrorMessageMapper
+    {
+        // エラーコードを日本語理由へ変換
+        public static string Map(string errorCode)
         {
             if (string.IsNullOrEmpty(errorCode))
             {
@@ -704,7 +699,6 @@ namespace Plugin_VoicepeakProxy
 
             return errorCode;
         }
-
     }
 
     // Worker親子連動をOS機能で管理
