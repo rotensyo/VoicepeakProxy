@@ -105,6 +105,7 @@ namespace Plugin_VoicepeakProxy
             if (bouyomi != null)
             {
                 bouyomi.TalkTaskStarted -= OnTalkTaskStarted;
+                bouyomi.EnableTalkTaskStarted = false;
             }
 
             if (workerStartThread != null)
@@ -261,6 +262,7 @@ namespace Plugin_VoicepeakProxy
             if (bouyomi != null)
             {
                 bouyomi.TalkTaskStarted -= OnTalkTaskStarted;
+                bouyomi.EnableTalkTaskStarted = false;
             }
 
             string reason = string.IsNullOrEmpty(detail) ? (capturedReason ?? "不明なエラー") : detail;
