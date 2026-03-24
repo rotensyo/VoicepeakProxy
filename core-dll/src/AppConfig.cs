@@ -207,9 +207,9 @@ internal static class AppConfigValidator
             throw new InvalidOperationException("ui.moveToStartShortcut は null/空文字/空白にできません");
         }
 
-        if (!VoicepeakUiController.IsValidShortcut(config.Ui.PlayShortcut))
+        if (!VoicepeakUiController.IsValidPlayShortcut(config.Ui.PlayShortcut))
         {
-            throw new InvalidOperationException("ui.playShortcut の形式が不正です（例: F3, Ctrl+F4, Space）");
+            throw new InvalidOperationException("ui.playShortcut は修飾なしキーのみ指定できます（例: F3, Space, Home）");
         }
 
         if (config.Ui.SentenceBreakTriggers == null)

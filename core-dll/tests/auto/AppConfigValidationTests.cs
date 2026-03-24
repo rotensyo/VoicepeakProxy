@@ -110,6 +110,16 @@ public class AppConfigValidationTests
     }
 
     [TestMethod]
+    public void Validate_ModifierPlayShortcut_Throws()
+    {
+        // 修飾付き再生ショートカットを拒否
+        InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
+            ValidateWith(config => config.Ui.PlayShortcut = "Ctrl+F4"));
+
+        StringAssert.Contains(ex.Message, "ui.playShortcut");
+    }
+
+    [TestMethod]
     public void Validate_BootValidationTextNull_Throws()
     {
         // 起動検証文字列nullを拒否

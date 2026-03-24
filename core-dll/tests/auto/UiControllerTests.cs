@@ -48,6 +48,18 @@ public class UiControllerTests
     }
 
     [TestMethod]
+    public void IsValidPlayShortcut_AcceptsOnlyNonModifierKeys()
+    {
+        // 再生ショートカットは修飾なしのみ許可
+        Assert.IsTrue(VoicepeakUiController.IsValidPlayShortcut("F3"));
+        Assert.IsTrue(VoicepeakUiController.IsValidPlayShortcut("Space"));
+        Assert.IsTrue(VoicepeakUiController.IsValidPlayShortcut("Home"));
+        Assert.IsFalse(VoicepeakUiController.IsValidPlayShortcut("Ctrl+F4"));
+        Assert.IsFalse(VoicepeakUiController.IsValidPlayShortcut("Shift+Space"));
+        Assert.IsFalse(VoicepeakUiController.IsValidPlayShortcut("Alt+F3"));
+    }
+
+    [TestMethod]
     public void IsValidMoveToStartShortcut_AllowsAnyNonBlankValue()
     {
         // 先頭移動設定は非空文字列を許可

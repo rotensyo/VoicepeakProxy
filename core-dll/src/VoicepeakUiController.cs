@@ -429,6 +429,17 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return ShortcutSpec.TryParse(raw, out _);
     }
 
+    // 再生ショートカットは修飾なしキーのみ許可
+    internal static bool IsValidPlayShortcut(string raw)
+    {
+        if (!ShortcutSpec.TryParse(raw, out ShortcutSpec spec))
+        {
+            return false;
+        }
+
+        return !spec.Control && !spec.Shift && !spec.Alt;
+    }
+
     internal static bool IsValidMoveToStartShortcut(string raw)
     {
         return !string.IsNullOrWhiteSpace(raw);
@@ -484,38 +495,12 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             return false;
         }
 
-        List<VirtualKey> downs = new List<VirtualKey>();
-        try
+        if (spec.Control || spec.Shift || spec.Alt)
         {
-            if (spec.Control)
-            {
-                SendKeyDown(hwnd, VirtualKey.Control);
-                downs.Add(VirtualKey.Control);
-            }
-
-            if (spec.Shift)
-            {
-                SendKeyDown(hwnd, VirtualKey.Shift);
-                downs.Add(VirtualKey.Shift);
-            }
-
-            if (spec.Alt)
-            {
-                SendKeyDown(hwnd, VirtualKey.Menu);
-                downs.Add(VirtualKey.Menu);
-            }
-
-            SendKeyDown(hwnd, spec.Key);
-            SendKeyUp(hwnd, spec.Key);
-            return true;
+            return false;
         }
-        finally
-        {
-            for (int i = downs.Count - 1; i >= 0; i--)
-            {
-                SendKeyUp(hwnd, downs[i]);
-            }
-        }
+
+        return SendKeyDown(hwnd, spec.Key) && SendKeyUp(hwnd, spec.Key);
     }
 
     private bool SendKey(IntPtr hwnd, VirtualKey key)
