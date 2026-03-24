@@ -213,6 +213,16 @@ internal sealed class WorkerHost
             speakRequest.Text = request.Text;
 
             SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWait(config, speakRequest, _logger);
+            ClearInputOnceResult clearResult = VoicepeakOneShot.ClearInputOnce(config, _logger);
+            if (!clearResult.Succeeded)
+            {
+                _logger.Warn("post_speak_clear_failed taskId=" + request.TaskId + " status=" + clearResult.Status + " error=" + clearResult.ErrorMessage);
+            }
+            else
+            {
+                _logger.Info("post_speak_clear_ok taskId=" + request.TaskId);
+            }
+
             if (!result.Succeeded)
             {
                 if (IsNonFatalDropStatus(result.Status))
