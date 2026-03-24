@@ -215,6 +215,14 @@ internal sealed class WorkerHost
             SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWait(config, speakRequest, _logger);
             if (!result.Succeeded)
             {
+                if (IsNonFatalDropStatus(result.Status))
+                {
+                    _logger.Warn("speak_dropped_non_fatal taskId=" + request.TaskId + " status=" + result.Status + " error=" + result.ErrorMessage);
+                    WorkerSpeakResponse dropped = new WorkerSpeakResponse();
+                    dropped.Accepted = true;
+                    return dropped;
+                }
+
                 _logger.Warn("speak_failed taskId=" + request.TaskId + " status=" + result.Status + " error=" + result.ErrorMessage);
                 WorkerSpeakResponse failed = new WorkerSpeakResponse();
                 failed.Accepted = false;
@@ -235,6 +243,15 @@ internal sealed class WorkerHost
             failed.ErrorMessage = "execute_speak_failed detail=" + ex.Message;
             return failed;
         }
+    }
+
+    // 継続可能なドロップ対象を判定
+    private static bool IsNonFatalDropStatus(SpeakOnceStatus status)
+    {
+        // InvalidRequest: 入力不正はWorker側そのものには悪影響なし
+        // StartConfirmTimeout: 再生失敗だが初期化時には入力成功しているはずなのでおそらく設定値が際を攻めすぎているパターン、一応継続
+        return status == SpeakOnceStatus.InvalidRequest
+            || status == SpeakOnceStatus.StartConfirmTimeout;
     }
 
     // 起動時検証を実行
