@@ -188,7 +188,10 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
                 int pairCount = Math.Max(1, before.VisibleBlockCount + 1);
                 int deleteSteps = ComputeCompositeDeleteSteps(before.Read, before.VisibleBlockCount);
-                if (!RunCompositeClearCycle(mainHwnd, pairCount, deleteSteps, actionDelayMs))
+                if (!ExecuteWithModifierIsolation(mainHwnd, "composite_clear_cycle", action: () =>
+                {
+                    return RunCompositeClearCycleCore(mainHwnd, pairCount, deleteSteps, actionDelayMs);
+                }))
                 {
                     return false;
                 }
@@ -212,7 +215,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             }
 
             int clearSteps = ComputeNonCompositeDeleteSteps(before.Read, before.VisibleBlockCount);
-            if (!ExecuteWithModifierIsolation(mainHwnd, "clear_input_delete_loop", requireIsolation: true, action: () =>
+            if (!ExecuteWithModifierIsolation(mainHwnd, "clear_input_delete_loop", action: () =>
             {
                 for (int i = 0; i < clearSteps; i++)
                 {
@@ -282,7 +285,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return Math.Max(10, baseLength + 10 + inputBoxCount);
     }
 
-    private bool RunCompositeClearCycle(IntPtr mainHwnd, int pairCount, int deleteSteps, int actionDelayMs)
+    private bool RunCompositeClearCycleCore(IntPtr mainHwnd, int pairCount, int deleteSteps, int actionDelayMs)
     {
         if (!FocusInputForKeyboardIfNeeded(mainHwnd, actionDelayMs))
         {
@@ -314,20 +317,12 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
 
         int actualDeletes = Math.Max(0, deleteSteps);
-        if (!ExecuteWithModifierIsolation(mainHwnd, "composite_clear_delete_loop", requireIsolation: true, action: () =>
+        for (int i = 0; i < actualDeletes; i++)
         {
-            for (int i = 0; i < actualDeletes; i++)
+            if (!PressDeleteCore(mainHwnd))
             {
-                if (!PressDeleteCore(mainHwnd))
-                {
-                    return false;
-                }
+                return false;
             }
-
-            return true;
-        }))
-        {
-            return false;
         }
 
         return true;
@@ -370,7 +365,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             modifierIsolationEnabled = TryEnableModifierKeyIsolation(typeTextTargetHwnd, "type_text");
             if (!modifierIsolationEnabled)
             {
-                _log.Warn("type_text_hook_unavailable_continue route=wm_char_only");
+                _log.Warn("modifier_guard_unavailable op=type_text");
+                return false;
             }
 
             if (statsProbeEnabled && modifierIsolationEnabled)
@@ -442,7 +438,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     }
 
     // 指定操作を修飾キー中立化フックで保護
-    private bool ExecuteWithModifierIsolation(IntPtr targetHwnd, string operationName, bool requireIsolation, Func<bool> action)
+    private bool ExecuteWithModifierIsolation(IntPtr targetHwnd, string operationName, Func<bool> action)
     {
         bool modifierIsolationEnabled = false;
         try
@@ -450,13 +446,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             modifierIsolationEnabled = TryEnableModifierKeyIsolation(targetHwnd, operationName);
             if (!modifierIsolationEnabled)
             {
-                if (requireIsolation)
-                {
-                    _log.Warn($"modifier_guard_unavailable op={SanitizeForLog(operationName)}");
-                    return false;
-                }
-
-                _log.Warn($"modifier_guard_unavailable_continue op={SanitizeForLog(operationName)}");
+                _log.Warn($"modifier_guard_unavailable op={SanitizeForLog(operationName)}");
+                return false;
             }
 
             return action();
@@ -750,9 +741,9 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     // 再生ショートカットを送信
     public bool PressPlay(IntPtr mainHwnd)
     {
-        return ExecuteWithModifierIsolation(mainHwnd, "press_play", requireIsolation: true, action: () =>
+        return ExecuteWithModifierIsolation(mainHwnd, "press_play", action: () =>
         {
-            if (!KillFocus(mainHwnd))
+            if (!KillFocusCore(mainHwnd))
             {
                 return false;
             }
@@ -768,7 +759,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
     public bool MoveToStart(IntPtr mainHwnd, int actionDelayMs)
     {
-        return ExecuteWithModifierIsolation(mainHwnd, "move_to_start", requireIsolation: true, action: () =>
+        return ExecuteWithModifierIsolation(mainHwnd, "move_to_start", action: () =>
         {
             SleepActionDelay(actionDelayMs);
             if (IsFunctionKeyMoveToStartShortcut(_ui.MoveToStartShortcut))
@@ -782,7 +773,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
     public bool PressDelete(IntPtr mainHwnd)
     {
-        return ExecuteWithModifierIsolation(mainHwnd, "press_delete", requireIsolation: true, action: () =>
+        return ExecuteWithModifierIsolation(mainHwnd, "press_delete", action: () =>
             PressDeleteCore(mainHwnd));
     }
 
@@ -804,6 +795,13 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     }
 
     public bool KillFocus(IntPtr mainHwnd)
+    {
+        return ExecuteWithModifierIsolation(mainHwnd, "kill_focus", action: () =>
+            KillFocusCore(mainHwnd));
+    }
+
+    // KillFocus送信の共通実体
+    private bool KillFocusCore(IntPtr mainHwnd)
     {
         return SendWindowMessage(mainHwnd, WmKillFocus, IntPtr.Zero, IntPtr.Zero);
     }
