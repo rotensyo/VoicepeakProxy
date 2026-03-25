@@ -71,6 +71,7 @@ public sealed class UiConfig
 public sealed class DebugConfig
 {
     public bool LogTextCandidates { get; set; } = false;
+    public bool LogModifierHookStats { get; set; } = false;
 }
 
 // 文字列変換設定
