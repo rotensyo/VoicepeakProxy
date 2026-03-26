@@ -32,12 +32,26 @@ public enum ModifierHookApi
 // 修飾キー中立化フックの制御
 internal sealed class ModifierKeyHookController
 {
-    private static readonly Encoding Utf8NoBom = new UTF8Encoding(false);
     private readonly object _gate = new object();
-    private NamedPipeClientStream _pipe;
-    private StreamReader _reader;
-    private StreamWriter _writer;
+    private readonly int _hookCommandTimeoutMs;
+    private readonly int _hookConnectTimeoutMs;
+    private readonly int _hookConnectTotalWaitMs;
+    private readonly IModifierHookPlatform _platform;
+    private IModifierHookConnection _connection;
     private int _pid;
+
+    public ModifierKeyHookController(int hookCommandTimeoutMs, int hookConnectTimeoutMs, int hookConnectTotalWaitMs)
+        : this(hookCommandTimeoutMs, hookConnectTimeoutMs, hookConnectTotalWaitMs, new DefaultModifierHookPlatform())
+    {
+    }
+
+    internal ModifierKeyHookController(int hookCommandTimeoutMs, int hookConnectTimeoutMs, int hookConnectTotalWaitMs, IModifierHookPlatform platform)
+    {
+        _hookCommandTimeoutMs = Math.Max(1, hookCommandTimeoutMs);
+        _hookConnectTimeoutMs = Math.Max(1, hookConnectTimeoutMs);
+        _hookConnectTotalWaitMs = Math.Max(1, hookConnectTotalWaitMs);
+        _platform = platform ?? throw new ArgumentNullException(nameof(platform));
+    }
 
     public bool EnsureInjected(int pid, AppLogger log)
     {
@@ -51,7 +65,7 @@ internal sealed class ModifierKeyHookController
 
             DisposePipe();
 
-            if (TryConnectExisting(pid, log))
+            if (TryConnectExisting(pid, log, _hookConnectTimeoutMs))
             {
                 _pid = pid;
                 log.Info($"modifier_hook_reused pid={pid}");
@@ -59,14 +73,14 @@ internal sealed class ModifierKeyHookController
             }
 
             bool injected = TryInject(pid, log);
-            if (!injected && TryConnectExisting(pid, log, timeoutMs: 1000))
+            if (!injected && TryConnectExisting(pid, log, _hookConnectTimeoutMs))
             {
                 _pid = pid;
                 log.Info($"modifier_hook_reused pid={pid}");
                 return true;
             }
 
-            if (!WaitForPipeReady(pid, log, totalWaitMs: 8000))
+            if (!WaitForPipeReady(pid, log, _hookConnectTotalWaitMs))
             {
                 log.Warn($"modifier_hook_connect_failed pid={pid} reason=pipe_not_ready");
                 return false;
@@ -175,12 +189,11 @@ internal sealed class ModifierKeyHookController
             string injectionLibrary = Assembly.GetExecutingAssembly().Location;
             string pipeName = GetPipeName(pid);
             log.Debug($"modifier_hook_inject_start pid={pid}");
-            RemoteHooking.Inject(
-                pid,
-                InjectionOptions.DoNotRequireStrongName,
-                injectionLibrary,
-                injectionLibrary,
-                pipeName);
+            if (!_platform.Inject(pid, injectionLibrary, pipeName))
+            {
+                return false;
+            }
+
             log.Debug($"modifier_hook_inject_done pid={pid}");
             return true;
         }
@@ -191,45 +204,41 @@ internal sealed class ModifierKeyHookController
         }
     }
 
-    private bool TryConnectExisting(int pid, AppLogger log, int timeoutMs = 500)
+    private bool TryConnectExisting(int pid, AppLogger log, int timeoutMs)
     {
         string pipeName = GetPipeName(pid);
-        NamedPipeClientStream candidate = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.None);
-        try
+        if (_platform.TryConnect(pipeName, timeoutMs, out IModifierHookConnection connection, out Exception error))
         {
-            candidate.Connect(timeoutMs);
-            if (!candidate.IsConnected)
-            {
-                candidate.Dispose();
-                return false;
-            }
-
-            candidate.ReadMode = PipeTransmissionMode.Byte;
-            _pipe = candidate;
-            _reader = new StreamReader(_pipe, Utf8NoBom, false, 1024, true);
-            _writer = new StreamWriter(_pipe, Utf8NoBom, 1024, true) { AutoFlush = true };
+            _connection = connection;
             return true;
         }
-        catch (Exception ex)
+
+        if (error != null)
         {
-            candidate.Dispose();
-            log.Debug($"modifier_hook_connect_retry pid={pid} reason={Sanitize(ex.GetType().Name)}");
-            return false;
+            log.Debug($"modifier_hook_connect_retry pid={pid} reason={Sanitize(error.GetType().Name)} message={Sanitize(error.Message)}");
         }
+
+        return false;
     }
 
     private bool WaitForPipeReady(int pid, AppLogger log, int totalWaitMs)
     {
+        int intervalMs = Math.Min(200, _hookConnectTimeoutMs);
+        if (intervalMs <= 0)
+        {
+            intervalMs = 1;
+        }
+
         int waited = 0;
         while (waited < totalWaitMs)
         {
-            if (TryConnectExisting(pid, log, timeoutMs: 200))
+            if (TryConnectExisting(pid, log, _hookConnectTimeoutMs))
             {
                 return true;
             }
 
-            Thread.Sleep(200);
-            waited += 200;
+            _platform.Sleep(intervalMs);
+            waited += intervalMs;
         }
 
         return false;
@@ -248,15 +257,20 @@ internal sealed class ModifierKeyHookController
     private bool SendCommand(string command, out string response)
     {
         response = string.Empty;
-        if (!IsConnected() || _reader == null || _writer == null)
+        if (!IsConnected() || _connection == null)
         {
             return false;
         }
 
         try
         {
-            _writer.WriteLine(command ?? string.Empty);
-            response = _reader.ReadLine() ?? string.Empty;
+            if (!_connection.Send(command ?? string.Empty, _hookCommandTimeoutMs, out string line))
+            {
+                DisposePipe();
+                return false;
+            }
+
+            response = line ?? string.Empty;
             return true;
         }
         catch
@@ -268,27 +282,15 @@ internal sealed class ModifierKeyHookController
 
     private bool IsConnected()
     {
-        return _pipe != null && _pipe.IsConnected;
+        return _connection != null && _connection.IsConnected;
     }
 
     private void DisposePipe()
     {
-        if (_writer != null)
+        if (_connection != null)
         {
-            _writer.Dispose();
-            _writer = null;
-        }
-
-        if (_reader != null)
-        {
-            _reader.Dispose();
-            _reader = null;
-        }
-
-        if (_pipe != null)
-        {
-            _pipe.Dispose();
-            _pipe = null;
+            _connection.Dispose();
+            _connection = null;
         }
 
         _pid = 0;
@@ -312,6 +314,108 @@ internal sealed class ModifierKeyHookController
     private static string Sanitize(string value)
     {
         return string.IsNullOrEmpty(value) ? string.Empty : value.Replace("\r", string.Empty).Replace("\n", string.Empty);
+    }
+}
+
+internal interface IModifierHookConnection : IDisposable
+{
+    bool IsConnected { get; }
+    bool Send(string command, int timeoutMs, out string response);
+}
+
+internal interface IModifierHookPlatform
+{
+    bool Inject(int pid, string injectionLibraryPath, string pipeName);
+    bool TryConnect(string pipeName, int timeoutMs, out IModifierHookConnection connection, out Exception error);
+    void Sleep(int milliseconds);
+}
+
+internal sealed class DefaultModifierHookPlatform : IModifierHookPlatform
+{
+    public bool Inject(int pid, string injectionLibraryPath, string pipeName)
+    {
+        RemoteHooking.Inject(
+            pid,
+            InjectionOptions.DoNotRequireStrongName,
+            injectionLibraryPath,
+            injectionLibraryPath,
+            pipeName);
+        return true;
+    }
+
+    public bool TryConnect(string pipeName, int timeoutMs, out IModifierHookConnection connection, out Exception error)
+    {
+        connection = null;
+        error = null;
+        NamedPipeClientStream candidate = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.None);
+        try
+        {
+            candidate.Connect(timeoutMs);
+            if (!candidate.IsConnected)
+            {
+                candidate.Dispose();
+                return false;
+            }
+
+            connection = new NamedPipeModifierHookConnection(candidate);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            candidate.Dispose();
+            error = ex;
+            return false;
+        }
+    }
+
+    public void Sleep(int milliseconds)
+    {
+        Thread.Sleep(milliseconds);
+    }
+}
+
+internal sealed class NamedPipeModifierHookConnection : IModifierHookConnection
+{
+    private static readonly Encoding Utf8NoBom = new UTF8Encoding(false);
+    private readonly NamedPipeClientStream _pipe;
+    private readonly StreamReader _reader;
+    private readonly StreamWriter _writer;
+
+    public NamedPipeModifierHookConnection(NamedPipeClientStream pipe)
+    {
+        _pipe = pipe ?? throw new ArgumentNullException(nameof(pipe));
+        _reader = new StreamReader(_pipe, Utf8NoBom, false, 1024, true);
+        _writer = new StreamWriter(_pipe, Utf8NoBom, 1024, true) { AutoFlush = true };
+    }
+
+    public bool IsConnected => _pipe != null && _pipe.IsConnected;
+
+    public bool Send(string command, int timeoutMs, out string response)
+    {
+        response = string.Empty;
+        try
+        {
+            _writer.WriteLine(command ?? string.Empty);
+            var readTask = _reader.ReadLineAsync();
+            if (!readTask.Wait(Math.Max(1, timeoutMs)))
+            {
+                return false;
+            }
+
+            response = readTask.Result ?? string.Empty;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _writer.Dispose();
+        _reader.Dispose();
+        _pipe.Dispose();
     }
 }
 
@@ -473,7 +577,6 @@ internal sealed class ModifierHookPipeServer
 
     public void RunLoop()
     {
-        ModifierHookDiag.Write($"pipe_server_start name={_pipeName}");
         while (true)
         {
             try
@@ -486,7 +589,6 @@ internal sealed class ModifierHookPipeServer
                     PipeOptions.None))
                 {
                     pipe.WaitForConnection();
-                    ModifierHookDiag.Write("pipe_server_connected");
                     using (var reader = new StreamReader(pipe, Utf8NoBom, false, 1024, true))
                     using (var writer = new StreamWriter(pipe, Utf8NoBom, 1024, true) { AutoFlush = true })
                     while (pipe.IsConnected)
@@ -501,22 +603,11 @@ internal sealed class ModifierHookPipeServer
                     }
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                ModifierHookDiag.Write($"pipe_server_error type={ex.GetType().Name} message={Sanitize(ex.Message)}");
                 Thread.Sleep(10);
             }
         }
-    }
-
-    private static string Sanitize(string text)
-    {
-        if (string.IsNullOrEmpty(text))
-        {
-            return string.Empty;
-        }
-
-        return text.Replace("\r", " ").Replace("\n", " ");
     }
 
     private string HandleRequest(string request)
@@ -595,7 +686,6 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
 
     public ModifierKeyHookEntryPoint(RemoteHooking.IContext context, string pipeName)
     {
-        ModifierHookDiag.Write($"entry_ctor_start pipe={pipeName}");
         _pipeServer = new ModifierHookPipeServer(pipeName, _state);
 
         IntPtr getKeyStateAddress = LocalHook.GetProcAddress("user32.dll", "GetKeyState");
@@ -615,12 +705,10 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
         _getKeyStateHook.ThreadACL.SetExclusiveACL(new[] { 0 });
         _getAsyncKeyStateHook.ThreadACL.SetExclusiveACL(new[] { 0 });
         _getKeyboardStateHook.ThreadACL.SetExclusiveACL(new[] { 0 });
-        ModifierHookDiag.Write("entry_ctor_done");
     }
 
     public void Run(RemoteHooking.IContext context, string pipeName)
     {
-        ModifierHookDiag.Write("entry_run_start");
         var serverThread = new Thread(_pipeServer.RunLoop)
         {
             IsBackground = true,
@@ -728,29 +816,5 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
     private static void WriteKeyboardState(IntPtr lpKeyState, int index, byte value)
     {
         Marshal.WriteByte(lpKeyState, index, value);
-    }
-}
-
-// 注入先診断ログ
-internal static class ModifierHookDiag
-{
-    private static readonly object Gate = new object();
-
-    public static void Write(string message)
-    {
-        try
-        {
-            string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VoicepeakProxyCore");
-            Directory.CreateDirectory(dir);
-            string path = Path.Combine(dir, "modifier-hook-diag.log");
-            string line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {message}{Environment.NewLine}";
-            lock (Gate)
-            {
-                File.AppendAllText(path, line, Encoding.UTF8);
-            }
-        }
-        catch
-        {
-        }
     }
 }

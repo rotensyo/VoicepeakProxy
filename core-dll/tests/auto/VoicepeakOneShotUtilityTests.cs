@@ -69,6 +69,25 @@ public class VoicepeakOneShotUtilityTests
         Assert.AreEqual("A", result.ActualText);
         Assert.AreEqual(1, ui.PressPlayCalls);
         Assert.IsTrue(ui.CallLog.IndexOf("prepare_playback") < ui.CallLog.IndexOf("press_play"));
+        Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
+        Assert.AreEqual(1, ui.EndModifierIsolationSessionCalls);
+    }
+
+    [TestMethod]
+    public void ValidateInputOnceCore_BeginModifierIsolationSessionFails_ReturnsPrepareFailed()
+    {
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        ui.BeginModifierIsolationSessionHandler = (_, _) => false;
+
+        ValidateInputOnceResult result = VoicepeakOneShot.ValidateInputOnceCore(
+            new AppConfig(),
+            new AppLogger(new TestLogger()),
+            ui,
+            new FakeAudioSessionReader());
+
+        Assert.AreEqual(ValidateInputOnceStatus.PrepareFailed, result.Status);
+        Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
+        Assert.AreEqual(0, ui.EndModifierIsolationSessionCalls);
     }
 
     [TestMethod]
@@ -172,6 +191,21 @@ public class VoicepeakOneShotUtilityTests
         Assert.AreEqual(ClearInputOnceStatus.Completed, result.Status);
         Assert.IsTrue(result.Succeeded);
         Assert.AreEqual(1, ui.ClearInputCalls);
+        Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
+        Assert.AreEqual(1, ui.EndModifierIsolationSessionCalls);
+    }
+
+    [TestMethod]
+    public void ClearInputOnceCore_BeginModifierIsolationSessionFails_ReturnsClearInputFailed()
+    {
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        ui.BeginModifierIsolationSessionHandler = (_, _) => false;
+
+        ClearInputOnceResult result = VoicepeakOneShot.ClearInputOnceCore(new AppConfig(), new AppLogger(new TestLogger()), ui);
+
+        Assert.AreEqual(ClearInputOnceStatus.ClearInputFailed, result.Status);
+        Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
+        Assert.AreEqual(0, ui.EndModifierIsolationSessionCalls);
     }
 
     private static FakeVoicepeakUiController CreateResolvedUi()

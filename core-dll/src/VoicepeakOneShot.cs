@@ -134,6 +134,18 @@ public static class VoicepeakOneShot
             return new ValidateInputOnceResult { Status = ValidateInputOnceStatus.TargetNotFound };
         }
 
+        if (!ui.BeginModifierIsolationSession(hwnd, "oneshot_validate"))
+        {
+            return new ValidateInputOnceResult
+            {
+                Status = ValidateInputOnceStatus.PrepareFailed,
+                ErrorMessage = "reason=modifier_guard_unavailable"
+            };
+        }
+
+        try
+        {
+
         if (ui.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.Validation))
         {
             ui.TryPrimeInputContext(process, hwnd, InputContextPrimeReason.Validation);
@@ -211,11 +223,16 @@ public static class VoicepeakOneShot
             };
         }
 
-        return new ValidateInputOnceResult
+            return new ValidateInputOnceResult
+            {
+                Status = ValidateInputOnceStatus.InvalidRequest,
+                ErrorMessage = "reason=unknown"
+            };
+        }
+        finally
         {
-            Status = ValidateInputOnceStatus.InvalidRequest,
-            ErrorMessage = "reason=unknown"
-        };
+            ui.EndModifierIsolationSession("oneshot_validate");
+        }
     }
 
     // 単発入力削除
@@ -262,18 +279,31 @@ public static class VoicepeakOneShot
             return new ClearInputOnceResult { Status = ClearInputOnceStatus.TargetNotFound };
         }
 
+        if (!ui.BeginModifierIsolationSession(hwnd, "oneshot_clear_input"))
+        {
+            return new ClearInputOnceResult { Status = ClearInputOnceStatus.ClearInputFailed };
+        }
+
+        try
+        {
+
         if (!ui.IsAlive(process))
         {
             log.Error("対象プロセスが終了したため処理を中断しました。");
             return new ClearInputOnceResult { Status = ClearInputOnceStatus.ProcessLost };
         }
 
-        if (!ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, false))
-        {
-            return new ClearInputOnceResult { Status = ClearInputOnceStatus.ClearInputFailed };
-        }
+            if (!ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, false))
+            {
+                return new ClearInputOnceResult { Status = ClearInputOnceStatus.ClearInputFailed };
+            }
 
-        return new ClearInputOnceResult { Status = ClearInputOnceStatus.Completed };
+            return new ClearInputOnceResult { Status = ClearInputOnceStatus.Completed };
+        }
+        finally
+        {
+            ui.EndModifierIsolationSession("oneshot_clear_input");
+        }
     }
 
     // 単発実行
@@ -356,11 +386,19 @@ public static class VoicepeakOneShot
             return new SpeakOnceResult { Status = SpeakOnceStatus.TargetNotFound, SegmentsExecuted = 0 };
         }
 
-        int executed = 0;
-        for (int i = 0; i < job.Segments.Count; i++)
+        if (!ui.BeginModifierIsolationSession(hwnd, "oneshot_speak_once"))
         {
-            Segment seg = job.Segments[i];
-            log.Info($"segment_start jobId={job.JobId} index={i}");
+            log.Warn($"job_dropped jobId={job.JobId} reason=modifier_guard_unavailable");
+            return new SpeakOnceResult { Status = SpeakOnceStatus.PrepareFailed, SegmentsExecuted = 0 };
+        }
+
+        int executed = 0;
+        try
+        {
+            for (int i = 0; i < job.Segments.Count; i++)
+            {
+                Segment seg = job.Segments[i];
+                log.Info($"segment_start jobId={job.JobId} index={i}");
 
             long segmentStartAt = MonoClock.NowMs();
             bool prepared = JobExecutionCore.PrepareSegment(config, ui, process, hwnd, seg.Text, log, false);
@@ -417,13 +455,18 @@ public static class VoicepeakOneShot
 
             log.Warn($"job_dropped jobId={job.JobId} reason=process_lost");
             return new SpeakOnceResult { Status = SpeakOnceStatus.ProcessLost, SegmentsExecuted = executed };
-        }
+            }
 
-        return new SpeakOnceResult
+            return new SpeakOnceResult
+            {
+                Status = SpeakOnceStatus.Completed,
+                SegmentsExecuted = executed
+            };
+        }
+        finally
         {
-            Status = SpeakOnceStatus.Completed,
-            SegmentsExecuted = executed
-        };
+            ui.EndModifierIsolationSession("oneshot_speak_once");
+        }
     }
 
     // 単発実行
@@ -506,13 +549,21 @@ public static class VoicepeakOneShot
             return new SpeakOnceResult { Status = SpeakOnceStatus.TargetNotFound, SegmentsExecuted = 0 };
         }
 
-        int executed = 0;
-        for (int i = 0; i < job.Segments.Count; i++)
+        if (!ui.BeginModifierIsolationSession(hwnd, "oneshot_speak_wait"))
         {
-            Segment seg = job.Segments[i];
-            bool isLast = i == job.Segments.Count - 1;
-            bool recoveryClickUsed = false;
-            log.Info($"segment_start jobId={job.JobId} index={i}");
+            log.Warn($"job_dropped jobId={job.JobId} reason=modifier_guard_unavailable");
+            return new SpeakOnceResult { Status = SpeakOnceStatus.PrepareFailed, SegmentsExecuted = 0 };
+        }
+
+        int executed = 0;
+        try
+        {
+            for (int i = 0; i < job.Segments.Count; i++)
+            {
+                Segment seg = job.Segments[i];
+                bool isLast = i == job.Segments.Count - 1;
+                bool recoveryClickUsed = false;
+                log.Info($"segment_start jobId={job.JobId} index={i}");
 
             long segmentStartAt = MonoClock.NowMs();
             bool prepared = JobExecutionCore.PrepareSegment(config, ui, process, hwnd, seg.Text, log, false);
@@ -607,14 +658,19 @@ public static class VoicepeakOneShot
                 return new SpeakOnceResult { Status = SpeakOnceStatus.ProcessLost, SegmentsExecuted = executed };
             }
 
-            continue;
-        }
+                continue;
+            }
 
-        return new SpeakOnceResult
+            return new SpeakOnceResult
+            {
+                Status = SpeakOnceStatus.Completed,
+                SegmentsExecuted = executed
+            };
+        }
+        finally
         {
-            Status = SpeakOnceStatus.Completed,
-            SegmentsExecuted = executed
-        };
+            ui.EndModifierIsolationSession("oneshot_speak_wait");
+        }
     }
 
     // 開始確認のみを監視

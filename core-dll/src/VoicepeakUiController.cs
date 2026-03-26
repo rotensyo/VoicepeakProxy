@@ -32,9 +32,12 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private readonly IVoicepeakProcessApi _processApi;
     private readonly ModifierKeyHookController _modifierKeyHookController;
     private readonly object _inputPrimeGate = new object();
+    private readonly object _modifierIsolationSessionGate = new object();
     private int _primedProcessId;
     private IntPtr _primedMainHwnd;
     private int _lastInjectedEnterCount;
+    private int _modifierIsolationSessionDepth;
+    private uint _modifierIsolationSessionProcessId;
 
     // UI設定とロガーを保持
     public VoicepeakUiController(UiConfig ui, DebugConfig debug, AppLogger log)
@@ -59,7 +62,10 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         _debug = debug ?? new DebugConfig();
         _log = log;
         _processApi = processApi ?? new DefaultVoicepeakProcessApi();
-        _modifierKeyHookController = new ModifierKeyHookController();
+        _modifierKeyHookController = new ModifierKeyHookController(
+            _prepare.HookCommandTimeoutMs,
+            _prepare.HookConnectTimeoutMs,
+            _prepare.HookConnectTotalWaitMs);
         _sentenceBreakTriggerIndex = BuildSentenceBreakTriggerIndex(ui);
         WarnIfMoveToStartShortcutWillUseSequentialFallback(_ui.MoveToStartShortcut);
     }
@@ -328,6 +334,12 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return true;
     }
 
+    // 既存テスト互換のため残置
+    private bool RunCompositeClearCycle(IntPtr mainHwnd, int pairCount, int deleteSteps, int actionDelayMs)
+    {
+        return RunCompositeClearCycleCore(mainHwnd, pairCount, deleteSteps, actionDelayMs);
+    }
+
     private static int EstimateVisibleBlockCount(IntPtr mainHwnd)
     {
         if (mainHwnd == IntPtr.Zero)
@@ -352,8 +364,9 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     {
         string send = text ?? string.Empty;
         HashSet<int> enterPositions = ComputeSentenceBreakEnterPositions(send);
-        if (!TryResolveTypeTextTargetHwnd(mainHwnd, out IntPtr typeTextTargetHwnd))
+        if (mainHwnd == IntPtr.Zero)
         {
+            _log.Warn("type_text_target_resolve_failed reason=main_hwnd_zero");
             return false;
         }
 
@@ -362,7 +375,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         bool statsProbeStarted = false;
         try
         {
-            modifierIsolationEnabled = TryEnableModifierKeyIsolation(typeTextTargetHwnd, "type_text");
+            modifierIsolationEnabled = TryEnableModifierKeyIsolation(mainHwnd, "type_text");
             if (!modifierIsolationEnabled)
             {
                 _log.Warn("modifier_guard_unavailable op=type_text");
@@ -375,9 +388,9 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 statsProbeStarted = true;
             }
 
-            if (!TryTypeTextByWindowMessages(typeTextTargetHwnd, send, enterPositions, charDelayMs, out int messageEnterCount))
+            if (!TryTypeTextByWindowMessages(mainHwnd, send, enterPositions, charDelayMs, out int messageEnterCount))
             {
-                _log.Warn($"type_text_target_send_failed reason=wm_char_failed hwnd=0x{typeTextTargetHwnd.ToInt64():X}");
+                _log.Warn($"type_text_target_send_failed reason=wm_char_failed hwnd=0x{mainHwnd.ToInt64():X}");
                 return false;
             }
 
@@ -416,6 +429,16 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             return false;
         }
 
+        if (!IsVoicepeakProcessId(processId))
+        {
+            return true;
+        }
+
+        if (IsModifierIsolationSessionActive(processId))
+        {
+            return true;
+        }
+
         if (!_modifierKeyHookController.EnsureInjected((int)processId, _log))
         {
             return false;
@@ -433,8 +456,123 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     // 修飾キー中立化フックを無効化
     private void DisableModifierKeyIsolation(string operationName)
     {
+        if (IsAnyModifierIsolationSessionActive())
+        {
+            return;
+        }
+
         _modifierKeyHookController.SetEnabled(false, _log);
         _log.Info($"modifier_isolation_disabled op={SanitizeForLog(operationName)}");
+    }
+
+    public bool BeginModifierIsolationSession(IntPtr mainHwnd, string operationName)
+    {
+        if (mainHwnd == IntPtr.Zero)
+        {
+            _log.Warn($"modifier_session_begin_failed reason=target_hwnd_zero op={SanitizeForLog(operationName)}");
+            return false;
+        }
+
+        GetWindowThreadProcessId(mainHwnd, out uint processId);
+        if (processId == 0)
+        {
+            _log.Warn($"modifier_session_begin_failed reason=target_pid_zero op={SanitizeForLog(operationName)}");
+            return false;
+        }
+
+        if (!IsVoicepeakProcessId(processId))
+        {
+            return true;
+        }
+
+        lock (_modifierIsolationSessionGate)
+        {
+            if (_modifierIsolationSessionDepth > 0)
+            {
+                if (_modifierIsolationSessionProcessId != processId)
+                {
+                    _log.Warn($"modifier_session_begin_failed reason=process_mismatch op={SanitizeForLog(operationName)}");
+                    return false;
+                }
+
+                _modifierIsolationSessionDepth++;
+                _log.Info($"modifier_session_reused op={SanitizeForLog(operationName)} depth={_modifierIsolationSessionDepth}");
+                return true;
+            }
+
+            if (!_modifierKeyHookController.EnsureInjected((int)processId, _log))
+            {
+                _log.Warn($"modifier_session_begin_failed reason=ensure_injected_failed op={SanitizeForLog(operationName)}");
+                return false;
+            }
+
+            if (!_modifierKeyHookController.SetEnabled(true, _log))
+            {
+                _log.Warn($"modifier_session_begin_failed reason=set_enabled_failed op={SanitizeForLog(operationName)}");
+                return false;
+            }
+
+            _modifierIsolationSessionProcessId = processId;
+            _modifierIsolationSessionDepth = 1;
+            _log.Info($"modifier_session_begin op={SanitizeForLog(operationName)} pid={processId}");
+            return true;
+        }
+    }
+
+    public void EndModifierIsolationSession(string operationName)
+    {
+        lock (_modifierIsolationSessionGate)
+        {
+            if (_modifierIsolationSessionDepth <= 0)
+            {
+                return;
+            }
+
+            _modifierIsolationSessionDepth--;
+            if (_modifierIsolationSessionDepth > 0)
+            {
+                _log.Info($"modifier_session_keep op={SanitizeForLog(operationName)} depth={_modifierIsolationSessionDepth}");
+                return;
+            }
+
+            _modifierIsolationSessionProcessId = 0;
+            _modifierKeyHookController.SetEnabled(false, _log);
+            _log.Info($"modifier_session_end op={SanitizeForLog(operationName)}");
+        }
+    }
+
+    private bool IsModifierIsolationSessionActive(uint processId)
+    {
+        lock (_modifierIsolationSessionGate)
+        {
+            return _modifierIsolationSessionDepth > 0 && _modifierIsolationSessionProcessId == processId;
+        }
+    }
+
+    private bool IsAnyModifierIsolationSessionActive()
+    {
+        lock (_modifierIsolationSessionGate)
+        {
+            return _modifierIsolationSessionDepth > 0;
+        }
+    }
+
+    private static bool IsVoicepeakProcessId(uint processId)
+    {
+        if (processId == 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            Process process = Process.GetProcessById((int)processId);
+            return string.Equals(process.ProcessName, "voicepeak", StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     // 指定操作を修飾キー中立化フックで保護
@@ -518,224 +656,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             }
         }
         return true;
-    }
-
-    // TypeText送信先を入力コントロールhwndへ固定
-    private bool TryResolveTypeTextTargetHwnd(IntPtr mainHwnd, out IntPtr targetHwnd)
-    {
-        targetHwnd = IntPtr.Zero;
-        if (mainHwnd == IntPtr.Zero)
-        {
-            _log.Warn("type_text_target_resolve_failed reason=main_hwnd_zero");
-            return false;
-        }
-
-        if (!TryGetBestInputBox(mainHwnd, out AutomationElement inputBox) || inputBox == null)
-        {
-            _log.Warn("type_text_target_resolve_failed reason=input_box_not_found");
-            return false;
-        }
-
-        IntPtr resolvedByBest = TryResolveElementWindowHandle(mainHwnd, inputBox);
-        if (resolvedByBest != IntPtr.Zero)
-        {
-            targetHwnd = resolvedByBest;
-            _log.Info($"type_text_target_resolved reason=best_input_box hwnd=0x{targetHwnd.ToInt64():X}");
-            return true;
-        }
-
-        if (!TryResolveTypeTextTargetFromCandidates(mainHwnd, out targetHwnd, out int candidateCount))
-        {
-            if (!TryResolveTypeTextTargetFromGuiThread(mainHwnd, out targetHwnd, out string guiReason))
-            {
-                _log.Warn($"type_text_target_resolve_failed reason=native_handle_not_found candidateCount={candidateCount} guiReason={guiReason}");
-                return false;
-            }
-
-            _log.Info($"type_text_target_resolved reason=gui_thread hwnd=0x{targetHwnd.ToInt64():X}");
-            return true;
-        }
-
-        _log.Info($"type_text_target_resolved reason=alternative_candidate hwnd=0x{targetHwnd.ToInt64():X}");
-        return true;
-    }
-
-    // 入力候補群から有効なウィンドウハンドルを解決
-    private static bool TryResolveTypeTextTargetFromCandidates(IntPtr mainHwnd, out IntPtr targetHwnd, out int candidateCount)
-    {
-        targetHwnd = IntPtr.Zero;
-        candidateCount = 0;
-        try
-        {
-            AutomationElement root = AutomationElement.FromHandle(mainHwnd);
-            List<TextCandidateInfo> candidates = CollectTextCandidates(root, maxCount: 200);
-            candidateCount = candidates?.Count ?? 0;
-            if (candidates == null || candidates.Count == 0)
-            {
-                return false;
-            }
-
-            double bestScore = double.MinValue;
-            for (int i = 0; i < candidates.Count; i++)
-            {
-                AutomationElement candidate = candidates[i].Element;
-                IntPtr handle = TryResolveElementWindowHandle(mainHwnd, candidate);
-                if (handle == IntPtr.Zero)
-                {
-                    continue;
-                }
-
-                if (candidates[i].Score > bestScore)
-                {
-                    bestScore = candidates[i].Score;
-                    targetHwnd = handle;
-                }
-            }
-
-            return targetHwnd != IntPtr.Zero;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    // 要素から有効なウィンドウハンドルを取得
-    private static IntPtr TryResolveElementWindowHandle(IntPtr mainHwnd, AutomationElement element)
-    {
-        if (element == null)
-        {
-            return IntPtr.Zero;
-        }
-
-        try
-        {
-            int nativeHandle = element.Current.NativeWindowHandle;
-            if (nativeHandle == 0)
-            {
-                return IntPtr.Zero;
-            }
-
-            IntPtr hwnd = new IntPtr(nativeHandle);
-            if (IsWindow(hwnd) && IsDescendantOrSelf(mainHwnd, hwnd))
-            {
-                return hwnd;
-            }
-        }
-        catch
-        {
-        }
-
-        return TryResolveWindowHandleFromElementBounds(mainHwnd, element);
-    }
-
-    // 要素矩形から子ウィンドウハンドルを解決
-    private static IntPtr TryResolveWindowHandleFromElementBounds(IntPtr mainHwnd, AutomationElement element)
-    {
-        if (mainHwnd == IntPtr.Zero || element == null)
-        {
-            return IntPtr.Zero;
-        }
-
-        try
-        {
-            var rect = element.Current.BoundingRectangle;
-            if (rect.IsEmpty)
-            {
-                return IntPtr.Zero;
-            }
-
-            int screenX = (int)(rect.Left + (rect.Width / 2.0));
-            int screenY = (int)(rect.Top + (rect.Height / 3.0 * 2.0));
-            POINT screenPoint = new POINT { X = screenX, Y = screenY };
-            IntPtr hwnd = WindowFromPoint(screenPoint);
-            if (hwnd == IntPtr.Zero)
-            {
-                return IntPtr.Zero;
-            }
-
-            return IsDescendantOrSelf(mainHwnd, hwnd) ? hwnd : IntPtr.Zero;
-        }
-        catch
-        {
-            return IntPtr.Zero;
-        }
-    }
-
-    // 対象ハンドルがメイン配下かを判定
-    private static bool IsDescendantOrSelf(IntPtr mainHwnd, IntPtr targetHwnd)
-    {
-        if (targetHwnd == IntPtr.Zero)
-        {
-            return false;
-        }
-
-        if (mainHwnd == IntPtr.Zero)
-        {
-            return IsWindow(targetHwnd);
-        }
-
-        if (targetHwnd == mainHwnd || IsChild(mainHwnd, targetHwnd))
-        {
-            return true;
-        }
-
-        GetWindowThreadProcessId(mainHwnd, out uint mainProcessId);
-        GetWindowThreadProcessId(targetHwnd, out uint targetProcessId);
-        return mainProcessId != 0 && mainProcessId == targetProcessId;
-    }
-
-    // GUIスレッド情報から入力先ハンドルを解決
-    private static bool TryResolveTypeTextTargetFromGuiThread(IntPtr mainHwnd, out IntPtr targetHwnd, out string reason)
-    {
-        targetHwnd = IntPtr.Zero;
-        reason = "unknown";
-        if (mainHwnd == IntPtr.Zero)
-        {
-            reason = "main_hwnd_zero";
-            return false;
-        }
-
-        uint targetThreadId = GetWindowThreadProcessId(mainHwnd, out _);
-        if (targetThreadId == 0)
-        {
-            reason = "target_thread_not_found";
-            return false;
-        }
-
-        GUITHREADINFO info = new GUITHREADINFO
-        {
-            cbSize = Marshal.SizeOf(typeof(GUITHREADINFO))
-        };
-
-        if (!GetGUIThreadInfo(targetThreadId, ref info))
-        {
-            reason = "get_gui_thread_info_failed";
-            return false;
-        }
-
-        IntPtr[] handles = { info.hwndFocus, info.hwndCaret, info.hwndActive };
-        string[] labels = { "focus", "caret", "active" };
-        for (int i = 0; i < handles.Length; i++)
-        {
-            IntPtr h = handles[i];
-            if (h == IntPtr.Zero || !IsWindow(h))
-            {
-                continue;
-            }
-
-            if (!IsDescendantOrSelf(mainHwnd, h))
-            {
-                continue;
-            }
-
-            targetHwnd = h;
-            reason = labels[i];
-            return true;
-        }
-
-        reason = "no_usable_gui_handle";
-        return false;
     }
 
     // 再生ショートカットを送信
@@ -907,11 +827,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
     private static bool SendWindowMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
     {
-        return TrySendWindowMessage(hWnd, msg, wParam, lParam, out _);
-    }
-
-    private static bool TrySendWindowMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, out IntPtr result)
-    {
+        IntPtr result;
         IntPtr ok = SendMessageTimeout(hWnd, msg, wParam, lParam, SmtoAbortIfHung, 1000, out result);
         return ok != IntPtr.Zero;
     }
@@ -1563,15 +1479,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private static extern bool ScreenToClient(IntPtr hWnd, ref POINT lpPoint);
 
     [DllImport("user32.dll", SetLastError = true)]
-    private static extern IntPtr WindowFromPoint(POINT point);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool IsChild(IntPtr hWndParent, IntPtr hWnd);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO lpgui);
-
-    [DllImport("user32.dll", SetLastError = true)]
     private static extern IntPtr GetForegroundWindow();
 
     [DllImport("user32.dll", SetLastError = true)]
@@ -1590,9 +1497,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
     [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool IsWindow(IntPtr hWnd);
-
-    [DllImport("user32.dll", SetLastError = true)]
     private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 
     [StructLayout(LayoutKind.Sequential)]
@@ -1600,29 +1504,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     {
         public int X;
         public int Y;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct RECT
-    {
-        public int Left;
-        public int Top;
-        public int Right;
-        public int Bottom;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct GUITHREADINFO
-    {
-        public int cbSize;
-        public uint flags;
-        public IntPtr hwndActive;
-        public IntPtr hwndFocus;
-        public IntPtr hwndCapture;
-        public IntPtr hwndMenuOwner;
-        public IntPtr hwndMoveSize;
-        public IntPtr hwndCaret;
-        public RECT rcCaret;
     }
 
     private enum VirtualKey

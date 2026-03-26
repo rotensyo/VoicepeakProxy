@@ -236,12 +236,21 @@ internal sealed class VoicepeakEngine : IDisposable
             return;
         }
 
-        for (int i = 0; i < job.Segments.Count; i++)
+        if (!_ui.BeginModifierIsolationSession(hwnd, "runtime_job"))
         {
-            Segment seg = job.Segments[i];
-            bool isLast = i == job.Segments.Count - 1;
-            bool recoveryClickUsed = false;
-            _log.Info($"segment_start jobId={job.JobId} index={i}");
+            DropJob(job, "modifier_guard_unavailable");
+            return;
+        }
+
+        try
+        {
+
+            for (int i = 0; i < job.Segments.Count; i++)
+            {
+                Segment seg = job.Segments[i];
+                bool isLast = i == job.Segments.Count - 1;
+                bool recoveryClickUsed = false;
+                _log.Info($"segment_start jobId={job.JobId} index={i}");
 
             lock (_gate)
             {
@@ -388,9 +397,14 @@ internal sealed class VoicepeakEngine : IDisposable
                     return;
                 }
             }
-        }
+            }
 
-        JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: true);
+            JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: true);
+        }
+        finally
+        {
+            _ui.EndModifierIsolationSession("runtime_job");
+        }
     }
 
 

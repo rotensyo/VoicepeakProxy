@@ -17,6 +17,8 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
     public Func<IntPtr, int, bool> MoveToStartHandler { get; set; } = (_, _) => true;
     public Func<IntPtr, bool> PressDeleteHandler { get; set; } = _ => true;
     public Func<IntPtr, bool> KillFocusHandler { get; set; } = _ => true;
+    public Func<IntPtr, string, bool> BeginModifierIsolationSessionHandler { get; set; } = (_, _) => true;
+    public Action<string> EndModifierIsolationSessionHandler { get; set; } = _ => { };
     public Func<IntPtr, ReadInputResult> ReadInputHandler { get; set; }
         = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA);
     public Func<int, (bool Success, Process Process, IntPtr Hwnd)> ResolveByPidHandler { get; set; }
@@ -37,6 +39,8 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
     public int MoveToStartCalls { get; private set; }
     public int PressDeleteCalls { get; private set; }
     public int KillFocusCalls { get; private set; }
+    public int BeginModifierIsolationSessionCalls { get; private set; }
+    public int EndModifierIsolationSessionCalls { get; private set; }
 
     public bool TryResolveTarget(out Process process, out IntPtr mainHwnd)
     {
@@ -126,6 +130,20 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
         KillFocusCalls++;
         CallLog.Add("kill_focus");
         return KillFocusHandler(mainHwnd);
+    }
+
+    public bool BeginModifierIsolationSession(IntPtr mainHwnd, string operationName)
+    {
+        BeginModifierIsolationSessionCalls++;
+        CallLog.Add("modifier_session_begin");
+        return BeginModifierIsolationSessionHandler(mainHwnd, operationName);
+    }
+
+    public void EndModifierIsolationSession(string operationName)
+    {
+        EndModifierIsolationSessionCalls++;
+        CallLog.Add("modifier_session_end");
+        EndModifierIsolationSessionHandler(operationName);
     }
 
     public ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd) => ReadInputHandler(mainHwnd);

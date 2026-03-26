@@ -46,6 +46,27 @@ public class VoicepeakOneShotCoreTests
         Assert.AreEqual(1, result.SegmentsExecuted);
         Assert.IsTrue(ui.CallLog.IndexOf("prepare_playback") >= 0);
         Assert.IsTrue(ui.CallLog.IndexOf("prepare_playback") < ui.CallLog.IndexOf("press_play"));
+        Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
+        Assert.AreEqual(1, ui.EndModifierIsolationSessionCalls);
+    }
+
+    [TestMethod]
+    public void SpeakOnceWaitCore_BeginModifierIsolationSessionFails_ReturnsPrepareFailed()
+    {
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        ui.BeginModifierIsolationSessionHandler = (_, _) => false;
+
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(
+            CreateConfig(),
+            new SpeakOnceRequest { Text = "A" },
+            new AppLogger(new TestLogger()),
+            RequestValidationMode.Strict,
+            ui,
+            new FakeAudioSessionReader());
+
+        Assert.AreEqual(SpeakOnceStatus.PrepareFailed, result.Status);
+        Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
+        Assert.AreEqual(0, ui.EndModifierIsolationSessionCalls);
     }
 
     [TestMethod]
@@ -133,6 +154,27 @@ public class VoicepeakOneShotCoreTests
         Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
         Assert.AreEqual(1, result.SegmentsExecuted);
         Assert.AreEqual(1, ui.PressPlayCalls);
+        Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
+        Assert.AreEqual(1, ui.EndModifierIsolationSessionCalls);
+    }
+
+    [TestMethod]
+    public void SpeakOnceCore_BeginModifierIsolationSessionFails_ReturnsPrepareFailed()
+    {
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        ui.BeginModifierIsolationSessionHandler = (_, _) => false;
+
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(
+            CreateConfig(),
+            new SpeakOnceRequest { Text = "A" },
+            new AppLogger(new TestLogger()),
+            RequestValidationMode.Strict,
+            ui,
+            new FakeAudioSessionReader());
+
+        Assert.AreEqual(SpeakOnceStatus.PrepareFailed, result.Status);
+        Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
+        Assert.AreEqual(0, ui.EndModifierIsolationSessionCalls);
     }
 
     [TestMethod]

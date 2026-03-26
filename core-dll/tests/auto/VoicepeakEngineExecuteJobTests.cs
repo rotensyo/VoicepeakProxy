@@ -150,6 +150,26 @@ public class VoicepeakEngineExecuteJobTests
 
         Assert.IsTrue(ui.CallLog.IndexOf("prepare_playback") >= 0);
         Assert.IsTrue(ui.CallLog.IndexOf("prepare_playback") < ui.CallLog.IndexOf("press_play"));
+        Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
+        Assert.AreEqual(1, ui.EndModifierIsolationSessionCalls);
+    }
+
+    [TestMethod]
+    public void ExecuteJob_BeginModifierIsolationSessionFails_DropsJobEarly()
+    {
+        TestLogger logger = new TestLogger();
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        ui.BeginModifierIsolationSessionHandler = (_, _) => false;
+
+        using CancellationTokenSource cts = new CancellationTokenSource();
+        VoicepeakEngine engine = CreateEngine(ui, new FakeAudioSessionReader(), logger, cts);
+
+        ReflectionTestHelper.InvokeCoreInstance(engine, "ExecuteJob", CreateJob("hello"));
+
+        Assert.IsTrue(logger.WarnMessages.Exists(m => m.Contains("reason=modifier_guard_unavailable")));
+        Assert.AreEqual(0, ui.PrepareForTextInputCalls);
+        Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
+        Assert.AreEqual(0, ui.EndModifierIsolationSessionCalls);
     }
 
     private static VoicepeakEngine CreateEngine(FakeVoicepeakUiController ui, FakeAudioSessionReader audio, TestLogger logger, CancellationTokenSource cts)
