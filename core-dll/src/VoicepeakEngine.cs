@@ -237,7 +237,8 @@ internal sealed class VoicepeakEngine : IDisposable
 
         if (!_ui.BeginModifierIsolationSession(process.Id, "runtime_job"))
         {
-            DropJob(job, "modifier_guard_unavailable");
+            DropJob(job, "modifier_guard_unavailable_fatal");
+            OnModifierGuardFatal("session_begin_failed");
             return;
         }
 
@@ -402,7 +403,10 @@ internal sealed class VoicepeakEngine : IDisposable
         }
         finally
         {
-            _ui.EndModifierIsolationSession("runtime_job");
+            if (!_ui.EndModifierIsolationSession("runtime_job"))
+            {
+                OnModifierGuardFatal("session_end_failed");
+            }
         }
     }
 
@@ -456,13 +460,27 @@ internal sealed class VoicepeakEngine : IDisposable
 
     private void OnProcessLost()
     {
+        OnFatalRuntimeError("process_lost", "対象プロセスが終了したため処理を中断しました。");
+    }
+
+    // 修飾キー中立化セッション異常で停止
+    private void OnModifierGuardFatal(string phase)
+    {
+        _log.Error($"modifier_guard_fatal phase={phase}");
+        OnFatalRuntimeError("modifier_guard_unavailable_fatal", "修飾キー中立化セッションが利用できないため処理を中断しました。");
+    }
+
+    // 致命エラーで常駐処理を停止
+    private void OnFatalRuntimeError(string reason, string message)
+    {
         if (_shutdownRequested)
         {
             return;
         }
 
         _shutdownRequested = true;
-        _log.Error("対象プロセスが終了したため処理を中断しました。");
+        _log.Error($"runtime_fatal reason={reason}");
+        _log.Error(message);
         _appCts.Cancel();
     }
 

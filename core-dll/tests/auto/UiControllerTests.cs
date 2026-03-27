@@ -724,6 +724,21 @@ public class UiControllerTests
         Assert.AreEqual(ReadInputSource.NoCandidate, result.Source);
     }
 
+    [TestMethod]
+    public void EndModifierIsolationSession_WhenDisableFails_ReturnsFalseAndClearsSessionState()
+    {
+        // 解除失敗時は再利用不能としてセッション状態を破棄
+        VoicepeakUiController controller = CreateController(new UiConfig(), new FakeVoicepeakProcessApi());
+        ReflectionTestHelper.SetField(controller, "_modifierIsolationSessionActive", true);
+        ReflectionTestHelper.SetField(controller, "_modifierIsolationSessionProcessId", (uint)123);
+
+        bool ok = controller.EndModifierIsolationSession("test_end_failure");
+
+        Assert.IsFalse(ok);
+        Assert.IsFalse((bool)ReflectionTestHelper.GetField(controller, "_modifierIsolationSessionActive"));
+        Assert.AreEqual((uint)0, (uint)ReflectionTestHelper.GetField(controller, "_modifierIsolationSessionProcessId"));
+    }
+
     private static VoicepeakUiController CreateController(UiConfig ui, IVoicepeakProcessApi processApi)
     {
         return new VoicepeakUiController(ui, new DebugConfig(), new AppLogger(new TestLogger()), processApi);

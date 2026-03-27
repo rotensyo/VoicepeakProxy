@@ -51,7 +51,7 @@ public class VoicepeakOneShotCoreTests
     }
 
     [TestMethod]
-    public void SpeakOnceWaitCore_BeginModifierIsolationSessionFails_ReturnsPrepareFailed()
+    public void SpeakOnceWaitCore_BeginModifierIsolationSessionFails_ReturnsProcessLost()
     {
         FakeVoicepeakUiController ui = CreateResolvedUi();
         ui.BeginModifierIsolationSessionHandler = (_, _) => false;
@@ -64,7 +64,8 @@ public class VoicepeakOneShotCoreTests
             ui,
             new FakeAudioSessionReader());
 
-        Assert.AreEqual(SpeakOnceStatus.PrepareFailed, result.Status);
+        Assert.AreEqual(SpeakOnceStatus.ProcessLost, result.Status);
+        StringAssert.Contains(result.ErrorMessage, "modifier_guard_unavailable_fatal");
         Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
         Assert.AreEqual(0, ui.EndModifierIsolationSessionCalls);
     }
@@ -159,7 +160,7 @@ public class VoicepeakOneShotCoreTests
     }
 
     [TestMethod]
-    public void SpeakOnceCore_BeginModifierIsolationSessionFails_ReturnsPrepareFailed()
+    public void SpeakOnceCore_BeginModifierIsolationSessionFails_ReturnsProcessLost()
     {
         FakeVoicepeakUiController ui = CreateResolvedUi();
         ui.BeginModifierIsolationSessionHandler = (_, _) => false;
@@ -172,9 +173,34 @@ public class VoicepeakOneShotCoreTests
             ui,
             new FakeAudioSessionReader());
 
-        Assert.AreEqual(SpeakOnceStatus.PrepareFailed, result.Status);
+        Assert.AreEqual(SpeakOnceStatus.ProcessLost, result.Status);
+        StringAssert.Contains(result.ErrorMessage, "modifier_guard_unavailable_fatal");
         Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
         Assert.AreEqual(0, ui.EndModifierIsolationSessionCalls);
+    }
+
+    [TestMethod]
+    public void SpeakOnceWaitCore_EndModifierIsolationSessionFails_ReturnsProcessLost()
+    {
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        ui.EndModifierIsolationSessionHandler = _ => false;
+        FakeAudioSessionReader audio = new FakeAudioSessionReader();
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
+
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(
+            CreateConfig(),
+            new SpeakOnceRequest { Text = "A" },
+            new AppLogger(new TestLogger()),
+            RequestValidationMode.Strict,
+            ui,
+            audio);
+
+        Assert.AreEqual(SpeakOnceStatus.ProcessLost, result.Status);
+        StringAssert.Contains(result.ErrorMessage, "modifier_guard_release_failed_fatal");
+        Assert.AreEqual(1, ui.EndModifierIsolationSessionCalls);
     }
 
     [TestMethod]

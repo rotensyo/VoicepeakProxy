@@ -18,7 +18,7 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
     public Func<IntPtr, bool> PressDeleteHandler { get; set; } = _ => true;
     public Func<IntPtr, bool> KillFocusHandler { get; set; } = _ => true;
     public Func<int, string, bool> BeginModifierIsolationSessionHandler { get; set; } = (_, _) => true;
-    public Action<string> EndModifierIsolationSessionHandler { get; set; } = _ => { };
+    public Func<string, bool> EndModifierIsolationSessionHandler { get; set; } = _ => true;
     public Func<IntPtr, ReadInputResult> ReadInputHandler { get; set; }
         = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA);
     public Func<int, (bool Success, Process Process, IntPtr Hwnd)> ResolveByPidHandler { get; set; }
@@ -139,11 +139,11 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
         return BeginModifierIsolationSessionHandler(voicepeakProcessId, operationName);
     }
 
-    public void EndModifierIsolationSession(string operationName)
+    public bool EndModifierIsolationSession(string operationName)
     {
         EndModifierIsolationSessionCalls++;
         CallLog.Add("modifier_session_end");
-        EndModifierIsolationSessionHandler(operationName);
+        return EndModifierIsolationSessionHandler(operationName);
     }
 
     public ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd) => ReadInputHandler(mainHwnd);

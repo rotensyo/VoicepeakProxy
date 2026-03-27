@@ -29,7 +29,7 @@ internal interface IVoicepeakUiController
     bool PressDelete(IntPtr mainHwnd);
     bool KillFocus(IntPtr mainHwnd);
     bool BeginModifierIsolationSession(int voicepeakProcessId, string operationName);
-    void EndModifierIsolationSession(string operationName);
+    bool EndModifierIsolationSession(string operationName);
     ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd);
 }
 

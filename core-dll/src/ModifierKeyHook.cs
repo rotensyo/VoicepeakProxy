@@ -96,21 +96,50 @@ internal sealed class ModifierKeyHookController
     {
         lock (_gate)
         {
-            if (!SendCommand($"ENABLE|{(enabled ? 1 : 0)}", out string response))
+            int targetPid = _pid;
+            if (TrySetEnabledOnce(enabled, log))
             {
-                log.Warn($"modifier_hook_state_failed enabled={enabled} reason=pipe_send_failed");
+                return true;
+            }
+
+            if (targetPid <= 0)
+            {
                 return false;
             }
 
-            if (!string.Equals(response, "OK", StringComparison.Ordinal))
+            DisposeConnection(resetPid: false);
+            if (!TryConnectExisting(targetPid, log, _hookConnectTimeoutMs))
             {
-                log.Warn($"modifier_hook_state_failed enabled={enabled} reason={Sanitize(response)}");
+                log.Warn($"modifier_hook_state_retry_failed enabled={enabled} reason=reconnect_failed");
                 return false;
             }
 
-            log.Info($"modifier_hook_state enabled={enabled}");
+            if (!TrySetEnabledOnce(enabled, log))
+            {
+                log.Warn($"modifier_hook_state_retry_failed enabled={enabled} reason=retry_send_failed");
+                return false;
+            }
+
             return true;
         }
+    }
+
+    private bool TrySetEnabledOnce(bool enabled, AppLogger log)
+    {
+        if (!SendCommand($"ENABLE|{(enabled ? 1 : 0)}", out string response))
+        {
+            log.Warn($"modifier_hook_state_failed enabled={enabled} reason=pipe_send_failed");
+            return false;
+        }
+
+        if (!string.Equals(response, "OK", StringComparison.Ordinal))
+        {
+            log.Warn($"modifier_hook_state_failed enabled={enabled} reason={Sanitize(response)}");
+            return false;
+        }
+
+        log.Info($"modifier_hook_state enabled={enabled}");
+        return true;
     }
 
     public void BeginStatsProbe(AppLogger log)
@@ -287,13 +316,21 @@ internal sealed class ModifierKeyHookController
 
     private void DisposePipe()
     {
+        DisposeConnection(resetPid: true);
+    }
+
+    private void DisposeConnection(bool resetPid)
+    {
         if (_connection != null)
         {
             _connection.Dispose();
             _connection = null;
         }
 
-        _pid = 0;
+        if (resetPid)
+        {
+            _pid = 0;
+        }
     }
 
     private static string GetPipeName(int pid)

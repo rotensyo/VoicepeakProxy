@@ -25,8 +25,10 @@ public class ModifierKeyHookControllerTests
         Assert.AreEqual(1, platform.ConnectCalls);
     }
 
-    [TestMethod]
-    public void SetEnabled_WhenCommandTimeout_ReturnsFalse()
+    [DataTestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void SetEnabled_WhenCommandTimeout_ReturnsFalse(bool enabledState)
     {
         FakeModifierHookConnection connection = new FakeModifierHookConnection
         {
@@ -45,10 +47,40 @@ public class ModifierKeyHookControllerTests
         AppLogger log = new AppLogger(new TestLogger());
 
         Assert.IsTrue(controller.EnsureInjected(123, log));
-        bool enabled = controller.SetEnabled(true, log);
+        bool enabled = controller.SetEnabled(enabledState, log);
 
         Assert.IsFalse(enabled);
         Assert.AreEqual(1, connection.SendCalls);
+    }
+
+    [DataTestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void SetEnabled_WhenFirstSendFails_ReconnectsAndRetriesOnce(bool enabledState)
+    {
+        int sendAttempt = 0;
+        FakeModifierHookPlatform platform = new FakeModifierHookPlatform
+        {
+            ConnectResults = new Queue<bool>(new[] { true, true }),
+            CreateConnection = () => new FakeModifierHookConnection
+            {
+                SendHandler = (string command, int timeoutMs, out string response) =>
+                {
+                    sendAttempt++;
+                    response = sendAttempt == 1 ? string.Empty : "OK";
+                    return sendAttempt > 1;
+                }
+            }
+        };
+        ModifierKeyHookController controller = new ModifierKeyHookController(100, 100, 500, platform);
+        AppLogger log = new AppLogger(new TestLogger());
+
+        Assert.IsTrue(controller.EnsureInjected(123, log));
+        bool enabled = controller.SetEnabled(enabledState, log);
+
+        Assert.IsTrue(enabled);
+        Assert.AreEqual(2, sendAttempt);
+        Assert.AreEqual(2, platform.ConnectCalls);
     }
 
     [TestMethod]
@@ -72,6 +104,7 @@ public class ModifierKeyHookControllerTests
     {
         public Queue<bool> ConnectResults { get; set; } = new Queue<bool>();
         public FakeModifierHookConnection ConnectionToReturn { get; set; } = new FakeModifierHookConnection();
+        public Func<IModifierHookConnection> CreateConnection { get; set; }
         public bool InjectResult { get; set; } = true;
         public int InjectCalls { get; private set; }
         public int ConnectCalls { get; private set; }
@@ -89,7 +122,7 @@ public class ModifierKeyHookControllerTests
             bool ok = ConnectResults.Count > 0 && ConnectResults.Dequeue();
             if (ok)
             {
-                connection = ConnectionToReturn;
+                connection = CreateConnection != null ? CreateConnection() : ConnectionToReturn;
                 error = null;
                 return true;
             }

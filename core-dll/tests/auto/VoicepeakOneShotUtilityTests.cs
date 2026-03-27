@@ -74,7 +74,7 @@ public class VoicepeakOneShotUtilityTests
     }
 
     [TestMethod]
-    public void ValidateInputOnceCore_BeginModifierIsolationSessionFails_ReturnsPrepareFailed()
+    public void ValidateInputOnceCore_BeginModifierIsolationSessionFails_ReturnsProcessLost()
     {
         FakeVoicepeakUiController ui = CreateResolvedUi();
         ui.BeginModifierIsolationSessionHandler = (_, _) => false;
@@ -85,7 +85,8 @@ public class VoicepeakOneShotUtilityTests
             ui,
             new FakeAudioSessionReader());
 
-        Assert.AreEqual(ValidateInputOnceStatus.PrepareFailed, result.Status);
+        Assert.AreEqual(ValidateInputOnceStatus.ProcessLost, result.Status);
+        StringAssert.Contains(result.ErrorMessage, "modifier_guard_unavailable_fatal");
         Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
         Assert.AreEqual(0, ui.EndModifierIsolationSessionCalls);
     }
@@ -196,16 +197,47 @@ public class VoicepeakOneShotUtilityTests
     }
 
     [TestMethod]
-    public void ClearInputOnceCore_BeginModifierIsolationSessionFails_ReturnsClearInputFailed()
+    public void ClearInputOnceCore_BeginModifierIsolationSessionFails_ReturnsProcessLost()
     {
         FakeVoicepeakUiController ui = CreateResolvedUi();
         ui.BeginModifierIsolationSessionHandler = (_, _) => false;
 
         ClearInputOnceResult result = VoicepeakOneShot.ClearInputOnceCore(new AppConfig(), new AppLogger(new TestLogger()), ui);
 
-        Assert.AreEqual(ClearInputOnceStatus.ClearInputFailed, result.Status);
+        Assert.AreEqual(ClearInputOnceStatus.ProcessLost, result.Status);
+        StringAssert.Contains(result.ErrorMessage, "modifier_guard_unavailable_fatal");
         Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
         Assert.AreEqual(0, ui.EndModifierIsolationSessionCalls);
+    }
+
+    [TestMethod]
+    public void ValidateInputOnceCore_EndModifierIsolationSessionFails_ReturnsProcessLost()
+    {
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        ui.EndModifierIsolationSessionHandler = _ => false;
+
+        ValidateInputOnceResult result = VoicepeakOneShot.ValidateInputOnceCore(
+            new AppConfig(),
+            new AppLogger(new TestLogger()),
+            ui,
+            new FakeAudioSessionReader());
+
+        Assert.AreEqual(ValidateInputOnceStatus.ProcessLost, result.Status);
+        StringAssert.Contains(result.ErrorMessage, "modifier_guard_release_failed_fatal");
+        Assert.AreEqual(1, ui.EndModifierIsolationSessionCalls);
+    }
+
+    [TestMethod]
+    public void ClearInputOnceCore_EndModifierIsolationSessionFails_ReturnsProcessLost()
+    {
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        ui.EndModifierIsolationSessionHandler = _ => false;
+
+        ClearInputOnceResult result = VoicepeakOneShot.ClearInputOnceCore(new AppConfig(), new AppLogger(new TestLogger()), ui);
+
+        Assert.AreEqual(ClearInputOnceStatus.ProcessLost, result.Status);
+        StringAssert.Contains(result.ErrorMessage, "modifier_guard_release_failed_fatal");
+        Assert.AreEqual(1, ui.EndModifierIsolationSessionCalls);
     }
 
     private static FakeVoicepeakUiController CreateResolvedUi()

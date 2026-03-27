@@ -38,7 +38,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private int _primedProcessId;
     private IntPtr _primedMainHwnd;
     private int _lastInjectedEnterCount;
-    private int _modifierIsolationSessionDepth;
+    private bool _modifierIsolationSessionActive;
     private uint _modifierIsolationSessionProcessId;
 
     // UI設定とロガーを保持
@@ -546,7 +546,12 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             return;
         }
 
-        _modifierKeyHookController.SetEnabled(false, _log);
+        if (!_modifierKeyHookController.SetEnabled(false, _log))
+        {
+            _log.Warn($"modifier_isolation_disable_failed op={SanitizeForLog(operationName)}");
+            return;
+        }
+
         _log.Info($"modifier_isolation_disabled op={SanitizeForLog(operationName)}");
     }
 
@@ -567,7 +572,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
         lock (_modifierIsolationSessionGate)
         {
-            if (_modifierIsolationSessionDepth > 0)
+            if (_modifierIsolationSessionActive)
             {
                 if (_modifierIsolationSessionProcessId != (uint)voicepeakProcessId)
                 {
@@ -575,8 +580,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                     return false;
                 }
 
-                _modifierIsolationSessionDepth++;
-                _log.Info($"modifier_session_reused op={SanitizeForLog(operationName)} depth={_modifierIsolationSessionDepth}");
+                _log.Info($"modifier_session_reused op={SanitizeForLog(operationName)}");
                 return true;
             }
 
@@ -593,32 +597,35 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             }
 
             _modifierIsolationSessionProcessId = (uint)voicepeakProcessId;
-            _modifierIsolationSessionDepth = 1;
+            _modifierIsolationSessionActive = true;
             _log.Info($"modifier_session_begin op={SanitizeForLog(operationName)} pid={voicepeakProcessId}");
             return true;
         }
     }
 
     // 修飾キー中立化セッション終了
-    public void EndModifierIsolationSession(string operationName)
+    public bool EndModifierIsolationSession(string operationName)
     {
         lock (_modifierIsolationSessionGate)
         {
-            if (_modifierIsolationSessionDepth <= 0)
+            if (!_modifierIsolationSessionActive)
             {
-                return;
+                return true;
             }
 
-            _modifierIsolationSessionDepth--;
-            if (_modifierIsolationSessionDepth > 0)
+            if (!_modifierKeyHookController.SetEnabled(false, _log))
             {
-                _log.Info($"modifier_session_keep op={SanitizeForLog(operationName)} depth={_modifierIsolationSessionDepth}");
-                return;
+                _log.Warn($"modifier_session_end_failed reason=set_enabled_failed op={SanitizeForLog(operationName)}");
+                // 再利用不能としてセッション状態を破棄
+                _modifierIsolationSessionProcessId = 0;
+                _modifierIsolationSessionActive = false;
+                return false;
             }
 
             _modifierIsolationSessionProcessId = 0;
-            _modifierKeyHookController.SetEnabled(false, _log);
+            _modifierIsolationSessionActive = false;
             _log.Info($"modifier_session_end op={SanitizeForLog(operationName)}");
+            return true;
         }
     }
 
@@ -627,7 +634,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     {
         lock (_modifierIsolationSessionGate)
         {
-            return _modifierIsolationSessionDepth > 0 && _modifierIsolationSessionProcessId == processId;
+            return _modifierIsolationSessionActive && _modifierIsolationSessionProcessId == processId;
         }
     }
 
@@ -636,7 +643,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     {
         lock (_modifierIsolationSessionGate)
         {
-            return _modifierIsolationSessionDepth > 0;
+            return _modifierIsolationSessionActive;
         }
     }
 
