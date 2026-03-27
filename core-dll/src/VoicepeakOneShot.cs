@@ -650,6 +650,7 @@ public static class VoicepeakOneShot
         }
     }
 
+    // 対象解決失敗をSpeakOnce結果へ変換
     private static SpeakOnceResult BuildSpeakResolveTargetFailedResult(IVoicepeakUiController ui, AppLogger log)
     {
         int processCount = ui.GetVoicepeakProcessCount();
@@ -669,6 +670,7 @@ public static class VoicepeakOneShot
         return new SpeakOnceResult { Status = SpeakOnceStatus.TargetNotFound, SegmentsExecuted = 0 };
     }
 
+    // 対象解決失敗をValidate結果へ変換
     private static ValidateInputOnceResult BuildValidateInputResolveTargetFailedResult(IVoicepeakUiController ui, AppLogger log)
     {
         int processCount = ui.GetVoicepeakProcessCount();
@@ -688,6 +690,7 @@ public static class VoicepeakOneShot
         return new ValidateInputOnceResult { Status = ValidateInputOnceStatus.TargetNotFound };
     }
 
+    // 対象解決失敗をClearInput結果へ変換
     private static ClearInputOnceResult BuildClearInputResolveTargetFailedResult(IVoicepeakUiController ui, AppLogger log)
     {
         int processCount = ui.GetVoicepeakProcessCount();

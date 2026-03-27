@@ -692,7 +692,7 @@ public class UiControllerTests
                 new TestLogger());
 
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
-            bool ok = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "RunCompositeClearCycle", window.Handle, 2, 3, 0);
+            bool ok = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "RunCompositeClearCycleCore", window.Handle, 2, 3, 0);
             Assert.IsTrue(ok);
             return window.Messages.ToArray();
         });

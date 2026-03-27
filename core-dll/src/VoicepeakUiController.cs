@@ -178,6 +178,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
     }
 
+    // キャッシュpidの妥当性を確認
     private bool IsValidVoicepeakProcess(int pid, out Process process)
     {
         process = null;
@@ -424,12 +425,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return true;
     }
 
-    // 既存テスト互換のため残置
-    private bool RunCompositeClearCycle(IntPtr mainHwnd, int pairCount, int deleteSteps, int actionDelayMs)
-    {
-        return RunCompositeClearCycleCore(mainHwnd, pairCount, deleteSteps, actionDelayMs);
-    }
-
     private static int EstimateVisibleBlockCount(IntPtr mainHwnd)
     {
         if (mainHwnd == IntPtr.Zero)
@@ -555,6 +550,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         _log.Info($"modifier_isolation_disabled op={SanitizeForLog(operationName)}");
     }
 
+    // 修飾キー中立化セッション開始
     public bool BeginModifierIsolationSession(int voicepeakProcessId, string operationName)
     {
         if (voicepeakProcessId <= 0)
@@ -603,6 +599,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
     }
 
+    // 修飾キー中立化セッション終了
     public void EndModifierIsolationSession(string operationName)
     {
         lock (_modifierIsolationSessionGate)
@@ -625,6 +622,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
     }
 
+    // 対象pidでセッション中か判定
     private bool IsModifierIsolationSessionActive(uint processId)
     {
         lock (_modifierIsolationSessionGate)
@@ -633,6 +631,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
     }
 
+    // いずれかのセッションが有効か判定
     private bool IsAnyModifierIsolationSessionActive()
     {
         lock (_modifierIsolationSessionGate)
@@ -641,6 +640,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
     }
 
+    // pidがvoicepeakかを確認
     private static bool IsVoicepeakProcessId(uint processId)
     {
         if (processId == 0)
