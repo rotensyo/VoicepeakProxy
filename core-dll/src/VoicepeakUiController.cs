@@ -33,6 +33,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private readonly ModifierKeyHookController _modifierKeyHookController;
     private readonly object _inputPrimeGate = new object();
     private readonly object _modifierIsolationSessionGate = new object();
+    // 単一操作経路前提のためロックは設けない
+    private int _cachedVoicepeakPid;
     private int _primedProcessId;
     private IntPtr _primedMainHwnd;
     private int _lastInjectedEnterCount;
@@ -76,15 +78,12 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         process = null;
         mainHwnd = IntPtr.Zero;
 
-        Process[] matches = _processApi.GetProcessesByName("voicepeak");
-        if (matches.Length == 0)
+        if (!TryResolveVoicepeakPid(out int pid))
         {
             return false;
         }
 
-        process = matches[0];
-        mainHwnd = _processApi.WaitMainWindowHandle(process, 3000);
-        return mainHwnd != IntPtr.Zero;
+        return TryResolveTargetByPid(pid, out process, out mainHwnd);
     }
 
     public bool TryResolveTargetByPid(int pid, out Process process, out IntPtr mainHwnd)
@@ -111,11 +110,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             {
                 return false;
             }
-
-            if (!string.Equals(process.ProcessName, "voicepeak", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
         }
         catch
         {
@@ -123,13 +117,109 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
 
         mainHwnd = _processApi.WaitMainWindowHandle(process, 3000);
-        return mainHwnd != IntPtr.Zero;
+        if (mainHwnd == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        _cachedVoicepeakPid = process.Id;
+        return true;
     }
 
     public int GetVoicepeakProcessCount()
     {
         Process[] matches = _processApi.GetProcessesByName("voicepeak");
         return matches.Length;
+    }
+
+    // PIDキャッシュを確認し必要時に更新
+    private bool TryResolveVoicepeakPid(out int pid)
+    {
+        pid = 0;
+
+        int cachedPid = _cachedVoicepeakPid;
+        if (cachedPid > 0)
+        {
+            if (IsValidVoicepeakProcess(cachedPid, out Process cachedProcess))
+            {
+                pid = cachedProcess.Id;
+                return true;
+            }
+
+            _cachedVoicepeakPid = 0;
+        }
+
+        Process[] matches = _processApi.GetProcessesByName("voicepeak");
+        if (matches == null || matches.Length != 1)
+        {
+            return false;
+        }
+
+        Process process = matches[0];
+        if (process == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            if (process.HasExited)
+            {
+                return false;
+            }
+
+            pid = process.Id;
+            _cachedVoicepeakPid = pid;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private bool IsValidVoicepeakProcess(int pid, out Process process)
+    {
+        process = null;
+        if (pid <= 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            process = _processApi.GetProcessById(pid);
+            if (process == null || process.HasExited)
+            {
+                return false;
+            }
+
+            Process[] matches = _processApi.GetProcessesByName("voicepeak");
+            if (matches == null || matches.Length == 0)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < matches.Length; i++)
+            {
+                Process candidate = matches[i];
+                if (candidate == null)
+                {
+                    continue;
+                }
+
+                if (candidate.Id == pid)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public bool IsAlive(Process process)
@@ -465,31 +555,25 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         _log.Info($"modifier_isolation_disabled op={SanitizeForLog(operationName)}");
     }
 
-    public bool BeginModifierIsolationSession(IntPtr mainHwnd, string operationName)
+    public bool BeginModifierIsolationSession(int voicepeakProcessId, string operationName)
     {
-        if (mainHwnd == IntPtr.Zero)
-        {
-            _log.Warn($"modifier_session_begin_failed reason=target_hwnd_zero op={SanitizeForLog(operationName)}");
-            return false;
-        }
-
-        GetWindowThreadProcessId(mainHwnd, out uint processId);
-        if (processId == 0)
+        if (voicepeakProcessId <= 0)
         {
             _log.Warn($"modifier_session_begin_failed reason=target_pid_zero op={SanitizeForLog(operationName)}");
             return false;
         }
 
-        if (!IsVoicepeakProcessId(processId))
+        if (!IsVoicepeakProcessId((uint)voicepeakProcessId))
         {
-            return true;
+            _log.Warn($"modifier_session_begin_failed reason=target_process_invalid op={SanitizeForLog(operationName)}");
+            return false;
         }
 
         lock (_modifierIsolationSessionGate)
         {
             if (_modifierIsolationSessionDepth > 0)
             {
-                if (_modifierIsolationSessionProcessId != processId)
+                if (_modifierIsolationSessionProcessId != (uint)voicepeakProcessId)
                 {
                     _log.Warn($"modifier_session_begin_failed reason=process_mismatch op={SanitizeForLog(operationName)}");
                     return false;
@@ -500,7 +584,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 return true;
             }
 
-            if (!_modifierKeyHookController.EnsureInjected((int)processId, _log))
+            if (!_modifierKeyHookController.EnsureInjected(voicepeakProcessId, _log))
             {
                 _log.Warn($"modifier_session_begin_failed reason=ensure_injected_failed op={SanitizeForLog(operationName)}");
                 return false;
@@ -512,9 +596,9 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 return false;
             }
 
-            _modifierIsolationSessionProcessId = processId;
+            _modifierIsolationSessionProcessId = (uint)voicepeakProcessId;
             _modifierIsolationSessionDepth = 1;
-            _log.Info($"modifier_session_begin op={SanitizeForLog(operationName)} pid={processId}");
+            _log.Info($"modifier_session_begin op={SanitizeForLog(operationName)} pid={voicepeakProcessId}");
             return true;
         }
     }

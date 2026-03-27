@@ -32,7 +32,6 @@ internal sealed class VoicepeakEngine : IDisposable
     private volatile bool _shutdownRequested;
     private volatile bool _interruptRequested;
     private WorkerState _state = WorkerState.Idle;
-    private int _preferredVoicepeakPid;
 
     // バックグラウンドワーカーを開始
     public VoicepeakEngine(AppConfig config, CancellationTokenSource appCts, AppLogger log)
@@ -236,7 +235,7 @@ internal sealed class VoicepeakEngine : IDisposable
             return;
         }
 
-        if (!_ui.BeginModifierIsolationSession(hwnd, "runtime_job"))
+        if (!_ui.BeginModifierIsolationSession(process.Id, "runtime_job"))
         {
             DropJob(job, "modifier_guard_unavailable");
             return;
@@ -425,31 +424,7 @@ internal sealed class VoicepeakEngine : IDisposable
 
     private bool TryResolveTarget(out Process process, out IntPtr hwnd)
     {
-        process = null;
-        hwnd = IntPtr.Zero;
-
-        int preferredPid = _preferredVoicepeakPid;
-        if (preferredPid > 0)
-        {
-            if (_ui.TryResolveTargetByPid(preferredPid, out process, out hwnd))
-            {
-                return true;
-            }
-        }
-
-        if (!_ui.TryResolveTarget(out process, out hwnd))
-        {
-            process = null;
-            hwnd = IntPtr.Zero;
-            return false;
-        }
-
-        if (process != null && process.Id > 0)
-        {
-            _preferredVoicepeakPid = process.Id;
-        }
-
-        return true;
+        return _ui.TryResolveTarget(out process, out hwnd);
     }
 
     private bool IsProcessAlive(Process process) => _ui.IsAlive(process);

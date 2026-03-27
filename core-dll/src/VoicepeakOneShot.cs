@@ -115,26 +115,12 @@ public static class VoicepeakOneShot
     {
         string targetText = config.Prepare.BootValidationText ?? string.Empty;
 
-        int processCount = ui.GetVoicepeakProcessCount();
-        if (processCount <= 0)
-        {
-            log.Error("voicepeak.exe が起動していません。");
-            return new ValidateInputOnceResult { Status = ValidateInputOnceStatus.ProcessNotFound };
-        }
-
-        if (processCount > 1)
-        {
-            log.Error($"voicepeak.exe が複数起動しています。1つだけ起動してください。（検出数: {processCount}）");
-            return new ValidateInputOnceResult { Status = ValidateInputOnceStatus.MultipleProcesses };
-        }
-
         if (!ui.TryResolveTarget(out Process process, out IntPtr hwnd))
         {
-            log.Error("対象ウィンドウを取得できませんでした。アプリの状態を確認してください。");
-            return new ValidateInputOnceResult { Status = ValidateInputOnceStatus.TargetNotFound };
+            return BuildValidateInputResolveTargetFailedResult(ui, log);
         }
 
-        if (!ui.BeginModifierIsolationSession(hwnd, "oneshot_validate"))
+        if (!ui.BeginModifierIsolationSession(process.Id, "oneshot_validate"))
         {
             return new ValidateInputOnceResult
             {
@@ -260,26 +246,12 @@ public static class VoicepeakOneShot
         AppLogger log,
         IVoicepeakUiController ui)
     {
-        int processCount = ui.GetVoicepeakProcessCount();
-        if (processCount <= 0)
-        {
-            log.Error("voicepeak.exe が起動していません。");
-            return new ClearInputOnceResult { Status = ClearInputOnceStatus.ProcessNotFound };
-        }
-
-        if (processCount > 1)
-        {
-            log.Error($"voicepeak.exe が複数起動しています。1つだけ起動してください。（検出数: {processCount}）");
-            return new ClearInputOnceResult { Status = ClearInputOnceStatus.MultipleProcesses };
-        }
-
         if (!ui.TryResolveTarget(out Process process, out IntPtr hwnd))
         {
-            log.Error("対象ウィンドウを取得できませんでした。アプリの状態を確認してください。");
-            return new ClearInputOnceResult { Status = ClearInputOnceStatus.TargetNotFound };
+            return BuildClearInputResolveTargetFailedResult(ui, log);
         }
 
-        if (!ui.BeginModifierIsolationSession(hwnd, "oneshot_clear_input"))
+        if (!ui.BeginModifierIsolationSession(process.Id, "oneshot_clear_input"))
         {
             return new ClearInputOnceResult { Status = ClearInputOnceStatus.ClearInputFailed };
         }
@@ -367,26 +339,12 @@ public static class VoicepeakOneShot
 
         log.Info($"job_received jobId={job.JobId} mode={job.Mode} interrupt={job.Interrupt} source=oneshot");
 
-        int processCount = ui.GetVoicepeakProcessCount();
-        if (processCount <= 0)
-        {
-            log.Error("voicepeak.exe が起動していません。");
-            return new SpeakOnceResult { Status = SpeakOnceStatus.ProcessNotFound, SegmentsExecuted = 0 };
-        }
-
-        if (processCount > 1)
-        {
-            log.Error($"voicepeak.exe が複数起動しています。1つだけ起動してください。（検出数: {processCount}）");
-            return new SpeakOnceResult { Status = SpeakOnceStatus.MultipleProcesses, SegmentsExecuted = 0 };
-        }
-
         if (!ui.TryResolveTarget(out Process process, out IntPtr hwnd))
         {
-            log.Error("対象ウィンドウを取得できませんでした。アプリの状態を確認してください。");
-            return new SpeakOnceResult { Status = SpeakOnceStatus.TargetNotFound, SegmentsExecuted = 0 };
+            return BuildSpeakResolveTargetFailedResult(ui, log);
         }
 
-        if (!ui.BeginModifierIsolationSession(hwnd, "oneshot_speak_once"))
+        if (!ui.BeginModifierIsolationSession(process.Id, "oneshot_speak_once"))
         {
             log.Warn($"job_dropped jobId={job.JobId} reason=modifier_guard_unavailable");
             return new SpeakOnceResult { Status = SpeakOnceStatus.PrepareFailed, SegmentsExecuted = 0 };
@@ -530,26 +488,12 @@ public static class VoicepeakOneShot
 
         log.Info($"job_received jobId={job.JobId} mode={job.Mode} interrupt={job.Interrupt} source=oneshot");
 
-        int processCount = ui.GetVoicepeakProcessCount();
-        if (processCount <= 0)
-        {
-            log.Error("voicepeak.exe が起動していません。");
-            return new SpeakOnceResult { Status = SpeakOnceStatus.ProcessNotFound, SegmentsExecuted = 0 };
-        }
-
-        if (processCount > 1)
-        {
-            log.Error($"voicepeak.exe が複数起動しています。1つだけ起動してください。（検出数: {processCount}）");
-            return new SpeakOnceResult { Status = SpeakOnceStatus.MultipleProcesses, SegmentsExecuted = 0 };
-        }
-
         if (!ui.TryResolveTarget(out Process process, out IntPtr hwnd))
         {
-            log.Error("対象ウィンドウを取得できませんでした。アプリの状態を確認してください。");
-            return new SpeakOnceResult { Status = SpeakOnceStatus.TargetNotFound, SegmentsExecuted = 0 };
+            return BuildSpeakResolveTargetFailedResult(ui, log);
         }
 
-        if (!ui.BeginModifierIsolationSession(hwnd, "oneshot_speak_wait"))
+        if (!ui.BeginModifierIsolationSession(process.Id, "oneshot_speak_wait"))
         {
             log.Warn($"job_dropped jobId={job.JobId} reason=modifier_guard_unavailable");
             return new SpeakOnceResult { Status = SpeakOnceStatus.PrepareFailed, SegmentsExecuted = 0 };
@@ -704,6 +648,63 @@ public static class VoicepeakOneShot
 
             Thread.Sleep(config.Audio.PollIntervalMs);
         }
+    }
+
+    private static SpeakOnceResult BuildSpeakResolveTargetFailedResult(IVoicepeakUiController ui, AppLogger log)
+    {
+        int processCount = ui.GetVoicepeakProcessCount();
+        if (processCount <= 0)
+        {
+            log.Error("voicepeak.exe が起動していません。");
+            return new SpeakOnceResult { Status = SpeakOnceStatus.ProcessNotFound, SegmentsExecuted = 0 };
+        }
+
+        if (processCount > 1)
+        {
+            log.Error($"voicepeak.exe が複数起動しています。1つだけ起動してください。（検出数: {processCount}）");
+            return new SpeakOnceResult { Status = SpeakOnceStatus.MultipleProcesses, SegmentsExecuted = 0 };
+        }
+
+        log.Error("対象ウィンドウを取得できませんでした。アプリの状態を確認してください。");
+        return new SpeakOnceResult { Status = SpeakOnceStatus.TargetNotFound, SegmentsExecuted = 0 };
+    }
+
+    private static ValidateInputOnceResult BuildValidateInputResolveTargetFailedResult(IVoicepeakUiController ui, AppLogger log)
+    {
+        int processCount = ui.GetVoicepeakProcessCount();
+        if (processCount <= 0)
+        {
+            log.Error("voicepeak.exe が起動していません。");
+            return new ValidateInputOnceResult { Status = ValidateInputOnceStatus.ProcessNotFound };
+        }
+
+        if (processCount > 1)
+        {
+            log.Error($"voicepeak.exe が複数起動しています。1つだけ起動してください。（検出数: {processCount}）");
+            return new ValidateInputOnceResult { Status = ValidateInputOnceStatus.MultipleProcesses };
+        }
+
+        log.Error("対象ウィンドウを取得できませんでした。アプリの状態を確認してください。");
+        return new ValidateInputOnceResult { Status = ValidateInputOnceStatus.TargetNotFound };
+    }
+
+    private static ClearInputOnceResult BuildClearInputResolveTargetFailedResult(IVoicepeakUiController ui, AppLogger log)
+    {
+        int processCount = ui.GetVoicepeakProcessCount();
+        if (processCount <= 0)
+        {
+            log.Error("voicepeak.exe が起動していません。");
+            return new ClearInputOnceResult { Status = ClearInputOnceStatus.ProcessNotFound };
+        }
+
+        if (processCount > 1)
+        {
+            log.Error($"voicepeak.exe が複数起動しています。1つだけ起動してください。（検出数: {processCount}）");
+            return new ClearInputOnceResult { Status = ClearInputOnceStatus.MultipleProcesses };
+        }
+
+        log.Error("対象ウィンドウを取得できませんでした。アプリの状態を確認してください。");
+        return new ClearInputOnceResult { Status = ClearInputOnceStatus.TargetNotFound };
     }
 
     private enum StartConfirmResult

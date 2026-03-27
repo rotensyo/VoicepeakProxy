@@ -28,7 +28,7 @@ internal interface IVoicepeakUiController
     bool MoveToStart(IntPtr mainHwnd, int actionDelayMs);
     bool PressDelete(IntPtr mainHwnd);
     bool KillFocus(IntPtr mainHwnd);
-    bool BeginModifierIsolationSession(IntPtr mainHwnd, string operationName);
+    bool BeginModifierIsolationSession(int voicepeakProcessId, string operationName);
     void EndModifierIsolationSession(string operationName);
     ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd);
 }
