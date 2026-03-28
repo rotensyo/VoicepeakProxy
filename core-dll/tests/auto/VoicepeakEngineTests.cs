@@ -442,9 +442,9 @@ public class VoicepeakEngineTests
     }
 
     [TestMethod]
-    public void BootValidate_PrefersPreferredPidBeforeFallback()
+    public void BootValidate_UsesResolveTargetPath()
     {
-        // 起動検証で優先pidを先に試行
+        // 起動検証で通常の対象解決を使用
         FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
         Process current = Process.GetCurrentProcess();
         int byPidCalls = 0;
@@ -466,13 +466,12 @@ public class VoicepeakEngineTests
 
         using CancellationTokenSource cts = new CancellationTokenSource();
         VoicepeakEngine engine = new VoicepeakEngine(config, cts, new AppLogger(new TestLogger()), ui, new FakeAudioSessionReader(), false);
-        ReflectionTestHelper.SetField(engine, "_preferredVoicepeakPid", current.Id);
 
         bool result = engine.BootValidate(BootValidationMode.Required);
 
         Assert.IsTrue(result);
-        Assert.AreEqual(1, byPidCalls);
-        Assert.AreEqual(0, fallbackCalls);
+        Assert.AreEqual(0, byPidCalls);
+        Assert.AreEqual(1, fallbackCalls);
     }
 
     private static VoicepeakEngine CreateEngine(FakeVoicepeakUiController ui = null, FakeAudioSessionReader audio = null, TestLogger logger = null, CancellationTokenSource appCts = null)

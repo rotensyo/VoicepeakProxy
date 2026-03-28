@@ -17,8 +17,11 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
     public Func<IntPtr, int, bool> MoveToStartHandler { get; set; } = (_, _) => true;
     public Func<IntPtr, bool> PressDeleteHandler { get; set; } = _ => true;
     public Func<IntPtr, bool> KillFocusHandler { get; set; } = _ => true;
+    public Func<int, string, bool> BeginModifierIsolationSessionHandler { get; set; } = (_, _) => true;
+    public Func<string, bool> EndModifierIsolationSessionHandler { get; set; } = _ => true;
     public Func<IntPtr, ReadInputResult> ReadInputHandler { get; set; }
         = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA);
+    public Func<ResolveTargetResult> ResolveTargetDetailedHandler { get; set; } = null;
     public Func<int, (bool Success, Process Process, IntPtr Hwnd)> ResolveByPidHandler { get; set; }
         = _ => (false, null, IntPtr.Zero);
     public Func<(bool Success, Process Process, IntPtr Hwnd)> ResolveTargetHandler { get; set; }
@@ -37,6 +40,10 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
     public int MoveToStartCalls { get; private set; }
     public int PressDeleteCalls { get; private set; }
     public int KillFocusCalls { get; private set; }
+    public int BeginModifierIsolationSessionCalls { get; private set; }
+    public int EndModifierIsolationSessionCalls { get; private set; }
+    public int GetVoicepeakProcessCountCalls { get; private set; }
+    public int TryResolveTargetDetailedCalls { get; private set; }
 
     public bool TryResolveTarget(out Process process, out IntPtr mainHwnd)
     {
@@ -54,7 +61,49 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
         return success;
     }
 
-    public int GetVoicepeakProcessCount() => ProcessCountHandler();
+    public int GetVoicepeakProcessCount()
+    {
+        GetVoicepeakProcessCountCalls++;
+        return ProcessCountHandler();
+    }
+
+    // 失敗理由付きの対象解決を模擬
+    public ResolveTargetResult TryResolveTargetDetailed()
+    {
+        TryResolveTargetDetailedCalls++;
+        if (ResolveTargetDetailedHandler != null)
+        {
+            return ResolveTargetDetailedHandler();
+        }
+
+        (bool success, Process resolvedProcess, IntPtr resolvedHwnd) = ResolveTargetHandler();
+        if (success)
+        {
+            return new ResolveTargetResult
+            {
+                Success = true,
+                Process = resolvedProcess,
+                MainHwnd = resolvedHwnd,
+                FailureReason = ResolveTargetFailureReason.None,
+                ProcessCount = 1
+            };
+        }
+
+        int processCount = GetVoicepeakProcessCount();
+        ResolveTargetFailureReason reason = processCount <= 0
+            ? ResolveTargetFailureReason.ProcessNotFound
+            : processCount > 1
+                ? ResolveTargetFailureReason.MultipleProcesses
+                : ResolveTargetFailureReason.TargetNotFound;
+        return new ResolveTargetResult
+        {
+            Success = false,
+            Process = null,
+            MainHwnd = IntPtr.Zero,
+            FailureReason = reason,
+            ProcessCount = processCount
+        };
+    }
 
     public bool IsAlive(Process process) => IsAliveHandler(process);
 
@@ -126,6 +175,20 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
         KillFocusCalls++;
         CallLog.Add("kill_focus");
         return KillFocusHandler(mainHwnd);
+    }
+
+    public bool BeginModifierIsolationSession(int voicepeakProcessId, string operationName)
+    {
+        BeginModifierIsolationSessionCalls++;
+        CallLog.Add("modifier_session_begin");
+        return BeginModifierIsolationSessionHandler(voicepeakProcessId, operationName);
+    }
+
+    public bool EndModifierIsolationSession(string operationName)
+    {
+        EndModifierIsolationSessionCalls++;
+        CallLog.Add("modifier_session_end");
+        return EndModifierIsolationSessionHandler(operationName);
     }
 
     public ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd) => ReadInputHandler(mainHwnd);

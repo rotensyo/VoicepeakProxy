@@ -30,10 +30,16 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private readonly Dictionary<char, List<SentenceBreakTrigger>> _sentenceBreakTriggerIndex;
     private readonly AppLogger _log;
     private readonly IVoicepeakProcessApi _processApi;
+    private readonly ModifierKeyHookController _modifierKeyHookController;
     private readonly object _inputPrimeGate = new object();
-    private int _primedProcessId;
-    private IntPtr _primedMainHwnd;
-    private int _lastInjectedEnterCount;
+    private readonly object _modifierIsolationSessionGate = new object();
+    // 単一操作経路前提のためロックは設けない
+    private int _cachedVoicepeakPid;  // 直近で解決できたvoicepeakプロセスIDのキャッシュ
+    private int _primedProcessId;  // 事前クリックを最後に行ったプロセスID
+    private IntPtr _primedMainHwnd;  // prime済みメインウィンドウハンドル
+    private int _lastInjectedEnterCount;  // 入力ブロック区切りに押下したEnter回数
+    private bool _modifierIsolationSessionActive;  // 修飾キー有効/無効の状態
+    private uint _modifierIsolationSessionProcessId;  // 修飾キー無効化対象プロセスID
 
     // UI設定とロガーを保持
     public VoicepeakUiController(UiConfig ui, DebugConfig debug, AppLogger log)
@@ -58,6 +64,10 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         _debug = debug ?? new DebugConfig();
         _log = log;
         _processApi = processApi ?? new DefaultVoicepeakProcessApi();
+        _modifierKeyHookController = new ModifierKeyHookController(
+            _prepare.HookCommandTimeoutMs,
+            _prepare.HookConnectTimeoutMs,
+            _prepare.HookConnectTotalWaitMs);
         _sentenceBreakTriggerIndex = BuildSentenceBreakTriggerIndex(ui);
         WarnIfMoveToStartShortcutWillUseSequentialFallback(_ui.MoveToStartShortcut);
     }
@@ -65,20 +75,50 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     // 対象プロセスとメインウィンドウを解決
     public bool TryResolveTarget(out Process process, out IntPtr mainHwnd)
     {
-        process = null;
-        mainHwnd = IntPtr.Zero;
-
-        Process[] matches = _processApi.GetProcessesByName("voicepeak");
-        if (matches.Length == 0)
-        {
-            return false;
-        }
-
-        process = matches[0];
-        mainHwnd = _processApi.WaitMainWindowHandle(process, 3000);
-        return mainHwnd != IntPtr.Zero;
+        ResolveTargetResult resolved = TryResolveTargetDetailed();
+        process = resolved.Process;
+        mainHwnd = resolved.MainHwnd;
+        return resolved.Success;
     }
 
+    // 対象解決と失敗理由を同時に返す
+    public ResolveTargetResult TryResolveTargetDetailed()
+    {
+        if (!TryResolveVoicepeakPidDetailed(out int pid, out ResolveTargetFailureReason reason, out int processCount))
+        {
+            return new ResolveTargetResult
+            {
+                Success = false,
+                FailureReason = reason,
+                ProcessCount = processCount,
+                Process = null,
+                MainHwnd = IntPtr.Zero
+            };
+        }
+
+        if (!TryResolveTargetByPid(pid, out Process process, out IntPtr mainHwnd))
+        {
+            return new ResolveTargetResult
+            {
+                Success = false,
+                FailureReason = ResolveTargetFailureReason.TargetNotFound,
+                ProcessCount = processCount,
+                Process = null,
+                MainHwnd = IntPtr.Zero
+            };
+        }
+
+        return new ResolveTargetResult
+        {
+            Success = true,
+            FailureReason = ResolveTargetFailureReason.None,
+            ProcessCount = processCount,
+            Process = process,
+            MainHwnd = mainHwnd
+        };
+    }
+
+    // 対象プロセスとウィンドウをpidから取得
     public bool TryResolveTargetByPid(int pid, out Process process, out IntPtr mainHwnd)
     {
         process = null;
@@ -103,11 +143,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             {
                 return false;
             }
-
-            if (!string.Equals(process.ProcessName, "voicepeak", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
         }
         catch
         {
@@ -115,13 +150,132 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
 
         mainHwnd = _processApi.WaitMainWindowHandle(process, 3000);
-        return mainHwnd != IntPtr.Zero;
+        if (mainHwnd == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        _cachedVoicepeakPid = process.Id;
+        return true;
     }
 
     public int GetVoicepeakProcessCount()
     {
         Process[] matches = _processApi.GetProcessesByName("voicepeak");
         return matches.Length;
+    }
+
+    // PIDキャッシュを確認し必要時に更新
+    private bool TryResolveVoicepeakPid(out int pid)
+    {
+        return TryResolveVoicepeakPidDetailed(out pid, out _, out _);
+    }
+
+    // PID解決と失敗理由を同時に返す
+    private bool TryResolveVoicepeakPidDetailed(out int pid, out ResolveTargetFailureReason reason, out int processCount)
+    {
+        pid = 0;
+        reason = ResolveTargetFailureReason.TargetNotFound;
+        processCount = 0;
+
+        int cachedPid = _cachedVoicepeakPid;
+        if (cachedPid > 0)
+        {
+            if (IsValidVoicepeakProcess(cachedPid, out Process cachedProcess))
+            {
+                pid = cachedProcess.Id;
+                processCount = 1;
+                reason = ResolveTargetFailureReason.None;
+                return true;
+            }
+
+            _cachedVoicepeakPid = 0;
+        }
+
+        Process[] matches = _processApi.GetProcessesByName("voicepeak");
+        processCount = matches?.Length ?? 0;
+        if (processCount <= 0)
+        {
+            reason = ResolveTargetFailureReason.ProcessNotFound;
+            return false;
+        }
+
+        if (processCount > 1)
+        {
+            reason = ResolveTargetFailureReason.MultipleProcesses;
+            return false;
+        }
+
+        Process process = matches[0];
+        if (process == null)
+        {
+            reason = ResolveTargetFailureReason.TargetNotFound;
+            return false;
+        }
+
+        try
+        {
+            if (process.HasExited)
+            {
+                reason = ResolveTargetFailureReason.TargetNotFound;
+                return false;
+            }
+
+            pid = process.Id;
+            _cachedVoicepeakPid = pid;
+            reason = ResolveTargetFailureReason.None;
+            return true;
+        }
+        catch
+        {
+            reason = ResolveTargetFailureReason.TargetNotFound;
+            return false;
+        }
+    }
+
+    // キャッシュpidの妥当性を確認
+    private bool IsValidVoicepeakProcess(int pid, out Process process)
+    {
+        process = null;
+        if (pid <= 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            process = _processApi.GetProcessById(pid);
+            if (process == null || process.HasExited)
+            {
+                return false;
+            }
+
+            Process[] matches = _processApi.GetProcessesByName("voicepeak");
+            if (matches == null || matches.Length == 0)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < matches.Length; i++)
+            {
+                Process candidate = matches[i];
+                if (candidate == null)
+                {
+                    continue;
+                }
+
+                if (candidate.Id == pid)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public bool IsAlive(Process process)
@@ -186,7 +340,10 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
                 int pairCount = Math.Max(1, before.VisibleBlockCount + 1);
                 int deleteSteps = ComputeCompositeDeleteSteps(before.Read, before.VisibleBlockCount);
-                if (!RunCompositeClearCycle(mainHwnd, pairCount, deleteSteps, actionDelayMs))
+                if (!ExecuteWithModifierIsolation(mainHwnd, "composite_clear_cycle", action: () =>
+                {
+                    return RunCompositeClearCycleCore(mainHwnd, pairCount, deleteSteps, actionDelayMs);
+                }))
                 {
                     return false;
                 }
@@ -210,12 +367,20 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             }
 
             int clearSteps = ComputeNonCompositeDeleteSteps(before.Read, before.VisibleBlockCount);
-            for (int i = 0; i < clearSteps; i++)
+            if (!ExecuteWithModifierIsolation(mainHwnd, "clear_input_delete_loop", action: () =>
             {
-                if (!PressDelete(mainHwnd))
+                for (int i = 0; i < clearSteps; i++)
                 {
-                    return false;
+                    if (!PressDeleteCore(mainHwnd))
+                    {
+                        return false;
+                    }
                 }
+
+                return true;
+            }))
+            {
+                return false;
             }
 
             ClearInputState after = ReadClearInputState(mainHwnd);
@@ -272,7 +437,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return Math.Max(10, baseLength + 10 + inputBoxCount);
     }
 
-    private bool RunCompositeClearCycle(IntPtr mainHwnd, int pairCount, int deleteSteps, int actionDelayMs)
+    private bool RunCompositeClearCycleCore(IntPtr mainHwnd, int pairCount, int deleteSteps, int actionDelayMs)
     {
         if (!FocusInputForKeyboardIfNeeded(mainHwnd, actionDelayMs))
         {
@@ -306,7 +471,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         int actualDeletes = Math.Max(0, deleteSteps);
         for (int i = 0; i < actualDeletes; i++)
         {
-            if (!PressDelete(mainHwnd))
+            if (!PressDeleteCore(mainHwnd))
             {
                 return false;
             }
@@ -315,6 +480,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return true;
     }
 
+    // 可視状態の入力ブロック数を取得
     private static int EstimateVisibleBlockCount(IntPtr mainHwnd)
     {
         if (mainHwnd == IntPtr.Zero)
@@ -339,12 +505,280 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     {
         string send = text ?? string.Empty;
         HashSet<int> enterPositions = ComputeSentenceBreakEnterPositions(send);
-        int injectedEnterCount = 0;
+        if (mainHwnd == IntPtr.Zero)
+        {
+            _log.Warn("type_text_target_resolve_failed reason=main_hwnd_zero");
+            return false;
+        }
+
+        bool modifierIsolationEnabled = false;
+        bool statsProbeEnabled = _debug.LogModifierHookStats;
+        bool statsProbeStarted = false;
+        try
+        {
+            modifierIsolationEnabled = TryEnableModifierKeyIsolation(mainHwnd, "type_text");
+            if (!modifierIsolationEnabled)
+            {
+                _log.Warn("modifier_guard_unavailable op=type_text");
+                return false;
+            }
+
+            if (statsProbeEnabled && modifierIsolationEnabled)
+            {
+                _modifierKeyHookController.BeginStatsProbe(_log);
+                statsProbeStarted = true;
+            }
+
+            if (!TryTypeTextByWindowMessages(mainHwnd, send, enterPositions, charDelayMs, out int messageEnterCount))
+            {
+                _log.Warn($"type_text_target_send_failed reason=wm_char_failed hwnd=0x{mainHwnd.ToInt64():X}");
+                return false;
+            }
+
+            _lastInjectedEnterCount = messageEnterCount;
+            _log.Info($"type_text_route_selected route=wm_char_only enterCount={messageEnterCount}");
+            return true;
+        }
+        finally
+        {
+            if (statsProbeEnabled && statsProbeStarted)
+            {
+                _modifierKeyHookController.EndStatsProbe(_log);
+                LogModifierHookStatsIfEnabled();
+            }
+
+            if (modifierIsolationEnabled)
+            {
+                DisableModifierKeyIsolation("type_text");
+            }
+        }
+    }
+
+    // 修飾キー中立化フックを有効化
+    private bool TryEnableModifierKeyIsolation(IntPtr targetHwnd, string operationName)
+    {
+        if (targetHwnd == IntPtr.Zero)
+        {
+            _log.Warn($"modifier_hook_enable_failed reason=target_hwnd_zero op={SanitizeForLog(operationName)}");
+            return false;
+        }
+
+        GetWindowThreadProcessId(targetHwnd, out uint processId);
+        if (processId == 0)
+        {
+            _log.Warn($"modifier_hook_enable_failed reason=target_pid_zero op={SanitizeForLog(operationName)}");
+            return false;
+        }
+
+        if (!IsVoicepeakProcessId(processId))
+        {
+            return true;
+        }
+
+        if (IsModifierIsolationSessionActive(processId))
+        {
+            return true;
+        }
+
+        if (!_modifierKeyHookController.EnsureInjected((int)processId, _log))
+        {
+            return false;
+        }
+
+        if (!_modifierKeyHookController.SetEnabled(true, _log))
+        {
+            return false;
+        }
+
+        _log.Info($"modifier_isolation_enabled op={SanitizeForLog(operationName)} pid={processId}");
+        return true;
+    }
+
+    // 修飾キー中立化フックを無効化
+    private void DisableModifierKeyIsolation(string operationName)
+    {
+        if (IsAnyModifierIsolationSessionActive())
+        {
+            return;
+        }
+
+        if (!_modifierKeyHookController.SetEnabled(false, _log))
+        {
+            _log.Warn($"modifier_isolation_disable_failed op={SanitizeForLog(operationName)}");
+            return;
+        }
+
+        _log.Info($"modifier_isolation_disabled op={SanitizeForLog(operationName)}");
+    }
+
+    // 修飾キー中立化セッション開始
+    public bool BeginModifierIsolationSession(int voicepeakProcessId, string operationName)
+    {
+        if (voicepeakProcessId <= 0)
+        {
+            _log.Warn($"modifier_session_begin_failed reason=target_pid_zero op={SanitizeForLog(operationName)}");
+            return false;
+        }
+
+        if (!IsVoicepeakProcessId((uint)voicepeakProcessId))
+        {
+            _log.Warn($"modifier_session_begin_failed reason=target_process_invalid op={SanitizeForLog(operationName)}");
+            return false;
+        }
+
+        lock (_modifierIsolationSessionGate)
+        {
+            if (_modifierIsolationSessionActive)
+            {
+                if (_modifierIsolationSessionProcessId != (uint)voicepeakProcessId)
+                {
+                    _log.Warn($"modifier_session_begin_failed reason=process_mismatch op={SanitizeForLog(operationName)}");
+                    return false;
+                }
+
+                _log.Info($"modifier_session_reused op={SanitizeForLog(operationName)}");
+                return true;
+            }
+
+            if (!_modifierKeyHookController.EnsureInjected(voicepeakProcessId, _log))
+            {
+                _log.Warn($"modifier_session_begin_failed reason=ensure_injected_failed op={SanitizeForLog(operationName)}");
+                return false;
+            }
+
+            if (!_modifierKeyHookController.SetEnabled(true, _log))
+            {
+                _log.Warn($"modifier_session_begin_failed reason=set_enabled_failed op={SanitizeForLog(operationName)}");
+                return false;
+            }
+
+            _modifierIsolationSessionProcessId = (uint)voicepeakProcessId;
+            _modifierIsolationSessionActive = true;
+            _log.Info($"modifier_session_begin op={SanitizeForLog(operationName)} pid={voicepeakProcessId}");
+            return true;
+        }
+    }
+
+    // 修飾キー中立化セッション終了
+    public bool EndModifierIsolationSession(string operationName)
+    {
+        lock (_modifierIsolationSessionGate)
+        {
+            if (!_modifierIsolationSessionActive)
+            {
+                return true;
+            }
+
+            if (!_modifierKeyHookController.SetEnabled(false, _log))
+            {
+                _log.Warn($"modifier_session_end_failed reason=set_enabled_failed op={SanitizeForLog(operationName)}");
+                // 再利用不能としてセッション状態を破棄
+                _modifierIsolationSessionProcessId = 0;
+                _modifierIsolationSessionActive = false;
+                return false;
+            }
+
+            _modifierIsolationSessionProcessId = 0;
+            _modifierIsolationSessionActive = false;
+            _log.Info($"modifier_session_end op={SanitizeForLog(operationName)}");
+            return true;
+        }
+    }
+
+    // 対象pidでセッション中か判定
+    private bool IsModifierIsolationSessionActive(uint processId)
+    {
+        lock (_modifierIsolationSessionGate)
+        {
+            return _modifierIsolationSessionActive && _modifierIsolationSessionProcessId == processId;
+        }
+    }
+
+    // いずれかのセッションが有効か判定
+    private bool IsAnyModifierIsolationSessionActive()
+    {
+        lock (_modifierIsolationSessionGate)
+        {
+            return _modifierIsolationSessionActive;
+        }
+    }
+
+    // pidがvoicepeakかを確認
+    private static bool IsVoicepeakProcessId(uint processId)
+    {
+        if (processId == 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            Process process = Process.GetProcessById((int)processId);
+            return string.Equals(process.ProcessName, "voicepeak", StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    // 指定操作を修飾キー中立化フックで保護
+    private bool ExecuteWithModifierIsolation(IntPtr targetHwnd, string operationName, Func<bool> action)
+    {
+        bool modifierIsolationEnabled = false;
+        try
+        {
+            modifierIsolationEnabled = TryEnableModifierKeyIsolation(targetHwnd, operationName);
+            if (!modifierIsolationEnabled)
+            {
+                _log.Warn($"modifier_guard_unavailable op={SanitizeForLog(operationName)}");
+                return false;
+            }
+
+            return action();
+        }
+        finally
+        {
+            if (modifierIsolationEnabled)
+            {
+                DisableModifierKeyIsolation(operationName);
+            }
+        }
+    }
+
+    // フック統計をデバッグ時のみ出力
+    private void LogModifierHookStatsIfEnabled()
+    {
+        if (!_debug.LogModifierHookStats)
+        {
+            return;
+        }
+
+        ModifierHookStatsSnapshot snapshot = _modifierKeyHookController.GetStatsSnapshot(_log);
+        if (snapshot == null)
+        {
+            _log.Debug("modifier_hook_stats unavailable=true");
+            return;
+        }
+
+        _log.Debug(
+            "modifier_hook_stats " +
+            $"get_key_state={snapshot.GetKeyStateCalls} " +
+            $"get_async_key_state={snapshot.GetAsyncKeyStateCalls} " +
+            $"get_keyboard_state={snapshot.GetKeyboardStateCalls} " +
+            $"modifier_queries={snapshot.ModifierQueries} " +
+            $"neutralized={snapshot.NeutralizedCalls} " +
+            $"thread_calls={snapshot.ThreadCallSummary}");
+    }
+
+    // WM_CHARとEnter送信で入力
+    private bool TryTypeTextByWindowMessages(IntPtr targetHwnd, string send, HashSet<int> enterPositions, int charDelayMs, out int injectedEnterCount)
+    {
+        injectedEnterCount = 0;
         for (int i = 0; i < send.Length; i++)
         {
-            char c = send[i];
             bool isLastCharInSegment = i == send.Length - 1;
-            if (!SendChar(mainHwnd, c))
+            if (!SendChar(targetHwnd, send[i]))
             {
                 return false;
             }
@@ -354,56 +788,64 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 Thread.Sleep(charDelayMs);
             }
 
-            // セグメント末尾では改行を抑止
             if (!isLastCharInSegment && enterPositions.Contains(i))
             {
-                if (!SendKey(mainHwnd, VirtualKey.Return))
+                if (!SendKey(targetHwnd, VirtualKey.Return))
                 {
                     return false;
                 }
 
                 injectedEnterCount++;
-
                 if (charDelayMs > 0)
                 {
                     Thread.Sleep(charDelayMs);
                 }
             }
         }
-
-        _lastInjectedEnterCount = injectedEnterCount;
-
         return true;
     }
 
     // 再生ショートカットを送信
     public bool PressPlay(IntPtr mainHwnd)
     {
-        if (!KillFocus(mainHwnd))
+        return ExecuteWithModifierIsolation(mainHwnd, "press_play", action: () =>
         {
-            return false;
-        }
+            if (!KillFocusCore(mainHwnd))
+            {
+                return false;
+            }
 
-        if (_ui.DelayBeforePlayShortcutMs > 0)
-        {
-            Thread.Sleep(_ui.DelayBeforePlayShortcutMs);
-        }
+            if (_ui.DelayBeforePlayShortcutMs > 0)
+            {
+                Thread.Sleep(_ui.DelayBeforePlayShortcutMs);
+            }
 
-        return SendShortcut(mainHwnd, _ui.PlayShortcut);
+            return SendShortcut(mainHwnd, _ui.PlayShortcut);
+        });
     }
 
     public bool MoveToStart(IntPtr mainHwnd, int actionDelayMs)
     {
-        SleepActionDelay(actionDelayMs);
-        if (IsFunctionKeyMoveToStartShortcut(_ui.MoveToStartShortcut))
+        return ExecuteWithModifierIsolation(mainHwnd, "move_to_start", action: () =>
         {
-            return SendShortcut(mainHwnd, _ui.MoveToStartShortcut);
-        }
+            SleepActionDelay(actionDelayMs);
+            if (IsFunctionKeyMoveToStartShortcut(_ui.MoveToStartShortcut))
+            {
+                return SendShortcut(mainHwnd, _ui.MoveToStartShortcut);
+            }
 
             return SendCompositeMoveToStart(mainHwnd, actionDelayMs);
-        }
+        });
+    }
 
     public bool PressDelete(IntPtr mainHwnd)
+    {
+        return ExecuteWithModifierIsolation(mainHwnd, "press_delete", action: () =>
+            PressDeleteCore(mainHwnd));
+    }
+
+    // Deleteキー送信の共通実体
+    private bool PressDeleteCore(IntPtr mainHwnd)
     {
         bool sent = SendKey(mainHwnd, VirtualKey.Delete);
         if (!sent)
@@ -421,12 +863,30 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
     public bool KillFocus(IntPtr mainHwnd)
     {
+        return ExecuteWithModifierIsolation(mainHwnd, "kill_focus", action: () =>
+            KillFocusCore(mainHwnd));
+    }
+
+    // KillFocus送信の共通実体
+    private bool KillFocusCore(IntPtr mainHwnd)
+    {
         return SendWindowMessage(mainHwnd, WmKillFocus, IntPtr.Zero, IntPtr.Zero);
     }
 
     internal static bool IsValidShortcut(string raw)
     {
         return ShortcutSpec.TryParse(raw, out _);
+    }
+
+    // 再生ショートカットは修飾なしキーのみ許可
+    internal static bool IsValidPlayShortcut(string raw)
+    {
+        if (!ShortcutSpec.TryParse(raw, out ShortcutSpec spec))
+        {
+            return false;
+        }
+
+        return !spec.Control && !spec.Shift && !spec.Alt;
     }
 
     internal static bool IsValidMoveToStartShortcut(string raw)
@@ -484,38 +944,12 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             return false;
         }
 
-        List<VirtualKey> downs = new List<VirtualKey>();
-        try
+        if (spec.Control || spec.Shift || spec.Alt)
         {
-            if (spec.Control)
-            {
-                SendKeyDown(hwnd, VirtualKey.Control);
-                downs.Add(VirtualKey.Control);
-            }
-
-            if (spec.Shift)
-            {
-                SendKeyDown(hwnd, VirtualKey.Shift);
-                downs.Add(VirtualKey.Shift);
-            }
-
-            if (spec.Alt)
-            {
-                SendKeyDown(hwnd, VirtualKey.Menu);
-                downs.Add(VirtualKey.Menu);
-            }
-
-            SendKeyDown(hwnd, spec.Key);
-            SendKeyUp(hwnd, spec.Key);
-            return true;
+            return false;
         }
-        finally
-        {
-            for (int i = downs.Count - 1; i >= 0; i--)
-            {
-                SendKeyUp(hwnd, downs[i]);
-            }
-        }
+
+        return SendKeyDown(hwnd, spec.Key) && SendKeyUp(hwnd, spec.Key);
     }
 
     private bool SendKey(IntPtr hwnd, VirtualKey key)

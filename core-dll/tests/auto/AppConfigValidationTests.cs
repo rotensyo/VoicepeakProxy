@@ -23,6 +23,9 @@ public class AppConfigValidationTests
         Assert.AreEqual(5, config.Prepare.SequentialMoveToStartKeyDelayBaseMs);
         Assert.AreEqual(1, config.Prepare.DeleteKeyDelayBaseMs);
         Assert.AreEqual(20, config.Prepare.ClearInputMaxPasses);
+        Assert.AreEqual(500, config.Prepare.HookCommandTimeoutMs);
+        Assert.AreEqual(300, config.Prepare.HookConnectTimeoutMs);
+        Assert.AreEqual(8000, config.Prepare.HookConnectTotalWaitMs);
         Assert.AreEqual("Ctrl+Up", config.Ui.MoveToStartShortcut);
         Assert.IsTrue(config.Ui.ClickAtValidationEnabled);
         Assert.IsFalse(config.Ui.ClickBeforeTextFocusWhenUninitializedEnabled);
@@ -79,6 +82,9 @@ public class AppConfigValidationTests
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.SequentialMoveToStartKeyDelayBaseMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.DeleteKeyDelayBaseMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.ClearInputMaxPasses = 0));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.HookCommandTimeoutMs = 0));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.HookConnectTimeoutMs = 0));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.HookConnectTotalWaitMs = 0));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Ui.DelayBeforePlayShortcutMs = -1));
     }
 
@@ -105,6 +111,16 @@ public class AppConfigValidationTests
         // 再生ショートカット不正を拒否
         InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
             ValidateWith(config => config.Ui.PlayShortcut = "Delete"));
+
+        StringAssert.Contains(ex.Message, "ui.playShortcut");
+    }
+
+    [TestMethod]
+    public void Validate_ModifierPlayShortcut_Throws()
+    {
+        // 修飾付き再生ショートカットを拒否
+        InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
+            ValidateWith(config => config.Ui.PlayShortcut = "Ctrl+F4"));
 
         StringAssert.Contains(ex.Message, "ui.playShortcut");
     }
@@ -185,6 +201,9 @@ public class AppConfigValidationTests
             config.Prepare.SequentialMoveToStartKeyDelayBaseMs = 0;
             config.Prepare.DeleteKeyDelayBaseMs = 0;
             config.Prepare.ClearInputMaxPasses = 1;
+            config.Prepare.HookCommandTimeoutMs = 1;
+            config.Prepare.HookConnectTimeoutMs = 1;
+            config.Prepare.HookConnectTotalWaitMs = 1;
             config.Ui.DelayBeforePlayShortcutMs = 0;
         });
     }

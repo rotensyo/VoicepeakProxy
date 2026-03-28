@@ -19,6 +19,60 @@ public class VoicepeakOneShotCoreTests
     }
 
     [TestMethod]
+    public void SpeakOnceCore_TargetResolveFailure_DoesNotRecountProcess()
+    {
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ResolveTargetDetailedHandler = () => new ResolveTargetResult
+            {
+                Success = false,
+                FailureReason = ResolveTargetFailureReason.ProcessNotFound,
+                ProcessCount = 0
+            },
+            ProcessCountHandler = () => 99
+        };
+
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(
+            CreateConfig(),
+            new SpeakOnceRequest { Text = "A" },
+            new AppLogger(new TestLogger()),
+            RequestValidationMode.Strict,
+            ui,
+            new FakeAudioSessionReader());
+
+        Assert.AreEqual(SpeakOnceStatus.ProcessNotFound, result.Status);
+        Assert.AreEqual(0, ui.GetVoicepeakProcessCountCalls);
+        Assert.AreEqual(1, ui.TryResolveTargetDetailedCalls);
+    }
+
+    [TestMethod]
+    public void SpeakOnceWaitCore_TargetResolveFailure_DoesNotRecountProcess()
+    {
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ResolveTargetDetailedHandler = () => new ResolveTargetResult
+            {
+                Success = false,
+                FailureReason = ResolveTargetFailureReason.ProcessNotFound,
+                ProcessCount = 0
+            },
+            ProcessCountHandler = () => 99
+        };
+
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(
+            CreateConfig(),
+            new SpeakOnceRequest { Text = "A" },
+            new AppLogger(new TestLogger()),
+            RequestValidationMode.Strict,
+            ui,
+            new FakeAudioSessionReader());
+
+        Assert.AreEqual(SpeakOnceStatus.ProcessNotFound, result.Status);
+        Assert.AreEqual(0, ui.GetVoicepeakProcessCountCalls);
+        Assert.AreEqual(1, ui.TryResolveTargetDetailedCalls);
+    }
+
+    [TestMethod]
     public void SpeakOnceWaitCore_InvalidRequest_ReturnsStatusAndMessage()
     {
         SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(CreateConfig(), null, new AppLogger(new TestLogger()), RequestValidationMode.Strict, new FakeVoicepeakUiController(), new FakeAudioSessionReader());
@@ -46,6 +100,28 @@ public class VoicepeakOneShotCoreTests
         Assert.AreEqual(1, result.SegmentsExecuted);
         Assert.IsTrue(ui.CallLog.IndexOf("prepare_playback") >= 0);
         Assert.IsTrue(ui.CallLog.IndexOf("prepare_playback") < ui.CallLog.IndexOf("press_play"));
+        Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
+        Assert.AreEqual(1, ui.EndModifierIsolationSessionCalls);
+    }
+
+    [TestMethod]
+    public void SpeakOnceWaitCore_BeginModifierIsolationSessionFails_ReturnsProcessLost()
+    {
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        ui.BeginModifierIsolationSessionHandler = (_, _) => false;
+
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(
+            CreateConfig(),
+            new SpeakOnceRequest { Text = "A" },
+            new AppLogger(new TestLogger()),
+            RequestValidationMode.Strict,
+            ui,
+            new FakeAudioSessionReader());
+
+        Assert.AreEqual(SpeakOnceStatus.ProcessLost, result.Status);
+        StringAssert.Contains(result.ErrorMessage, "modifier_guard_unavailable_fatal");
+        Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
+        Assert.AreEqual(0, ui.EndModifierIsolationSessionCalls);
     }
 
     [TestMethod]
@@ -133,6 +209,52 @@ public class VoicepeakOneShotCoreTests
         Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
         Assert.AreEqual(1, result.SegmentsExecuted);
         Assert.AreEqual(1, ui.PressPlayCalls);
+        Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
+        Assert.AreEqual(1, ui.EndModifierIsolationSessionCalls);
+    }
+
+    [TestMethod]
+    public void SpeakOnceCore_BeginModifierIsolationSessionFails_ReturnsProcessLost()
+    {
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        ui.BeginModifierIsolationSessionHandler = (_, _) => false;
+
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(
+            CreateConfig(),
+            new SpeakOnceRequest { Text = "A" },
+            new AppLogger(new TestLogger()),
+            RequestValidationMode.Strict,
+            ui,
+            new FakeAudioSessionReader());
+
+        Assert.AreEqual(SpeakOnceStatus.ProcessLost, result.Status);
+        StringAssert.Contains(result.ErrorMessage, "modifier_guard_unavailable_fatal");
+        Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
+        Assert.AreEqual(0, ui.EndModifierIsolationSessionCalls);
+    }
+
+    [TestMethod]
+    public void SpeakOnceWaitCore_EndModifierIsolationSessionFails_ReturnsProcessLost()
+    {
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        ui.EndModifierIsolationSessionHandler = _ => false;
+        FakeAudioSessionReader audio = new FakeAudioSessionReader();
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
+
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(
+            CreateConfig(),
+            new SpeakOnceRequest { Text = "A" },
+            new AppLogger(new TestLogger()),
+            RequestValidationMode.Strict,
+            ui,
+            audio);
+
+        Assert.AreEqual(SpeakOnceStatus.ProcessLost, result.Status);
+        StringAssert.Contains(result.ErrorMessage, "modifier_guard_release_failed_fatal");
+        Assert.AreEqual(1, ui.EndModifierIsolationSessionCalls);
     }
 
     [TestMethod]
