@@ -21,6 +21,7 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
     public Func<string, bool> EndModifierIsolationSessionHandler { get; set; } = _ => true;
     public Func<IntPtr, ReadInputResult> ReadInputHandler { get; set; }
         = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA);
+    public Func<ResolveTargetResult> ResolveTargetDetailedHandler { get; set; } = null;
     public Func<int, (bool Success, Process Process, IntPtr Hwnd)> ResolveByPidHandler { get; set; }
         = _ => (false, null, IntPtr.Zero);
     public Func<(bool Success, Process Process, IntPtr Hwnd)> ResolveTargetHandler { get; set; }
@@ -41,6 +42,8 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
     public int KillFocusCalls { get; private set; }
     public int BeginModifierIsolationSessionCalls { get; private set; }
     public int EndModifierIsolationSessionCalls { get; private set; }
+    public int GetVoicepeakProcessCountCalls { get; private set; }
+    public int TryResolveTargetDetailedCalls { get; private set; }
 
     public bool TryResolveTarget(out Process process, out IntPtr mainHwnd)
     {
@@ -58,7 +61,48 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
         return success;
     }
 
-    public int GetVoicepeakProcessCount() => ProcessCountHandler();
+    public int GetVoicepeakProcessCount()
+    {
+        GetVoicepeakProcessCountCalls++;
+        return ProcessCountHandler();
+    }
+
+    public ResolveTargetResult TryResolveTargetDetailed()
+    {
+        TryResolveTargetDetailedCalls++;
+        if (ResolveTargetDetailedHandler != null)
+        {
+            return ResolveTargetDetailedHandler();
+        }
+
+        (bool success, Process resolvedProcess, IntPtr resolvedHwnd) = ResolveTargetHandler();
+        if (success)
+        {
+            return new ResolveTargetResult
+            {
+                Success = true,
+                Process = resolvedProcess,
+                MainHwnd = resolvedHwnd,
+                FailureReason = ResolveTargetFailureReason.None,
+                ProcessCount = 1
+            };
+        }
+
+        int processCount = GetVoicepeakProcessCount();
+        ResolveTargetFailureReason reason = processCount <= 0
+            ? ResolveTargetFailureReason.ProcessNotFound
+            : processCount > 1
+                ? ResolveTargetFailureReason.MultipleProcesses
+                : ResolveTargetFailureReason.TargetNotFound;
+        return new ResolveTargetResult
+        {
+            Success = false,
+            Process = null,
+            MainHwnd = IntPtr.Zero,
+            FailureReason = reason,
+            ProcessCount = processCount
+        };
+    }
 
     public bool IsAlive(Process process) => IsAliveHandler(process);
 

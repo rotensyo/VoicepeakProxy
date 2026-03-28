@@ -75,15 +75,47 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     // 対象プロセスとメインウィンドウを解決
     public bool TryResolveTarget(out Process process, out IntPtr mainHwnd)
     {
-        process = null;
-        mainHwnd = IntPtr.Zero;
+        ResolveTargetResult resolved = TryResolveTargetDetailed();
+        process = resolved.Process;
+        mainHwnd = resolved.MainHwnd;
+        return resolved.Success;
+    }
 
-        if (!TryResolveVoicepeakPid(out int pid))
+    // 対象解決と失敗理由を同時に返す
+    public ResolveTargetResult TryResolveTargetDetailed()
+    {
+        if (!TryResolveVoicepeakPidDetailed(out int pid, out ResolveTargetFailureReason reason, out int processCount))
         {
-            return false;
+            return new ResolveTargetResult
+            {
+                Success = false,
+                FailureReason = reason,
+                ProcessCount = processCount,
+                Process = null,
+                MainHwnd = IntPtr.Zero
+            };
         }
 
-        return TryResolveTargetByPid(pid, out process, out mainHwnd);
+        if (!TryResolveTargetByPid(pid, out Process process, out IntPtr mainHwnd))
+        {
+            return new ResolveTargetResult
+            {
+                Success = false,
+                FailureReason = ResolveTargetFailureReason.TargetNotFound,
+                ProcessCount = processCount,
+                Process = null,
+                MainHwnd = IntPtr.Zero
+            };
+        }
+
+        return new ResolveTargetResult
+        {
+            Success = true,
+            FailureReason = ResolveTargetFailureReason.None,
+            ProcessCount = processCount,
+            Process = process,
+            MainHwnd = mainHwnd
+        };
     }
 
     public bool TryResolveTargetByPid(int pid, out Process process, out IntPtr mainHwnd)
@@ -135,7 +167,15 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     // PIDキャッシュを確認し必要時に更新
     private bool TryResolveVoicepeakPid(out int pid)
     {
+        return TryResolveVoicepeakPidDetailed(out pid, out _, out _);
+    }
+
+    // PIDキャッシュを確認し必要時に更新
+    private bool TryResolveVoicepeakPidDetailed(out int pid, out ResolveTargetFailureReason reason, out int processCount)
+    {
         pid = 0;
+        reason = ResolveTargetFailureReason.TargetNotFound;
+        processCount = 0;
 
         int cachedPid = _cachedVoicepeakPid;
         if (cachedPid > 0)
@@ -143,6 +183,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             if (IsValidVoicepeakProcess(cachedPid, out Process cachedProcess))
             {
                 pid = cachedProcess.Id;
+                processCount = 1;
+                reason = ResolveTargetFailureReason.None;
                 return true;
             }
 
@@ -150,14 +192,23 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
 
         Process[] matches = _processApi.GetProcessesByName("voicepeak");
-        if (matches == null || matches.Length != 1)
+        processCount = matches?.Length ?? 0;
+        if (processCount <= 0)
         {
+            reason = ResolveTargetFailureReason.ProcessNotFound;
+            return false;
+        }
+
+        if (processCount > 1)
+        {
+            reason = ResolveTargetFailureReason.MultipleProcesses;
             return false;
         }
 
         Process process = matches[0];
         if (process == null)
         {
+            reason = ResolveTargetFailureReason.TargetNotFound;
             return false;
         }
 
@@ -165,15 +216,18 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         {
             if (process.HasExited)
             {
+                reason = ResolveTargetFailureReason.TargetNotFound;
                 return false;
             }
 
             pid = process.Id;
             _cachedVoicepeakPid = pid;
+            reason = ResolveTargetFailureReason.None;
             return true;
         }
         catch
         {
+            reason = ResolveTargetFailureReason.TargetNotFound;
             return false;
         }
     }

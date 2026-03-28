@@ -523,6 +523,61 @@ public class UiControllerTests
     }
 
     [TestMethod]
+    public void TryResolveTargetDetailed_NoProcess_ReturnsProcessNotFound()
+    {
+        // 詳細解決で未起動理由を返す
+        FakeVoicepeakProcessApi api = new FakeVoicepeakProcessApi
+        {
+            GetProcessesByNameHandler = _ => Array.Empty<Process>()
+        };
+        VoicepeakUiController controller = CreateController(new UiConfig(), api);
+
+        ResolveTargetResult actual = controller.TryResolveTargetDetailed();
+
+        Assert.IsFalse(actual.Success);
+        Assert.AreEqual(ResolveTargetFailureReason.ProcessNotFound, actual.FailureReason);
+        Assert.AreEqual(0, actual.ProcessCount);
+    }
+
+    [TestMethod]
+    public void TryResolveTargetDetailed_MultipleProcesses_ReturnsMultipleProcesses()
+    {
+        // 詳細解決で複数起動理由を返す
+        Process current = Process.GetCurrentProcess();
+        FakeVoicepeakProcessApi api = new FakeVoicepeakProcessApi
+        {
+            GetProcessesByNameHandler = _ => new[] { current, current }
+        };
+        VoicepeakUiController controller = CreateController(new UiConfig(), api);
+
+        ResolveTargetResult actual = controller.TryResolveTargetDetailed();
+
+        Assert.IsFalse(actual.Success);
+        Assert.AreEqual(ResolveTargetFailureReason.MultipleProcesses, actual.FailureReason);
+        Assert.AreEqual(2, actual.ProcessCount);
+    }
+
+    [TestMethod]
+    public void TryResolveTargetDetailed_WindowNotFound_ReturnsTargetNotFound()
+    {
+        // 詳細解決でウィンドウ未取得理由を返す
+        Process current = Process.GetCurrentProcess();
+        FakeVoicepeakProcessApi api = new FakeVoicepeakProcessApi
+        {
+            GetProcessesByNameHandler = _ => new[] { current },
+            GetProcessByIdHandler = _ => current,
+            WaitMainWindowHandleHandler = (_, _) => IntPtr.Zero
+        };
+        VoicepeakUiController controller = CreateController(new UiConfig(), api);
+
+        ResolveTargetResult actual = controller.TryResolveTargetDetailed();
+
+        Assert.IsFalse(actual.Success);
+        Assert.AreEqual(ResolveTargetFailureReason.TargetNotFound, actual.FailureReason);
+        Assert.AreEqual(1, actual.ProcessCount);
+    }
+
+    [TestMethod]
     public void TryResolveTargetByPid_InvalidInputs_ReturnFalse()
     {
         // 不正pidを拒否

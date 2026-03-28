@@ -45,6 +45,31 @@ public class VoicepeakOneShotUtilityTests
     }
 
     [TestMethod]
+    public void ValidateInputOnceCore_TargetResolveFailure_DoesNotRecountProcess()
+    {
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ResolveTargetDetailedHandler = () => new ResolveTargetResult
+            {
+                Success = false,
+                FailureReason = ResolveTargetFailureReason.ProcessNotFound,
+                ProcessCount = 0
+            },
+            ProcessCountHandler = () => 99
+        };
+
+        ValidateInputOnceResult result = VoicepeakOneShot.ValidateInputOnceCore(
+            new AppConfig(),
+            new AppLogger(new TestLogger()),
+            ui,
+            new FakeAudioSessionReader());
+
+        Assert.AreEqual(ValidateInputOnceStatus.ProcessNotFound, result.Status);
+        Assert.AreEqual(0, ui.GetVoicepeakProcessCountCalls);
+        Assert.AreEqual(1, ui.TryResolveTargetDetailedCalls);
+    }
+
+    [TestMethod]
     public void ValidateInputOnceCore_Success_ReturnsCompleted()
     {
         FakeVoicepeakUiController ui = CreateResolvedUi();
@@ -169,6 +194,27 @@ public class VoicepeakOneShotUtilityTests
         ClearInputOnceResult result = VoicepeakOneShot.ClearInputOnceCore(new AppConfig(), new AppLogger(new TestLogger()), ui);
 
         Assert.AreEqual(ClearInputOnceStatus.ProcessNotFound, result.Status);
+    }
+
+    [TestMethod]
+    public void ClearInputOnceCore_TargetResolveFailure_DoesNotRecountProcess()
+    {
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ResolveTargetDetailedHandler = () => new ResolveTargetResult
+            {
+                Success = false,
+                FailureReason = ResolveTargetFailureReason.ProcessNotFound,
+                ProcessCount = 0
+            },
+            ProcessCountHandler = () => 99
+        };
+
+        ClearInputOnceResult result = VoicepeakOneShot.ClearInputOnceCore(new AppConfig(), new AppLogger(new TestLogger()), ui);
+
+        Assert.AreEqual(ClearInputOnceStatus.ProcessNotFound, result.Status);
+        Assert.AreEqual(0, ui.GetVoicepeakProcessCountCalls);
+        Assert.AreEqual(1, ui.TryResolveTargetDetailedCalls);
     }
 
     [TestMethod]

@@ -11,10 +11,30 @@ internal enum InputContextPrimeReason
     StartTimeoutRetry
 }
 
+// 対象解決失敗理由
+internal enum ResolveTargetFailureReason
+{
+    None,
+    ProcessNotFound,
+    MultipleProcesses,
+    TargetNotFound
+}
+
+// 対象解決結果
+internal sealed class ResolveTargetResult
+{
+    public bool Success { get; set; }
+    public Process Process { get; set; }
+    public IntPtr MainHwnd { get; set; }
+    public ResolveTargetFailureReason FailureReason { get; set; }
+    public int ProcessCount { get; set; }
+}
+
 // UI操作の依存を抽象化
 internal interface IVoicepeakUiController
 {
     bool TryResolveTarget(out Process process, out IntPtr mainHwnd);
+    ResolveTargetResult TryResolveTargetDetailed();
     bool TryResolveTargetByPid(int pid, out Process process, out IntPtr mainHwnd);
     int GetVoicepeakProcessCount();
     bool IsAlive(Process process);

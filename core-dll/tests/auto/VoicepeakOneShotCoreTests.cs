@@ -19,6 +19,60 @@ public class VoicepeakOneShotCoreTests
     }
 
     [TestMethod]
+    public void SpeakOnceCore_TargetResolveFailure_DoesNotRecountProcess()
+    {
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ResolveTargetDetailedHandler = () => new ResolveTargetResult
+            {
+                Success = false,
+                FailureReason = ResolveTargetFailureReason.ProcessNotFound,
+                ProcessCount = 0
+            },
+            ProcessCountHandler = () => 99
+        };
+
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(
+            CreateConfig(),
+            new SpeakOnceRequest { Text = "A" },
+            new AppLogger(new TestLogger()),
+            RequestValidationMode.Strict,
+            ui,
+            new FakeAudioSessionReader());
+
+        Assert.AreEqual(SpeakOnceStatus.ProcessNotFound, result.Status);
+        Assert.AreEqual(0, ui.GetVoicepeakProcessCountCalls);
+        Assert.AreEqual(1, ui.TryResolveTargetDetailedCalls);
+    }
+
+    [TestMethod]
+    public void SpeakOnceWaitCore_TargetResolveFailure_DoesNotRecountProcess()
+    {
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ResolveTargetDetailedHandler = () => new ResolveTargetResult
+            {
+                Success = false,
+                FailureReason = ResolveTargetFailureReason.ProcessNotFound,
+                ProcessCount = 0
+            },
+            ProcessCountHandler = () => 99
+        };
+
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(
+            CreateConfig(),
+            new SpeakOnceRequest { Text = "A" },
+            new AppLogger(new TestLogger()),
+            RequestValidationMode.Strict,
+            ui,
+            new FakeAudioSessionReader());
+
+        Assert.AreEqual(SpeakOnceStatus.ProcessNotFound, result.Status);
+        Assert.AreEqual(0, ui.GetVoicepeakProcessCountCalls);
+        Assert.AreEqual(1, ui.TryResolveTargetDetailedCalls);
+    }
+
+    [TestMethod]
     public void SpeakOnceWaitCore_InvalidRequest_ReturnsStatusAndMessage()
     {
         SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(CreateConfig(), null, new AppLogger(new TestLogger()), RequestValidationMode.Strict, new FakeVoicepeakUiController(), new FakeAudioSessionReader());
