@@ -52,6 +52,9 @@ public sealed class PrepareConfig
     public int SequentialMoveToStartKeyDelayBaseMs { get; set; } = 5;
     public int DeleteKeyDelayBaseMs { get; set; } = 1;
     public int ClearInputMaxPasses { get; set; } = 20;
+    public int HookCommandTimeoutMs { get; set; } = 500;
+    public int HookConnectTimeoutMs { get; set; } = 300;
+    public int HookConnectTotalWaitMs { get; set; } = 8000;
 }
 
 // UI操作関連設定
@@ -71,6 +74,7 @@ public sealed class UiConfig
 public sealed class DebugConfig
 {
     public bool LogTextCandidates { get; set; } = false;
+    public bool LogModifierHookStats { get; set; } = false;
 }
 
 // 文字列変換設定
@@ -195,6 +199,21 @@ internal static class AppConfigValidator
         if (config.Prepare.ClearInputMaxPasses <= 0)
         {
             throw new InvalidOperationException("prepare.clearInputMaxPasses は 1 以上で指定してください");
+        }
+
+        if (config.Prepare.HookCommandTimeoutMs <= 0)
+        {
+            throw new InvalidOperationException("prepare.hookCommandTimeoutMs は 1 以上で指定してください");
+        }
+
+        if (config.Prepare.HookConnectTimeoutMs <= 0)
+        {
+            throw new InvalidOperationException("prepare.hookConnectTimeoutMs は 1 以上で指定してください");
+        }
+
+        if (config.Prepare.HookConnectTotalWaitMs <= 0)
+        {
+            throw new InvalidOperationException("prepare.hookConnectTotalWaitMs は 1 以上で指定してください");
         }
 
         if (config.Ui.DelayBeforePlayShortcutMs < 0)

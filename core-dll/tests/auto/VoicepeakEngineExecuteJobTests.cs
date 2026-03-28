@@ -150,6 +150,52 @@ public class VoicepeakEngineExecuteJobTests
 
         Assert.IsTrue(ui.CallLog.IndexOf("prepare_playback") >= 0);
         Assert.IsTrue(ui.CallLog.IndexOf("prepare_playback") < ui.CallLog.IndexOf("press_play"));
+        Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
+        Assert.AreEqual(1, ui.EndModifierIsolationSessionCalls);
+    }
+
+    [TestMethod]
+    public void ExecuteJob_BeginModifierIsolationSessionFails_RequestsShutdown()
+    {
+        TestLogger logger = new TestLogger();
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        ui.BeginModifierIsolationSessionHandler = (_, _) => false;
+
+        using CancellationTokenSource cts = new CancellationTokenSource();
+        VoicepeakEngine engine = CreateEngine(ui, new FakeAudioSessionReader(), logger, cts);
+
+        ReflectionTestHelper.InvokeCoreInstance(engine, "ExecuteJob", CreateJob("hello"));
+
+        Assert.IsTrue(logger.WarnMessages.Exists(m => m.Contains("reason=modifier_guard_unavailable_fatal")));
+        Assert.IsTrue(logger.ErrorMessages.Exists(m => m.Contains("runtime_fatal reason=modifier_guard_unavailable_fatal")));
+        Assert.AreEqual(0, ui.PrepareForTextInputCalls);
+        Assert.AreEqual(1, ui.BeginModifierIsolationSessionCalls);
+        Assert.AreEqual(0, ui.EndModifierIsolationSessionCalls);
+        Assert.IsTrue(engine.IsShutdownRequested);
+        Assert.IsTrue(cts.IsCancellationRequested);
+    }
+
+    [TestMethod]
+    public void ExecuteJob_EndModifierIsolationSessionFails_RequestsShutdown()
+    {
+        TestLogger logger = new TestLogger();
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        ui.EndModifierIsolationSessionHandler = _ => false;
+        FakeAudioSessionReader audio = new FakeAudioSessionReader();
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 1f, StateLabel = "AudioSessionStateActive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
+        audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
+
+        using CancellationTokenSource cts = new CancellationTokenSource();
+        VoicepeakEngine engine = CreateEngine(ui, audio, logger, cts);
+
+        ReflectionTestHelper.InvokeCoreInstance(engine, "ExecuteJob", CreateJob("hello"));
+
+        Assert.AreEqual(1, ui.EndModifierIsolationSessionCalls);
+        Assert.IsTrue(logger.ErrorMessages.Exists(m => m.Contains("runtime_fatal reason=modifier_guard_unavailable_fatal")));
+        Assert.IsTrue(engine.IsShutdownRequested);
+        Assert.IsTrue(cts.IsCancellationRequested);
     }
 
     private static VoicepeakEngine CreateEngine(FakeVoicepeakUiController ui, FakeAudioSessionReader audio, TestLogger logger, CancellationTokenSource cts)

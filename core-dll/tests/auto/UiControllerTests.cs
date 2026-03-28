@@ -417,6 +417,7 @@ public class UiControllerTests
         FakeVoicepeakProcessApi api = new FakeVoicepeakProcessApi
         {
             GetProcessesByNameHandler = _ => new[] { current },
+            GetProcessByIdHandler = _ => current,
             WaitMainWindowHandleHandler = (_, _) => new IntPtr(123)
         };
         VoicepeakUiController controller = CreateController(new UiConfig(), api);
@@ -427,6 +428,153 @@ public class UiControllerTests
         Assert.IsNotNull(process);
         Assert.AreEqual(current.Id, process.Id);
         Assert.AreEqual(new IntPtr(123), hwnd);
+    }
+
+    [TestMethod]
+    public void TryResolveTarget_WhenCachedPidIsValid_UsesPidResolutionWithoutNameLookup()
+    {
+        // 有効キャッシュpidを優先して名前探索を行わない
+        Process current = Process.GetCurrentProcess();
+        int getProcessesByNameCalls = 0;
+        int getProcessByIdCalls = 0;
+        FakeVoicepeakProcessApi api = new FakeVoicepeakProcessApi
+        {
+            GetProcessesByNameHandler = _ =>
+            {
+                getProcessesByNameCalls++;
+                return new[] { current, current };
+            },
+            GetProcessByIdHandler = _ =>
+            {
+                getProcessByIdCalls++;
+                return current;
+            },
+            WaitMainWindowHandleHandler = (_, _) => new IntPtr(321)
+        };
+        VoicepeakUiController controller = CreateController(new UiConfig(), api);
+        ReflectionTestHelper.SetField(controller, "_cachedVoicepeakPid", current.Id);
+
+        bool actual = controller.TryResolveTarget(out Process process, out IntPtr hwnd);
+
+        Assert.IsTrue(actual);
+        Assert.AreEqual(1, getProcessesByNameCalls);
+        Assert.AreEqual(2, getProcessByIdCalls);
+        Assert.IsNotNull(process);
+        Assert.AreEqual(current.Id, process.Id);
+        Assert.AreEqual(new IntPtr(321), hwnd);
+    }
+
+    [TestMethod]
+    public void TryResolveTarget_WhenCachedPidIsInvalid_FallsBackToNameLookupAndUpdatesCache()
+    {
+        // 無効キャッシュpid時は名前探索へフォールバックして更新
+        Process current = Process.GetCurrentProcess();
+        int getProcessesByNameCalls = 0;
+        int getProcessByIdCalls = 0;
+        FakeVoicepeakProcessApi api = new FakeVoicepeakProcessApi
+        {
+            GetProcessByIdHandler = pid =>
+            {
+                getProcessByIdCalls++;
+                if (pid == 99999)
+                {
+                    throw new InvalidOperationException("not found");
+                }
+
+                return current;
+            },
+            GetProcessesByNameHandler = _ =>
+            {
+                getProcessesByNameCalls++;
+                return new[] { current };
+            },
+            WaitMainWindowHandleHandler = (_, _) => new IntPtr(444)
+        };
+        VoicepeakUiController controller = CreateController(new UiConfig(), api);
+        ReflectionTestHelper.SetField(controller, "_cachedVoicepeakPid", 99999);
+
+        bool actual = controller.TryResolveTarget(out Process process, out IntPtr hwnd);
+
+        Assert.IsTrue(actual);
+        Assert.AreEqual(2, getProcessByIdCalls);
+        Assert.AreEqual(1, getProcessesByNameCalls);
+        Assert.IsNotNull(process);
+        Assert.AreEqual(current.Id, process.Id);
+        Assert.AreEqual(new IntPtr(444), hwnd);
+        Assert.AreEqual(current.Id, (int)ReflectionTestHelper.GetField(controller, "_cachedVoicepeakPid"));
+    }
+
+    [TestMethod]
+    public void TryResolveTarget_WhenMultipleProcessesExist_ReturnsFalse()
+    {
+        // 複数候補時は失敗
+        Process current = Process.GetCurrentProcess();
+        FakeVoicepeakProcessApi api = new FakeVoicepeakProcessApi
+        {
+            GetProcessesByNameHandler = _ => new[] { current, current }
+        };
+        VoicepeakUiController controller = CreateController(new UiConfig(), api);
+
+        bool actual = controller.TryResolveTarget(out Process process, out IntPtr hwnd);
+
+        Assert.IsFalse(actual);
+        Assert.IsNull(process);
+        Assert.AreEqual(IntPtr.Zero, hwnd);
+    }
+
+    [TestMethod]
+    public void TryResolveTargetDetailed_NoProcess_ReturnsProcessNotFound()
+    {
+        // 詳細解決で未起動理由を返す
+        FakeVoicepeakProcessApi api = new FakeVoicepeakProcessApi
+        {
+            GetProcessesByNameHandler = _ => Array.Empty<Process>()
+        };
+        VoicepeakUiController controller = CreateController(new UiConfig(), api);
+
+        ResolveTargetResult actual = controller.TryResolveTargetDetailed();
+
+        Assert.IsFalse(actual.Success);
+        Assert.AreEqual(ResolveTargetFailureReason.ProcessNotFound, actual.FailureReason);
+        Assert.AreEqual(0, actual.ProcessCount);
+    }
+
+    [TestMethod]
+    public void TryResolveTargetDetailed_MultipleProcesses_ReturnsMultipleProcesses()
+    {
+        // 詳細解決で複数起動理由を返す
+        Process current = Process.GetCurrentProcess();
+        FakeVoicepeakProcessApi api = new FakeVoicepeakProcessApi
+        {
+            GetProcessesByNameHandler = _ => new[] { current, current }
+        };
+        VoicepeakUiController controller = CreateController(new UiConfig(), api);
+
+        ResolveTargetResult actual = controller.TryResolveTargetDetailed();
+
+        Assert.IsFalse(actual.Success);
+        Assert.AreEqual(ResolveTargetFailureReason.MultipleProcesses, actual.FailureReason);
+        Assert.AreEqual(2, actual.ProcessCount);
+    }
+
+    [TestMethod]
+    public void TryResolveTargetDetailed_WindowNotFound_ReturnsTargetNotFound()
+    {
+        // 詳細解決でウィンドウ未取得理由を返す
+        Process current = Process.GetCurrentProcess();
+        FakeVoicepeakProcessApi api = new FakeVoicepeakProcessApi
+        {
+            GetProcessesByNameHandler = _ => new[] { current },
+            GetProcessByIdHandler = _ => current,
+            WaitMainWindowHandleHandler = (_, _) => IntPtr.Zero
+        };
+        VoicepeakUiController controller = CreateController(new UiConfig(), api);
+
+        ResolveTargetResult actual = controller.TryResolveTargetDetailed();
+
+        Assert.IsFalse(actual.Success);
+        Assert.AreEqual(ResolveTargetFailureReason.TargetNotFound, actual.FailureReason);
+        Assert.AreEqual(1, actual.ProcessCount);
     }
 
     [TestMethod]
@@ -445,9 +593,9 @@ public class UiControllerTests
     }
 
     [TestMethod]
-    public void TryResolveTargetByPid_ProcessNameMismatch_ReturnsFalse()
+    public void TryResolveTargetByPid_MainWindowMissing_ReturnsFalse()
     {
-        // voicepeak以外のpidを拒否
+        // メインウィンドウ未取得を失敗扱い
         Process current = Process.GetCurrentProcess();
         FakeVoicepeakProcessApi api = new FakeVoicepeakProcessApi
         {
@@ -599,7 +747,7 @@ public class UiControllerTests
                 new TestLogger());
 
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
-            bool ok = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "RunCompositeClearCycle", window.Handle, 2, 3, 0);
+            bool ok = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "RunCompositeClearCycleCore", window.Handle, 2, 3, 0);
             Assert.IsTrue(ok);
             return window.Messages.ToArray();
         });
@@ -629,6 +777,21 @@ public class UiControllerTests
 
         Assert.IsFalse(result.Success);
         Assert.AreEqual(ReadInputSource.NoCandidate, result.Source);
+    }
+
+    [TestMethod]
+    public void EndModifierIsolationSession_WhenDisableFails_ReturnsFalseAndClearsSessionState()
+    {
+        // 解除失敗時は再利用不能としてセッション状態を破棄
+        VoicepeakUiController controller = CreateController(new UiConfig(), new FakeVoicepeakProcessApi());
+        ReflectionTestHelper.SetField(controller, "_modifierIsolationSessionActive", true);
+        ReflectionTestHelper.SetField(controller, "_modifierIsolationSessionProcessId", (uint)123);
+
+        bool ok = controller.EndModifierIsolationSession("test_end_failure");
+
+        Assert.IsFalse(ok);
+        Assert.IsFalse((bool)ReflectionTestHelper.GetField(controller, "_modifierIsolationSessionActive"));
+        Assert.AreEqual((uint)0, (uint)ReflectionTestHelper.GetField(controller, "_modifierIsolationSessionProcessId"));
     }
 
     private static VoicepeakUiController CreateController(UiConfig ui, IVoicepeakProcessApi processApi)
