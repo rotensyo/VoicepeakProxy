@@ -14,6 +14,8 @@ internal static class AppConfigMapper
         data.Normalize();
 
         AppConfig config = new AppConfig();
+        // core既定値を欠損補完に利用
+        PrepareConfig defaults = new AppConfig().Prepare;
 
         config.Server.MaxQueuedJobs = data.Server.MaxQueuedJobs;
 
@@ -34,6 +36,15 @@ internal static class AppConfigMapper
         config.Prepare.SequentialMoveToStartKeyDelayBaseMs = data.Prepare.SequentialMoveToStartKeyDelayBaseMs;
         config.Prepare.DeleteKeyDelayBaseMs = data.Prepare.DeleteKeyDelayBaseMs;
         config.Prepare.ClearInputMaxPasses = data.Prepare.ClearInputMaxPasses;
+        config.Prepare.HookCommandTimeoutMs = data.Prepare.HookCommandTimeoutMs > 0
+            ? data.Prepare.HookCommandTimeoutMs
+            : defaults.HookCommandTimeoutMs;
+        config.Prepare.HookConnectTimeoutMs = data.Prepare.HookConnectTimeoutMs > 0
+            ? data.Prepare.HookConnectTimeoutMs
+            : defaults.HookConnectTimeoutMs;
+        config.Prepare.HookConnectTotalWaitMs = data.Prepare.HookConnectTotalWaitMs > 0
+            ? data.Prepare.HookConnectTotalWaitMs
+            : defaults.HookConnectTotalWaitMs;
 
         config.Ui.MoveToStartShortcut = data.Ui.MoveToStartShortcut ?? string.Empty;
         config.Ui.PlayShortcut = data.Ui.PlayShortcut ?? string.Empty;
@@ -61,6 +72,7 @@ internal static class AppConfigMapper
         }
 
         config.Debug.LogTextCandidates = data.Debug.LogTextCandidates;
+        config.Debug.LogModifierHookStats = data.Debug.LogModifierHookStats;
 
         config.Validation.BootValidation = MapBootValidation(data.Validation.BootValidation);
         config.Validation.RequestValidation = MapRequestValidation(data.Validation.RequestValidation);
@@ -93,6 +105,9 @@ internal static class AppConfigMapper
         data.Prepare.SequentialMoveToStartKeyDelayBaseMs = config.Prepare.SequentialMoveToStartKeyDelayBaseMs;
         data.Prepare.DeleteKeyDelayBaseMs = config.Prepare.DeleteKeyDelayBaseMs;
         data.Prepare.ClearInputMaxPasses = config.Prepare.ClearInputMaxPasses;
+        data.Prepare.HookCommandTimeoutMs = config.Prepare.HookCommandTimeoutMs;
+        data.Prepare.HookConnectTimeoutMs = config.Prepare.HookConnectTimeoutMs;
+        data.Prepare.HookConnectTotalWaitMs = config.Prepare.HookConnectTotalWaitMs;
 
         data.Ui.MoveToStartShortcut = config.Ui.MoveToStartShortcut ?? string.Empty;
         data.Ui.PlayShortcut = config.Ui.PlayShortcut ?? string.Empty;
@@ -119,6 +134,7 @@ internal static class AppConfigMapper
         }
 
         data.Debug.LogTextCandidates = config.Debug.LogTextCandidates;
+        data.Debug.LogModifierHookStats = config.Debug.LogModifierHookStats;
         data.Validation.BootValidation = MapBootValidationBack(config.Validation.BootValidation);
         data.Validation.RequestValidation = MapRequestValidationBack(config.Validation.RequestValidation);
 

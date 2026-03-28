@@ -343,6 +343,30 @@ namespace Plugin_VoicepeakProxy
             get { return State.Settings.AppConfig.Prepare.ClearInputMaxPasses; }
             set { State.Settings.AppConfig.Prepare.ClearInputMaxPasses = value; }
         }
+
+        [Category("Prepare")]
+        [DisplayName("11)hookCommandTimeoutMs")]
+        public int HookCommandTimeoutMs
+        {
+            get { return State.Settings.AppConfig.Prepare.HookCommandTimeoutMs; }
+            set { State.Settings.AppConfig.Prepare.HookCommandTimeoutMs = value; }
+        }
+
+        [Category("Prepare")]
+        [DisplayName("12)hookConnectTimeoutMs")]
+        public int HookConnectTimeoutMs
+        {
+            get { return State.Settings.AppConfig.Prepare.HookConnectTimeoutMs; }
+            set { State.Settings.AppConfig.Prepare.HookConnectTimeoutMs = value; }
+        }
+
+        [Category("Prepare")]
+        [DisplayName("13)hookConnectTotalWaitMs")]
+        public int HookConnectTotalWaitMs
+        {
+            get { return State.Settings.AppConfig.Prepare.HookConnectTotalWaitMs; }
+            set { State.Settings.AppConfig.Prepare.HookConnectTotalWaitMs = value; }
+        }
     }
 
     // UI設定タブ
@@ -547,6 +571,14 @@ namespace Plugin_VoicepeakProxy
         {
             get { return State.Settings.AppConfig.Debug.LogTextCandidates; }
             set { State.Settings.AppConfig.Debug.LogTextCandidates = value; }
+        }
+
+        [Category("Debug")]
+        [DisplayName("02)logModifierHookStats")]
+        public bool LogModifierHookStats
+        {
+            get { return State.Settings.AppConfig.Debug.LogModifierHookStats; }
+            set { State.Settings.AppConfig.Debug.LogModifierHookStats = value; }
         }
     }
 

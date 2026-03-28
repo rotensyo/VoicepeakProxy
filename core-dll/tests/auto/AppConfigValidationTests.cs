@@ -20,9 +20,12 @@ public class AppConfigValidationTests
         Assert.AreEqual(0, config.Audio.StartConfirmMaxRetries);
         Assert.AreEqual(300, config.Audio.StopConfirmMs);
         Assert.AreEqual("初期化完了", config.Prepare.BootValidationText);
+        Assert.AreEqual(0, config.Prepare.CharDelayBaseMs);
+        Assert.AreEqual(5, config.Prepare.PostTypeWaitPerCharMs);
+        Assert.AreEqual(300, config.Prepare.PostTypeWaitMinMs);
         Assert.AreEqual(5, config.Prepare.SequentialMoveToStartKeyDelayBaseMs);
-        Assert.AreEqual(1, config.Prepare.DeleteKeyDelayBaseMs);
-        Assert.AreEqual(20, config.Prepare.ClearInputMaxPasses);
+        Assert.AreEqual(0, config.Prepare.DeleteKeyDelayBaseMs);
+        Assert.AreEqual(10, config.Prepare.ClearInputMaxPasses);
         Assert.AreEqual(500, config.Prepare.HookCommandTimeoutMs);
         Assert.AreEqual(300, config.Prepare.HookConnectTimeoutMs);
         Assert.AreEqual(8000, config.Prepare.HookConnectTotalWaitMs);

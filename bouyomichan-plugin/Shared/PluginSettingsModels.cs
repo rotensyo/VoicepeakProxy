@@ -162,6 +162,9 @@ namespace BouyomiVoicepeakBridge.Shared
         public int SequentialMoveToStartKeyDelayBaseMs { get; set; }
         public int DeleteKeyDelayBaseMs { get; set; }
         public int ClearInputMaxPasses { get; set; }
+        public int HookCommandTimeoutMs { get; set; }
+        public int HookConnectTimeoutMs { get; set; }
+        public int HookConnectTotalWaitMs { get; set; }
     }
 
     // UI関連設定
@@ -195,6 +198,7 @@ namespace BouyomiVoicepeakBridge.Shared
     public sealed class DebugConfigData
     {
         public bool LogTextCandidates { get; set; }
+        public bool LogModifierHookStats { get; set; }
     }
 
     // 置換設定
