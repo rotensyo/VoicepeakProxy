@@ -67,6 +67,7 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
         return ProcessCountHandler();
     }
 
+    // 失敗理由付きの対象解決を模擬
     public ResolveTargetResult TryResolveTargetDetailed()
     {
         TryResolveTargetDetailedCalls++;

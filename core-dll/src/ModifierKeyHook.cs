@@ -53,6 +53,7 @@ internal sealed class ModifierKeyHookController
         _platform = platform ?? throw new ArgumentNullException(nameof(platform));
     }
 
+    // フック注入済み接続を保証
     public bool EnsureInjected(int pid, AppLogger log)
     {
         lock (_gate)
@@ -92,6 +93,7 @@ internal sealed class ModifierKeyHookController
         }
     }
 
+    // フック有効状態を設定
     public bool SetEnabled(bool enabled, AppLogger log)
     {
         lock (_gate)
@@ -124,6 +126,7 @@ internal sealed class ModifierKeyHookController
         }
     }
 
+    // ENABLEコマンドを1回送信
     private bool TrySetEnabledOnce(bool enabled, AppLogger log)
     {
         if (!SendCommand($"ENABLE|{(enabled ? 1 : 0)}", out string response))
@@ -142,6 +145,7 @@ internal sealed class ModifierKeyHookController
         return true;
     }
 
+    // 統計プローブを開始
     public void BeginStatsProbe(AppLogger log)
     {
         lock (_gate)
@@ -162,6 +166,7 @@ internal sealed class ModifierKeyHookController
         }
     }
 
+    // 統計プローブを終了
     public void EndStatsProbe(AppLogger log)
     {
         lock (_gate)
@@ -176,6 +181,7 @@ internal sealed class ModifierKeyHookController
         }
     }
 
+    // 統計スナップショットを取得
     public ModifierHookStatsSnapshot GetStatsSnapshot(AppLogger log)
     {
         lock (_gate)
@@ -211,6 +217,7 @@ internal sealed class ModifierKeyHookController
         }
     }
 
+    // 対象プロセスへフック注入
     private bool TryInject(int pid, AppLogger log)
     {
         try
@@ -233,6 +240,7 @@ internal sealed class ModifierKeyHookController
         }
     }
 
+    // 既存パイプへ接続
     private bool TryConnectExisting(int pid, AppLogger log, int timeoutMs)
     {
         string pipeName = GetPipeName(pid);
@@ -250,6 +258,7 @@ internal sealed class ModifierKeyHookController
         return false;
     }
 
+    // パイプ接続可能まで待機
     private bool WaitForPipeReady(int pid, AppLogger log, int totalWaitMs)
     {
         int intervalMs = Math.Min(200, _hookConnectTimeoutMs);
@@ -273,6 +282,7 @@ internal sealed class ModifierKeyHookController
         return false;
     }
 
+    // 接続生存確認
     private bool TryPing()
     {
         if (!SendCommand("PING", out string response))
@@ -283,6 +293,7 @@ internal sealed class ModifierKeyHookController
         return string.Equals(response, "PONG", StringComparison.Ordinal);
     }
 
+    // コマンド送信と応答取得
     private bool SendCommand(string command, out string response)
     {
         response = string.Empty;
@@ -309,16 +320,19 @@ internal sealed class ModifierKeyHookController
         }
     }
 
+    // パイプ接続状態を判定
     private bool IsConnected()
     {
         return _connection != null && _connection.IsConnected;
     }
 
+    // 接続破棄とPIDリセット
     private void DisposePipe()
     {
         DisposeConnection(resetPid: true);
     }
 
+    // 接続を破棄
     private void DisposeConnection(bool resetPid)
     {
         if (_connection != null)
@@ -333,11 +347,13 @@ internal sealed class ModifierKeyHookController
         }
     }
 
+    // PIDからパイプ名を生成
     private static string GetPipeName(int pid)
     {
         return $"vp_modhook_{pid}";
     }
 
+    // 文字列をlongへ変換
     private static long ParseLong(string text)
     {
         if (long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out long value))
@@ -348,6 +364,7 @@ internal sealed class ModifierKeyHookController
         return 0;
     }
 
+    // ログ出力値を正規化
     private static string Sanitize(string value)
     {
         return string.IsNullOrEmpty(value) ? string.Empty : value.Replace("\r", string.Empty).Replace("\n", string.Empty);
@@ -369,6 +386,7 @@ internal interface IModifierHookPlatform
 
 internal sealed class DefaultModifierHookPlatform : IModifierHookPlatform
 {
+    // EasyHookで対象へ注入
     public bool Inject(int pid, string injectionLibraryPath, string pipeName)
     {
         RemoteHooking.Inject(
@@ -380,6 +398,7 @@ internal sealed class DefaultModifierHookPlatform : IModifierHookPlatform
         return true;
     }
 
+    // 名前付きパイプへ接続
     public bool TryConnect(string pipeName, int timeoutMs, out IModifierHookConnection connection, out Exception error)
     {
         connection = null;
@@ -405,6 +424,7 @@ internal sealed class DefaultModifierHookPlatform : IModifierHookPlatform
         }
     }
 
+    // 待機を実行
     public void Sleep(int milliseconds)
     {
         Thread.Sleep(milliseconds);
@@ -418,6 +438,7 @@ internal sealed class NamedPipeModifierHookConnection : IModifierHookConnection
     private readonly StreamReader _reader;
     private readonly StreamWriter _writer;
 
+    // パイプ接続ラッパーを初期化
     public NamedPipeModifierHookConnection(NamedPipeClientStream pipe)
     {
         _pipe = pipe ?? throw new ArgumentNullException(nameof(pipe));
@@ -425,8 +446,10 @@ internal sealed class NamedPipeModifierHookConnection : IModifierHookConnection
         _writer = new StreamWriter(_pipe, Utf8NoBom, 1024, true) { AutoFlush = true };
     }
 
+    // パイプ接続状態を返す
     public bool IsConnected => _pipe != null && _pipe.IsConnected;
 
+    // 1往復コマンドを送受信
     public bool Send(string command, int timeoutMs, out string response)
     {
         response = string.Empty;
@@ -448,6 +471,7 @@ internal sealed class NamedPipeModifierHookConnection : IModifierHookConnection
         }
     }
 
+    // パイプ関連リソースを解放
     public void Dispose()
     {
         _writer.Dispose();
@@ -469,21 +493,25 @@ internal sealed class ModifierHookRuntimeState
     private long _neutralizedCalls;
     private readonly Dictionary<int, int> _threadCalls = new Dictionary<int, int>();
 
+    // 有効状態を取得
     public bool IsEnabled()
     {
         return _enabled;
     }
 
+    // 有効状態を設定
     public void SetEnabled(bool enabled)
     {
         _enabled = enabled;
     }
 
+    // 統計収集状態を設定
     public void SetStatsEnabled(bool enabled)
     {
         _statsEnabled = enabled;
     }
 
+    // 統計カウンタを初期化
     public void ResetStats()
     {
         lock (_statsGate)
@@ -497,6 +525,7 @@ internal sealed class ModifierHookRuntimeState
         }
     }
 
+    // API呼び出し統計を記録
     public void RecordCall(ModifierHookApi api, int vKey, int threadId, bool neutralized)
     {
         if (!_statsEnabled)
@@ -543,6 +572,7 @@ internal sealed class ModifierHookRuntimeState
         }
     }
 
+    // 統計スナップショットを取得
     public ModifierHookStatsSnapshot Snapshot()
     {
         lock (_statsGate)
@@ -559,6 +589,7 @@ internal sealed class ModifierHookRuntimeState
         }
     }
 
+    // 修飾キー判定
     private static bool IsModifierVKey(int vKey)
     {
         return vKey == ModifierKeyHookEntryPoint.VkShift
@@ -572,6 +603,7 @@ internal sealed class ModifierHookRuntimeState
                || vKey == ModifierKeyHookEntryPoint.VkRMenu;
     }
 
+    // スレッド別集計を文字列化
     private static string BuildThreadSummary(Dictionary<int, int> source)
     {
         if (source == null || source.Count == 0)
@@ -606,12 +638,14 @@ internal sealed class ModifierHookPipeServer
     private readonly string _pipeName;
     private readonly ModifierHookRuntimeState _state;
 
+    // 制御パイプサーバーを初期化
     public ModifierHookPipeServer(string pipeName, ModifierHookRuntimeState state)
     {
         _pipeName = pipeName;
         _state = state;
     }
 
+    // 制御コマンド受信ループ
     public void RunLoop()
     {
         while (true)
@@ -647,6 +681,7 @@ internal sealed class ModifierHookPipeServer
         }
     }
 
+    // 受信コマンドを処理
     private string HandleRequest(string request)
     {
         if (string.IsNullOrWhiteSpace(request))
@@ -721,6 +756,7 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
     private readonly LocalHook _getAsyncKeyStateHook;
     private readonly LocalHook _getKeyboardStateHook;
 
+    // 注入先でフックを初期化
     public ModifierKeyHookEntryPoint(RemoteHooking.IContext context, string pipeName)
     {
         _pipeServer = new ModifierHookPipeServer(pipeName, _state);
@@ -744,6 +780,7 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
         _getKeyboardStateHook.ThreadACL.SetExclusiveACL(new[] { 0 });
     }
 
+    // 注入先で制御ループを開始
     public void Run(RemoteHooking.IContext context, string pipeName)
     {
         var serverThread = new Thread(_pipeServer.RunLoop)
@@ -760,6 +797,7 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
         }
     }
 
+    // GetKeyState呼び出しをフック
     private short GetKeyStateHooked(int vKey)
     {
         try
@@ -779,6 +817,7 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
         }
     }
 
+    // GetAsyncKeyState呼び出しをフック
     private short GetAsyncKeyStateHooked(int vKey)
     {
         try
@@ -798,6 +837,7 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
         }
     }
 
+    // GetKeyboardState呼び出しをフック
     private bool GetKeyboardStateHooked(IntPtr lpKeyState)
     {
         try
@@ -819,6 +859,7 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
         }
     }
 
+    // 修飾キー中立化対象を判定
     private bool ShouldNeutralize(int vKey)
     {
         if (!_state.IsEnabled())
@@ -837,6 +878,7 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
                || vKey == VkRMenu;
     }
 
+    // キーボード状態配列の修飾キーを無効化
     private static void NeutralizeKeyboardState(IntPtr lpKeyState)
     {
         WriteKeyboardState(lpKeyState, VkShift, 0);
@@ -850,6 +892,7 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
         WriteKeyboardState(lpKeyState, VkRMenu, 0);
     }
 
+    // キーボード状態配列へ値を書き込み
     private static void WriteKeyboardState(IntPtr lpKeyState, int index, byte value)
     {
         Marshal.WriteByte(lpKeyState, index, value);

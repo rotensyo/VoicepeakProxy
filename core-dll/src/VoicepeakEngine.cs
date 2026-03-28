@@ -235,6 +235,7 @@ internal sealed class VoicepeakEngine : IDisposable
             return;
         }
 
+        // 対象プロセスの修飾キーを中立化して入力時の誤爆を防止
         if (!_ui.BeginModifierIsolationSession(process.Id, "runtime_job"))
         {
             DropJob(job, "modifier_guard_unavailable_fatal");
@@ -403,6 +404,7 @@ internal sealed class VoicepeakEngine : IDisposable
         }
         finally
         {
+            // 処理完了後に対象プロセスの修飾キーを有効化
             if (!_ui.EndModifierIsolationSession("runtime_job"))
             {
                 OnModifierGuardFatal("session_end_failed");

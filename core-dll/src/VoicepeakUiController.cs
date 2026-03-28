@@ -34,12 +34,12 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private readonly object _inputPrimeGate = new object();
     private readonly object _modifierIsolationSessionGate = new object();
     // 単一操作経路前提のためロックは設けない
-    private int _cachedVoicepeakPid;
-    private int _primedProcessId;
-    private IntPtr _primedMainHwnd;
-    private int _lastInjectedEnterCount;
-    private bool _modifierIsolationSessionActive;
-    private uint _modifierIsolationSessionProcessId;
+    private int _cachedVoicepeakPid;  // 直近で解決できたvoicepeakプロセスIDのキャッシュ
+    private int _primedProcessId;  // 事前クリックを最後に行ったプロセスID
+    private IntPtr _primedMainHwnd;  // prime済みメインウィンドウハンドル
+    private int _lastInjectedEnterCount;  // 入力ブロック区切りに押下したEnter回数
+    private bool _modifierIsolationSessionActive;  // 修飾キー有効/無効の状態
+    private uint _modifierIsolationSessionProcessId;  // 修飾キー無効化対象プロセスID
 
     // UI設定とロガーを保持
     public VoicepeakUiController(UiConfig ui, DebugConfig debug, AppLogger log)
@@ -118,6 +118,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         };
     }
 
+    // 対象プロセスとウィンドウをpidから取得
     public bool TryResolveTargetByPid(int pid, out Process process, out IntPtr mainHwnd)
     {
         process = null;
@@ -170,7 +171,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return TryResolveVoicepeakPidDetailed(out pid, out _, out _);
     }
 
-    // PIDキャッシュを確認し必要時に更新
+    // PID解決と失敗理由を同時に返す
     private bool TryResolveVoicepeakPidDetailed(out int pid, out ResolveTargetFailureReason reason, out int processCount)
     {
         pid = 0;
@@ -479,6 +480,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return true;
     }
 
+    // 可視状態の入力ブロック数を取得
     private static int EstimateVisibleBlockCount(IntPtr mainHwnd)
     {
         if (mainHwnd == IntPtr.Zero)

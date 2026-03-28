@@ -33,7 +33,9 @@ internal sealed class ResolveTargetResult
 // UI操作の依存を抽象化
 internal interface IVoicepeakUiController
 {
+    // 対象解決を成功可否のみで返す
     bool TryResolveTarget(out Process process, out IntPtr mainHwnd);
+    // 対象解決結果と失敗理由を返す
     ResolveTargetResult TryResolveTargetDetailed();
     bool TryResolveTargetByPid(int pid, out Process process, out IntPtr mainHwnd);
     int GetVoicepeakProcessCount();
