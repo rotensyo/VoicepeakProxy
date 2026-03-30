@@ -128,27 +128,27 @@ internal static class JobExecutionCore
             return false;
         }
 
-        if (!ui.PrepareForTextInput(process, hwnd, config.Prepare.ActionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed))
+        if (!ui.PrepareForTextInput(process, hwnd, config.InputTiming.ActionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed))
         {
             log.Warn("prepare_failed_detail reason=prepare_text_input_failed cause=shortcut_not_applied_or_context_mismatch");
             return false;
         }
 
-        if (!ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed))
+        if (!ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed))
         {
             log.Warn("prepare_failed_detail reason=clear_input_failed cause=move_to_start_or_delete_not_applied");
             return false;
         }
 
         string expected = InputTextNormalizer.Normalize(text);
-        int charDelay = config.Prepare.CharDelayBaseMs;
+        int charDelay = config.InputTiming.CharDelayBaseMs;
         if (!ui.TypeText(hwnd, expected, charDelay))
         {
             log.Warn("prepare_failed_detail reason=type_text_failed cause=wm_char_input_failed");
             return false;
         }
 
-        int postTypeWaitMs = ComputePostTypeWaitMs(expected, config.Prepare.PostTypeWaitPerCharMs, config.Prepare.PostTypeWaitMinMs);
+        int postTypeWaitMs = ComputePostTypeWaitMs(expected, config.InputTiming.PostTypeWaitPerCharMs, config.InputTiming.PostTypeWaitMinMs);
         if (postTypeWaitMs > 0)
         {
             Thread.Sleep(postTypeWaitMs);
@@ -185,7 +185,7 @@ internal static class JobExecutionCore
             if (interruptRequested())
             {
                 onInterrupt?.Invoke();
-                MoveToStartDuringPlayback(config, ui, hwnd, config.Prepare.ActionDelayMs);
+                MoveToStartDuringPlayback(config, ui, hwnd, config.InputTiming.ActionDelayMs);
                 return SpeakMonitorResult.Interrupted();
             }
 
@@ -217,7 +217,7 @@ internal static class JobExecutionCore
                 long maxMs = config.Audio.MaxSpeakingDurationSec * 1000L;
                 if ((now - speakingStartedAt) > maxMs)
                 {
-                    MoveToStartDuringPlayback(config, ui, hwnd, config.Prepare.ActionDelayMs);
+                    MoveToStartDuringPlayback(config, ui, hwnd, config.InputTiming.ActionDelayMs);
                     return SpeakMonitorResult.MaxDuration();
                 }
             }
@@ -283,9 +283,9 @@ internal static class JobExecutionCore
         string target = targetText ?? string.Empty;
         InputValidateResult bootValidate = InputValidateResult.Fail("unknown", "unknown", string.Empty);
         bool bootInputOk = false;
-        int charDelay = config.Prepare.CharDelayBaseMs;
+        int charDelay = config.InputTiming.CharDelayBaseMs;
 
-        for (int attempt = 0; attempt <= config.Prepare.BootValidationMaxRetries; attempt++)
+        for (int attempt = 0; attempt <= config.Startup.BootValidationMaxRetries; attempt++)
         {
             bootValidate = ValidateInputText(config, ui, process, hwnd, target, charDelay, useProbeGuardChars: true);
             if (bootValidate.Success)
@@ -299,10 +299,10 @@ internal static class JobExecutionCore
                 $"attempt={attempt} reason={bootValidate.Reason} cause={bootValidate.Cause} " +
                 $"expected=\"{SanitizeForLog(target)}\" actual=\"{SanitizeForLog(bootValidate.ActualText)}\"");
 
-            bool hasNextAttempt = attempt < config.Prepare.BootValidationMaxRetries;
-            if (hasNextAttempt && config.Prepare.BootValidationRetryIntervalMs > 0)
+            bool hasNextAttempt = attempt < config.Startup.BootValidationMaxRetries;
+            if (hasNextAttempt && config.Startup.BootValidationRetryIntervalMs > 0)
             {
-                Thread.Sleep(config.Prepare.BootValidationRetryIntervalMs);
+                Thread.Sleep(config.Startup.BootValidationRetryIntervalMs);
             }
         }
 
@@ -324,7 +324,7 @@ internal static class JobExecutionCore
         bool recoveryClickUsed = false;
         for (int startAttempt = 0; startAttempt <= config.Audio.StartConfirmMaxRetries; startAttempt++)
         {
-            if (!ui.PrepareForPlayback(process, hwnd, config.Prepare.ActionDelayMs))
+            if (!ui.PrepareForPlayback(process, hwnd, config.InputTiming.ActionDelayMs))
             {
                 log.Error("起動時動作チェック失敗: 先頭移動ショートカットの実行に失敗しました。");
                 return BootValidationRunResult.MoveToStartFailed(bootValidate);
@@ -349,7 +349,7 @@ internal static class JobExecutionCore
 
             if (speakResult.Kind == SpeakMonitorKind.Completed)
             {
-                ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, true);
+                ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, true);
                 log.Info("boot_validation_ok");
                 return BootValidationRunResult.Completed(bootValidate);
             }
@@ -398,12 +398,12 @@ internal static class JobExecutionCore
             return InputValidateResult.Fail("process_not_alive", "voicepeak_process_exited_or_unavailable", string.Empty);
         }
 
-        if (!ui.PrepareForTextInput(process, hwnd, config.Prepare.ActionDelayMs, true))
+        if (!ui.PrepareForTextInput(process, hwnd, config.InputTiming.ActionDelayMs, true))
         {
             return InputValidateResult.Fail("move_to_start_failed", "shortcut_not_applied_or_context_mismatch", string.Empty);
         }
 
-        if (!ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, true))
+        if (!ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, true))
         {
             return InputValidateResult.Fail("clear_input_failed", "move_to_start_or_delete_not_applied", string.Empty);
         }
@@ -415,7 +415,7 @@ internal static class JobExecutionCore
             return InputValidateResult.Fail("type_text_failed", "wm_char_input_failed", string.Empty);
         }
 
-        int postTypeWaitMs = ComputePostTypeWaitMs(expected, config.Prepare.PostTypeWaitPerCharMs, config.Prepare.PostTypeWaitMinMs);
+        int postTypeWaitMs = ComputePostTypeWaitMs(expected, config.InputTiming.PostTypeWaitPerCharMs, config.InputTiming.PostTypeWaitMinMs);
         if (postTypeWaitMs > 0)
         {
             Thread.Sleep(postTypeWaitMs);
@@ -423,7 +423,7 @@ internal static class JobExecutionCore
 
         if (useProbeGuardChars)
         {
-            if (!ui.PrepareForTextInput(process, hwnd, config.Prepare.ActionDelayMs, true))
+            if (!ui.PrepareForTextInput(process, hwnd, config.InputTiming.ActionDelayMs, true))
             {
                 return InputValidateResult.Fail("move_to_start_failed", "shortcut_not_applied_or_context_mismatch", string.Empty);
             }
@@ -494,7 +494,7 @@ internal static class JobExecutionCore
             return;
         }
 
-        ui.ClearInput(process, hwnd, config.Prepare.ActionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed);
+        ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed);
         if (killFocusAfterClear)
         {
             ui.KillFocus(hwnd);
@@ -532,8 +532,8 @@ internal static class JobExecutionCore
         if (string.Equals(phase, "pre", StringComparison.Ordinal))
         {
             string normalized = InputTextNormalizer.Normalize(nextText);
-            int typingMs = normalized.Length * config.Prepare.CharDelayBaseMs;
-            int postTypeWaitMs = ComputePostTypeWaitMs(normalized, config.Prepare.PostTypeWaitPerCharMs, config.Prepare.PostTypeWaitMinMs);
+            int typingMs = normalized.Length * config.InputTiming.CharDelayBaseMs;
+            int postTypeWaitMs = ComputePostTypeWaitMs(normalized, config.InputTiming.PostTypeWaitPerCharMs, config.InputTiming.PostTypeWaitMinMs);
             requiredByFormulaMs += typingMs + postTypeWaitMs;
         }
 

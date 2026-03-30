@@ -6,13 +6,15 @@ namespace VoicepeakProxyCore;
 // 実行時設定のルート
 public sealed class AppConfig
 {
-    public ServerConfig Server { get; set; } = new ServerConfig();
+    public QueueConfig Queue { get; set; } = new QueueConfig();
     public AudioConfig Audio { get; set; } = new AudioConfig();
-    public PrepareConfig Prepare { get; set; } = new PrepareConfig();
+    public StartupConfig Startup { get; set; } = new StartupConfig();
+    public HookConfig Hook { get; set; } = new HookConfig();
     public UiConfig Ui { get; set; } = new UiConfig();
-    public TextTransformConfig TextTransform { get; set; } = new TextTransformConfig();
-    public DebugConfig Debug { get; set; } = new DebugConfig();
+    public InputTimingConfig InputTiming { get; set; } = new InputTimingConfig();
+    public TextConfig Text { get; set; } = new TextConfig();
     public ValidationConfig Validation { get; set; } = new ValidationConfig();
+    public DebugConfig Debug { get; set; } = new DebugConfig();
 }
 
 // 検証方針の設定
@@ -22,8 +24,8 @@ public sealed class ValidationConfig
     public RequestValidationMode RequestValidation { get; set; } = RequestValidationMode.Strict;
 }
 
-// サーバ関連設定
-public sealed class ServerConfig
+// キュー関連設定
+public sealed class QueueConfig
 {
     public int MaxQueuedJobs { get; set; } = 500;
 }
@@ -39,19 +41,20 @@ public sealed class AudioConfig
     public int MaxSpeakingDurationSec { get; set; } = 300;
 }
 
-// 入力準備関連設定
-public sealed class PrepareConfig
+// 起動時処理関連設定
+public sealed class StartupConfig
 {
     public string BootValidationText { get; set; } = "初期化完了";
     public int BootValidationMaxRetries { get; set; } = 2;
     public int BootValidationRetryIntervalMs { get; set; } = 1000;
-    public int CharDelayBaseMs { get; set; } = 0;
-    public int ActionDelayMs { get; set; } = 5;
-    public int PostTypeWaitPerCharMs { get; set; } = 5;
-    public int PostTypeWaitMinMs { get; set; } = 300;
-    public int SequentialMoveToStartKeyDelayBaseMs { get; set; } = 5;
-    public int DeleteKeyDelayBaseMs { get; set; } = 0;
-    public int ClearInputMaxPasses { get; set; } = 10;
+    public bool ClickAtValidationEnabled { get; set; } = true;
+    public bool ClickBeforeTextFocusWhenUninitializedEnabled { get; set; } = false;
+    public bool ClickOnStartTimeoutRetryEnabled { get; set; } = false;
+}
+
+// 修飾キーフック関連設定
+public sealed class HookConfig
+{
     public int HookCommandTimeoutMs { get; set; } = 500;
     public int HookConnectTimeoutMs { get; set; } = 300;
     public int HookConnectTotalWaitMs { get; set; } = 8000;
@@ -63,11 +66,26 @@ public sealed class UiConfig
     public string MoveToStartShortcut { get; set; } = "Ctrl+Up";
     public string PlayShortcut { get; set; } = "Space";
     public int DelayBeforePlayShortcutMs { get; set; } = 60;
-    public bool ClickAtValidationEnabled { get; set; } = true;
-    public bool ClickBeforeTextFocusWhenUninitializedEnabled { get; set; } = false;
-    public bool ClickOnStartTimeoutRetryEnabled { get; set; } = false;
+}
+
+// 入力タイミング関連設定
+public sealed class InputTimingConfig
+{
+    public int CharDelayBaseMs { get; set; } = 0;
+    public int ActionDelayMs { get; set; } = 5;
+    public int PostTypeWaitPerCharMs { get; set; } = 5;
+    public int PostTypeWaitMinMs { get; set; } = 300;
+    public int SequentialMoveToStartKeyDelayBaseMs { get; set; } = 5;
+    public int DeleteKeyDelayBaseMs { get; set; } = 0;
+    public int ClearInputMaxPasses { get; set; } = 10;
+}
+
+// テキスト処理設定
+public sealed class TextConfig
+{
     public bool SendEnterAfterSentenceBreak { get; set; } = false;
     public List<string> SentenceBreakTriggers { get; set; } = new List<string> { "。", "！", "？", "!", "?" };
+    public List<ReplaceRule> ReplaceRules { get; set; } = new List<ReplaceRule>();
 }
 
 // デバッグ関連設定
@@ -75,12 +93,6 @@ public sealed class DebugConfig
 {
     public bool LogTextCandidates { get; set; } = false;
     public bool LogModifierHookStats { get; set; } = false;
-}
-
-// 文字列変換設定
-public sealed class TextTransformConfig
-{
-    public List<ReplaceRule> ReplaceRules { get; set; } = new List<ReplaceRule>();
 }
 
 // 置換ルール定義
@@ -101,9 +113,9 @@ internal static class AppConfigValidator
             throw new InvalidOperationException("config は null にできません");
         }
 
-        if (config.Server == null)
+        if (config.Queue == null)
         {
-            throw new InvalidOperationException("server は null にできません");
+            throw new InvalidOperationException("queue は null にできません");
         }
 
         if (config.Audio == null)
@@ -111,9 +123,14 @@ internal static class AppConfigValidator
             throw new InvalidOperationException("audio は null にできません");
         }
 
-        if (config.Prepare == null)
+        if (config.Startup == null)
         {
-            throw new InvalidOperationException("prepare は null にできません");
+            throw new InvalidOperationException("startup は null にできません");
+        }
+
+        if (config.Hook == null)
+        {
+            throw new InvalidOperationException("hook は null にできません");
         }
 
         if (config.Ui == null)
@@ -121,9 +138,19 @@ internal static class AppConfigValidator
             throw new InvalidOperationException("ui は null にできません");
         }
 
-        if (config.TextTransform == null)
+        if (config.InputTiming == null)
         {
-            throw new InvalidOperationException("textTransform は null にできません");
+            throw new InvalidOperationException("inputTiming は null にできません");
+        }
+
+        if (config.Text == null)
+        {
+            throw new InvalidOperationException("text は null にできません");
+        }
+
+        if (config.Debug == null)
+        {
+            throw new InvalidOperationException("debug は null にできません");
         }
 
         if (config.Validation == null)
@@ -131,9 +158,9 @@ internal static class AppConfigValidator
             throw new InvalidOperationException("validation は null にできません");
         }
 
-        if (config.Server.MaxQueuedJobs < 0)
+        if (config.Queue.MaxQueuedJobs < 0)
         {
-            throw new InvalidOperationException("server.maxQueuedJobs は 0 以上で指定してください");
+            throw new InvalidOperationException("queue.maxQueuedJobs は 0 以上で指定してください");
         }
 
         if (config.Audio.PollIntervalMs <= 0)
@@ -156,64 +183,34 @@ internal static class AppConfigValidator
             throw new InvalidOperationException("audio.stopConfirmMs は 1 以上で指定してください");
         }
 
-        if (config.Prepare.ActionDelayMs < 0)
+        if (config.Startup.BootValidationText == null)
         {
-            throw new InvalidOperationException("prepare.actionDelayMs は 0 以上で指定してください");
+            throw new InvalidOperationException("startup.bootValidationText は null にできません");
         }
 
-        if (config.Prepare.BootValidationText == null)
+        if (config.Startup.BootValidationMaxRetries < 0)
         {
-            throw new InvalidOperationException("prepare.bootValidationText は null にできません");
+            throw new InvalidOperationException("startup.bootValidationMaxRetries は 0 以上で指定してください");
         }
 
-        if (config.Prepare.BootValidationMaxRetries < 0)
+        if (config.Startup.BootValidationRetryIntervalMs < 0)
         {
-            throw new InvalidOperationException("prepare.bootValidationMaxRetries は 0 以上で指定してください");
+            throw new InvalidOperationException("startup.bootValidationRetryIntervalMs は 0 以上で指定してください");
         }
 
-        if (config.Prepare.BootValidationRetryIntervalMs < 0)
+        if (config.Hook.HookCommandTimeoutMs <= 0)
         {
-            throw new InvalidOperationException("prepare.bootValidationRetryIntervalMs は 0 以上で指定してください");
+            throw new InvalidOperationException("hook.hookCommandTimeoutMs は 1 以上で指定してください");
         }
 
-        if (config.Prepare.PostTypeWaitPerCharMs < 0)
+        if (config.Hook.HookConnectTimeoutMs <= 0)
         {
-            throw new InvalidOperationException("prepare.postTypeWaitPerCharMs は 0 以上で指定してください");
+            throw new InvalidOperationException("hook.hookConnectTimeoutMs は 1 以上で指定してください");
         }
 
-        if (config.Prepare.PostTypeWaitMinMs < 0)
+        if (config.Hook.HookConnectTotalWaitMs <= 0)
         {
-            throw new InvalidOperationException("prepare.postTypeWaitMinMs は 0 以上で指定してください");
-        }
-
-        if (config.Prepare.SequentialMoveToStartKeyDelayBaseMs < 0)
-        {
-            throw new InvalidOperationException("prepare.sequentialMoveToStartKeyDelayBaseMs は 0 以上で指定してください");
-        }
-
-        if (config.Prepare.DeleteKeyDelayBaseMs < 0)
-        {
-            throw new InvalidOperationException("prepare.deleteKeyDelayBaseMs は 0 以上で指定してください");
-        }
-
-        if (config.Prepare.ClearInputMaxPasses <= 0)
-        {
-            throw new InvalidOperationException("prepare.clearInputMaxPasses は 1 以上で指定してください");
-        }
-
-        if (config.Prepare.HookCommandTimeoutMs <= 0)
-        {
-            throw new InvalidOperationException("prepare.hookCommandTimeoutMs は 1 以上で指定してください");
-        }
-
-        if (config.Prepare.HookConnectTimeoutMs <= 0)
-        {
-            throw new InvalidOperationException("prepare.hookConnectTimeoutMs は 1 以上で指定してください");
-        }
-
-        if (config.Prepare.HookConnectTotalWaitMs <= 0)
-        {
-            throw new InvalidOperationException("prepare.hookConnectTotalWaitMs は 1 以上で指定してください");
+            throw new InvalidOperationException("hook.hookConnectTotalWaitMs は 1 以上で指定してください");
         }
 
         if (config.Ui.DelayBeforePlayShortcutMs < 0)
@@ -231,23 +228,53 @@ internal static class AppConfigValidator
             throw new InvalidOperationException("ui.playShortcut は修飾なしキーのみ指定できます（例: F3, Space, Home）");
         }
 
-        if (config.Ui.SentenceBreakTriggers == null)
+        if (config.InputTiming.ActionDelayMs < 0)
         {
-            throw new InvalidOperationException("ui.sentenceBreakTriggers は null にできません");
+            throw new InvalidOperationException("inputTiming.actionDelayMs は 0 以上で指定してください");
         }
 
-        for (int i = 0; i < config.Ui.SentenceBreakTriggers.Count; i++)
+        if (config.InputTiming.PostTypeWaitPerCharMs < 0)
         {
-            string token = config.Ui.SentenceBreakTriggers[i];
+            throw new InvalidOperationException("inputTiming.postTypeWaitPerCharMs は 0 以上で指定してください");
+        }
+
+        if (config.InputTiming.PostTypeWaitMinMs < 0)
+        {
+            throw new InvalidOperationException("inputTiming.postTypeWaitMinMs は 0 以上で指定してください");
+        }
+
+        if (config.InputTiming.SequentialMoveToStartKeyDelayBaseMs < 0)
+        {
+            throw new InvalidOperationException("inputTiming.sequentialMoveToStartKeyDelayBaseMs は 0 以上で指定してください");
+        }
+
+        if (config.InputTiming.DeleteKeyDelayBaseMs < 0)
+        {
+            throw new InvalidOperationException("inputTiming.deleteKeyDelayBaseMs は 0 以上で指定してください");
+        }
+
+        if (config.InputTiming.ClearInputMaxPasses <= 0)
+        {
+            throw new InvalidOperationException("inputTiming.clearInputMaxPasses は 1 以上で指定してください");
+        }
+
+        if (config.Text.SentenceBreakTriggers == null)
+        {
+            throw new InvalidOperationException("text.sentenceBreakTriggers は null にできません");
+        }
+
+        for (int i = 0; i < config.Text.SentenceBreakTriggers.Count; i++)
+        {
+            string token = config.Text.SentenceBreakTriggers[i];
             if (string.IsNullOrEmpty(token))
             {
-                throw new InvalidOperationException($"ui.sentenceBreakTriggers[{i}] は空文字を指定できません");
+                throw new InvalidOperationException($"text.sentenceBreakTriggers[{i}] は空文字を指定できません");
             }
         }
 
-        if (config.TextTransform.ReplaceRules == null)
+        if (config.Text.ReplaceRules == null)
         {
-            throw new InvalidOperationException("textTransform.replaceRules は null にできません");
+            throw new InvalidOperationException("text.replaceRules は null にできません");
         }
     }
 }

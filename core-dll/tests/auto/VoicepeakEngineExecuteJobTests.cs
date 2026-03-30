@@ -89,7 +89,7 @@ public class VoicepeakEngineExecuteJobTests
         ui.ShouldAttemptPrimeInputContextHandler = (_, _, reason) => reason == InputContextPrimeReason.StartTimeoutRetry;
         AppConfig config = CreateConfig();
         config.Ui.MoveToStartShortcut = "Ctrl+Up";
-        config.Ui.ClickOnStartTimeoutRetryEnabled = true;
+        config.Startup.ClickOnStartTimeoutRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 2;
         config.Audio.StopConfirmMs = 1;
@@ -117,7 +117,7 @@ public class VoicepeakEngineExecuteJobTests
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
         AppConfig config = CreateConfig();
         config.Ui.MoveToStartShortcut = "F3";
-        config.Ui.ClickOnStartTimeoutRetryEnabled = true;
+        config.Startup.ClickOnStartTimeoutRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 1;

@@ -17,7 +17,7 @@ public class CompositeMoveToStartManualTests
         // 起動時検証を有効化
         AppConfig config = CreateManualConfig();
         config.Validation.BootValidation = BootValidationMode.Required;
-        config.Prepare.BootValidationText = "フォーカス確認です。";
+        config.Startup.BootValidationText = "フォーカス確認です。";
 
         using VoicepeakRuntime runtime = VoicepeakRuntime.Start(config, new ConsoleAppLogger());
 
@@ -134,17 +134,17 @@ public class CompositeMoveToStartManualTests
         // 手動確認向け設定
         AppConfig config = new AppConfig();
         config.Ui.MoveToStartShortcut = "Ctrl+Up";
-        config.Ui.ClickAtValidationEnabled = true;
-        config.Ui.ClickBeforeTextFocusWhenUninitializedEnabled = true;
-        config.Ui.ClickOnStartTimeoutRetryEnabled = true;
+        config.Startup.ClickAtValidationEnabled = true;
+        config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled = true;
+        config.Startup.ClickOnStartTimeoutRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 2000;
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 300;
         config.Audio.MaxSpeakingDurationSec = 30;
-        config.Prepare.ActionDelayMs = 20;
-        config.Prepare.CharDelayBaseMs = 1;
-        config.Prepare.PostTypeWaitPerCharMs = 4;
-        config.Prepare.PostTypeWaitMinMs = 100;
+        config.InputTiming.ActionDelayMs = 20;
+        config.InputTiming.CharDelayBaseMs = 1;
+        config.InputTiming.PostTypeWaitPerCharMs = 4;
+        config.InputTiming.PostTypeWaitMinMs = 100;
         return config;
     }
 

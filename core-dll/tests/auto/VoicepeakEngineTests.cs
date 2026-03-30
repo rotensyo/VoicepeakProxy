@@ -54,7 +54,7 @@ public class VoicepeakEngineTests
         FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
         ui.ReadInputHandler = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA);
         AppConfig config = CreateEngineConfig();
-        config.Prepare.BootValidationText = string.Empty;
+        config.Startup.BootValidationText = string.Empty;
         TestLogger logger = new TestLogger();
 
         using CancellationTokenSource cts = new CancellationTokenSource();
@@ -158,7 +158,7 @@ public class VoicepeakEngineTests
         ui.ShouldAttemptPrimeInputContextHandler = (_, _, reason) => reason == InputContextPrimeReason.Validation;
         AppConfig config = CreateEngineConfig();
         config.Ui.MoveToStartShortcut = "Ctrl+Up";
-        config.Prepare.BootValidationText = string.Empty;
+        config.Startup.BootValidationText = string.Empty;
 
         using CancellationTokenSource cts = new CancellationTokenSource();
         VoicepeakEngine engine = new VoicepeakEngine(config, cts, new AppLogger(new TestLogger()), ui, new FakeAudioSessionReader(), false);
@@ -178,7 +178,7 @@ public class VoicepeakEngineTests
         ui.ReadInputHandler = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA);
         AppConfig config = CreateEngineConfig();
         config.Ui.MoveToStartShortcut = "F3";
-        config.Prepare.BootValidationText = string.Empty;
+        config.Startup.BootValidationText = string.Empty;
 
         using CancellationTokenSource cts = new CancellationTokenSource();
         VoicepeakEngine engine = new VoicepeakEngine(config, cts, new AppLogger(new TestLogger()), ui, new FakeAudioSessionReader(), false);
@@ -204,8 +204,8 @@ public class VoicepeakEngineTests
         ui.ShouldAttemptPrimeInputContextHandler = (_, _, reason) => reason == InputContextPrimeReason.StartTimeoutRetry;
         AppConfig config = CreateEngineConfig();
         config.Ui.MoveToStartShortcut = "Ctrl+Up";
-        config.Ui.ClickAtValidationEnabled = false;
-        config.Ui.ClickOnStartTimeoutRetryEnabled = true;
+        config.Startup.ClickAtValidationEnabled = false;
+        config.Startup.ClickOnStartTimeoutRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 1;
@@ -462,7 +462,7 @@ public class VoicepeakEngineTests
         };
 
         AppConfig config = CreateEngineConfig();
-        config.Prepare.BootValidationText = string.Empty;
+        config.Startup.BootValidationText = string.Empty;
 
         using CancellationTokenSource cts = new CancellationTokenSource();
         VoicepeakEngine engine = new VoicepeakEngine(config, cts, new AppLogger(new TestLogger()), ui, new FakeAudioSessionReader(), false);
@@ -489,9 +489,9 @@ public class VoicepeakEngineTests
     private static AppConfig CreateEngineConfig()
     {
         AppConfig config = new AppConfig();
-        config.Prepare.BootValidationText = "abc";
-        config.Prepare.BootValidationMaxRetries = 0;
-        config.Prepare.BootValidationRetryIntervalMs = 0;
+        config.Startup.BootValidationText = "abc";
+        config.Startup.BootValidationMaxRetries = 0;
+        config.Startup.BootValidationRetryIntervalMs = 0;
         config.Audio.PollIntervalMs = 1;
         config.Audio.StartConfirmTimeoutMs = 10;
         config.Audio.StopConfirmMs = 1;

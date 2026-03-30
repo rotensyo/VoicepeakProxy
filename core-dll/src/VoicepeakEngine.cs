@@ -50,7 +50,7 @@ internal sealed class VoicepeakEngine : IDisposable
         _config = config;
         _appCts = appCts;
         _log = log;
-        _ui = ui ?? new VoicepeakUiController(config.Ui, config.Prepare, config.Debug, _log);
+        _ui = ui ?? new VoicepeakUiController(config.Ui, config.InputTiming, config.Startup, config.Hook, config.Text, config.Debug, _log);
         _audio = audio ?? new AudioSessionReader(_log);
         _worker = null;
         if (startWorker)
@@ -101,7 +101,7 @@ internal sealed class VoicepeakEngine : IDisposable
             process,
             hwnd,
             _log,
-            _config.Prepare.BootValidationText);
+            _config.Startup.BootValidationText);
         if (result.Kind == BootValidationRunKind.Completed)
         {
             return true;
@@ -137,7 +137,7 @@ internal sealed class VoicepeakEngine : IDisposable
                 switch (job.Mode)
                 {
                     case JobMode.Queue:
-                        if (_queue.Count >= _config.Server.MaxQueuedJobs)
+                        if (_queue.Count >= _config.Queue.MaxQueuedJobs)
                         {
                             return new EnqueueResult
                             {
@@ -302,7 +302,7 @@ internal sealed class VoicepeakEngine : IDisposable
 
             for (int startAttempt = 0; startAttempt <= _config.Audio.StartConfirmMaxRetries; startAttempt++)
             {
-                if (!_ui.PrepareForPlayback(process, hwnd, _config.Prepare.ActionDelayMs))
+                if (!_ui.PrepareForPlayback(process, hwnd, _config.InputTiming.ActionDelayMs))
                 {
                     DropJob(job, "move_to_start_failed");
                     JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: false);

@@ -134,7 +134,7 @@ internal static class JobCompiler
         foreach (Match m in PauseTokenParser.Matches(input))
         {
             // pause制御は置換対象から除外
-            string chunk = ApplyReplaceRules(input.Substring(index, m.Index - index), config.TextTransform.ReplaceRules);
+            string chunk = ApplyReplaceRules(input.Substring(index, m.Index - index), config.Text.ReplaceRules);
             if (chunk.Length > 0)
             {
                 segments.Add(new Segment
@@ -151,7 +151,7 @@ internal static class JobCompiler
             index = m.Index + m.Length;
         }
 
-        string tail = ApplyReplaceRules(input.Substring(index), config.TextTransform.ReplaceRules);
+        string tail = ApplyReplaceRules(input.Substring(index), config.Text.ReplaceRules);
         if (tail.Length > 0)
         {
             segments.Add(new Segment

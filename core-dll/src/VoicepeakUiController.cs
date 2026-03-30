@@ -25,7 +25,10 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private const uint WmLButtonUp = 0x0202;
     private const int MkLButton = 0x0001;
     private readonly UiConfig _ui;
-    private readonly PrepareConfig _prepare;
+    private readonly InputTimingConfig _inputTiming;
+    private readonly StartupConfig _startup;
+    private readonly HookConfig _hook;
+    private readonly TextConfig _text;
     private readonly DebugConfig _debug;
     private readonly Dictionary<char, List<SentenceBreakTrigger>> _sentenceBreakTriggerIndex;
     private readonly AppLogger _log;
@@ -43,32 +46,35 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
     // UI設定とロガーを保持
     public VoicepeakUiController(UiConfig ui, DebugConfig debug, AppLogger log)
-        : this(ui, new PrepareConfig(), debug, log, new DefaultVoicepeakProcessApi())
+        : this(ui, new InputTimingConfig(), new StartupConfig(), new HookConfig(), new TextConfig(), debug, log, new DefaultVoicepeakProcessApi())
     {
     }
 
-    public VoicepeakUiController(UiConfig ui, PrepareConfig prepare, DebugConfig debug, AppLogger log)
-        : this(ui, prepare, debug, log, new DefaultVoicepeakProcessApi())
+    public VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, StartupConfig startup, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log)
+        : this(ui, inputTiming, startup, hook, text, debug, log, new DefaultVoicepeakProcessApi())
     {
     }
 
     internal VoicepeakUiController(UiConfig ui, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
-        : this(ui, new PrepareConfig(), debug, log, processApi)
+        : this(ui, new InputTimingConfig(), new StartupConfig(), new HookConfig(), new TextConfig(), debug, log, processApi)
     {
     }
 
-    internal VoicepeakUiController(UiConfig ui, PrepareConfig prepare, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
+    internal VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, StartupConfig startup, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
     {
-        _ui = ui;
-        _prepare = prepare ?? new PrepareConfig();
+        _ui = ui ?? new UiConfig();
+        _inputTiming = inputTiming ?? new InputTimingConfig();
+        _startup = startup ?? new StartupConfig();
+        _hook = hook ?? new HookConfig();
+        _text = text ?? new TextConfig();
         _debug = debug ?? new DebugConfig();
         _log = log;
         _processApi = processApi ?? new DefaultVoicepeakProcessApi();
         _modifierKeyHookController = new ModifierKeyHookController(
-            _prepare.HookCommandTimeoutMs,
-            _prepare.HookConnectTimeoutMs,
-            _prepare.HookConnectTotalWaitMs);
-        _sentenceBreakTriggerIndex = BuildSentenceBreakTriggerIndex(ui);
+            _hook.HookCommandTimeoutMs,
+            _hook.HookConnectTimeoutMs,
+            _hook.HookConnectTotalWaitMs);
+        _sentenceBreakTriggerIndex = BuildSentenceBreakTriggerIndex(_text);
         WarnIfMoveToStartShortcutWillUseSequentialFallback(_ui.MoveToStartShortcut);
     }
 
@@ -326,7 +332,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     // 入力欄をクリア
     public bool ClearInput(Process process, IntPtr mainHwnd, int actionDelayMs, bool allowCompositePrimeBeforeTextFocusWhenUnprimed)
     {
-        int clearInputMaxPasses = Math.Max(1, _prepare.ClearInputMaxPasses);
+        int clearInputMaxPasses = Math.Max(1, _inputTiming.ClearInputMaxPasses);
         bool compositeMoveToStart = UsesSequentialMoveToStartFallback(_ui.MoveToStartShortcut);
         if (compositeMoveToStart)
         {
@@ -452,9 +458,9 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 return false;
             }
 
-            if (_prepare.SequentialMoveToStartKeyDelayBaseMs > 0)
+            if (_inputTiming.SequentialMoveToStartKeyDelayBaseMs > 0)
             {
-                Thread.Sleep(_prepare.SequentialMoveToStartKeyDelayBaseMs);
+                Thread.Sleep(_inputTiming.SequentialMoveToStartKeyDelayBaseMs);
             }
 
             if (!SendKey(mainHwnd, VirtualKey.Up))
@@ -462,9 +468,9 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 return false;
             }
 
-            if (_prepare.SequentialMoveToStartKeyDelayBaseMs > 0)
+            if (_inputTiming.SequentialMoveToStartKeyDelayBaseMs > 0)
             {
-                Thread.Sleep(_prepare.SequentialMoveToStartKeyDelayBaseMs);
+                Thread.Sleep(_inputTiming.SequentialMoveToStartKeyDelayBaseMs);
             }
         }
 
@@ -853,9 +859,9 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             return false;
         }
 
-        if (_prepare.DeleteKeyDelayBaseMs > 0)
+        if (_inputTiming.DeleteKeyDelayBaseMs > 0)
         {
-            Thread.Sleep(_prepare.DeleteKeyDelayBaseMs);
+            Thread.Sleep(_inputTiming.DeleteKeyDelayBaseMs);
         }
 
         return true;
@@ -1071,11 +1077,11 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         switch (reason)
         {
             case InputContextPrimeReason.Validation:
-                return _ui.ClickAtValidationEnabled && !IsInputContextPrimed(process, mainHwnd);
+                return _startup.ClickAtValidationEnabled && !IsInputContextPrimed(process, mainHwnd);
             case InputContextPrimeReason.BeforeTextFocusWhenUnprimed:
-                return _ui.ClickBeforeTextFocusWhenUninitializedEnabled && !IsInputContextPrimed(process, mainHwnd);
+                return _startup.ClickBeforeTextFocusWhenUninitializedEnabled && !IsInputContextPrimed(process, mainHwnd);
             case InputContextPrimeReason.StartTimeoutRetry:
-                return _ui.ClickOnStartTimeoutRetryEnabled;
+                return _startup.ClickOnStartTimeoutRetryEnabled;
             default:
                 return false;
         }
@@ -1233,9 +1239,9 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 return false;
             }
 
-            if (_prepare.SequentialMoveToStartKeyDelayBaseMs > 0)
+            if (_inputTiming.SequentialMoveToStartKeyDelayBaseMs > 0)
             {
-                Thread.Sleep(_prepare.SequentialMoveToStartKeyDelayBaseMs);
+                Thread.Sleep(_inputTiming.SequentialMoveToStartKeyDelayBaseMs);
             }
 
             if (!SendKey(mainHwnd, VirtualKey.Up))
@@ -1243,9 +1249,9 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 return false;
             }
 
-            if (_prepare.SequentialMoveToStartKeyDelayBaseMs > 0)
+            if (_inputTiming.SequentialMoveToStartKeyDelayBaseMs > 0)
             {
-                Thread.Sleep(_prepare.SequentialMoveToStartKeyDelayBaseMs);
+                Thread.Sleep(_inputTiming.SequentialMoveToStartKeyDelayBaseMs);
             }
         }
 
@@ -1549,10 +1555,10 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
     }
 
-    private static Dictionary<char, List<SentenceBreakTrigger>> BuildSentenceBreakTriggerIndex(UiConfig ui)
+    private static Dictionary<char, List<SentenceBreakTrigger>> BuildSentenceBreakTriggerIndex(TextConfig text)
     {
         var index = new Dictionary<char, List<SentenceBreakTrigger>>();
-        if (ui?.SentenceBreakTriggers == null)
+        if (text?.SentenceBreakTriggers == null)
         {
             return index;
         }
@@ -1560,9 +1566,9 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         var used = new HashSet<string>(StringComparer.Ordinal);
         int order = 0;
 
-        for (int i = 0; i < ui.SentenceBreakTriggers.Count; i++)
+        for (int i = 0; i < text.SentenceBreakTriggers.Count; i++)
         {
-            string token = ui.SentenceBreakTriggers[i];
+            string token = text.SentenceBreakTriggers[i];
             if (!string.IsNullOrEmpty(token))
             {
                 if (used.Add(token))
@@ -1684,7 +1690,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private HashSet<int> ComputeSentenceBreakEnterPositions(string text)
     {
         HashSet<int> positions = new HashSet<int>();
-        if (!_ui.SendEnterAfterSentenceBreak || string.IsNullOrEmpty(text))
+        if (!_text.SendEnterAfterSentenceBreak || string.IsNullOrEmpty(text))
         {
             return positions;
         }

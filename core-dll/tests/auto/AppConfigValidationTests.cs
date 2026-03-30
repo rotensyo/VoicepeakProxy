@@ -14,26 +14,26 @@ public class AppConfigValidationTests
         // 既定値を確認
         AppConfig config = new AppConfig();
 
-        Assert.AreEqual(500, config.Server.MaxQueuedJobs);
+        Assert.AreEqual(500, config.Queue.MaxQueuedJobs);
         Assert.AreEqual(50, config.Audio.PollIntervalMs);
         Assert.AreEqual(1000, config.Audio.StartConfirmTimeoutMs);
         Assert.AreEqual(0, config.Audio.StartConfirmMaxRetries);
         Assert.AreEqual(300, config.Audio.StopConfirmMs);
-        Assert.AreEqual("初期化完了", config.Prepare.BootValidationText);
-        Assert.AreEqual(0, config.Prepare.CharDelayBaseMs);
-        Assert.AreEqual(5, config.Prepare.PostTypeWaitPerCharMs);
-        Assert.AreEqual(300, config.Prepare.PostTypeWaitMinMs);
-        Assert.AreEqual(5, config.Prepare.SequentialMoveToStartKeyDelayBaseMs);
-        Assert.AreEqual(0, config.Prepare.DeleteKeyDelayBaseMs);
-        Assert.AreEqual(10, config.Prepare.ClearInputMaxPasses);
-        Assert.AreEqual(500, config.Prepare.HookCommandTimeoutMs);
-        Assert.AreEqual(300, config.Prepare.HookConnectTimeoutMs);
-        Assert.AreEqual(8000, config.Prepare.HookConnectTotalWaitMs);
+        Assert.AreEqual("初期化完了", config.Startup.BootValidationText);
+        Assert.AreEqual(0, config.InputTiming.CharDelayBaseMs);
+        Assert.AreEqual(5, config.InputTiming.PostTypeWaitPerCharMs);
+        Assert.AreEqual(300, config.InputTiming.PostTypeWaitMinMs);
+        Assert.AreEqual(5, config.InputTiming.SequentialMoveToStartKeyDelayBaseMs);
+        Assert.AreEqual(0, config.InputTiming.DeleteKeyDelayBaseMs);
+        Assert.AreEqual(10, config.InputTiming.ClearInputMaxPasses);
+        Assert.AreEqual(500, config.Hook.HookCommandTimeoutMs);
+        Assert.AreEqual(300, config.Hook.HookConnectTimeoutMs);
+        Assert.AreEqual(8000, config.Hook.HookConnectTotalWaitMs);
         Assert.AreEqual("Ctrl+Up", config.Ui.MoveToStartShortcut);
-        Assert.IsTrue(config.Ui.ClickAtValidationEnabled);
-        Assert.IsFalse(config.Ui.ClickBeforeTextFocusWhenUninitializedEnabled);
-        Assert.IsFalse(config.Ui.ClickOnStartTimeoutRetryEnabled);
-        CollectionAssert.AreEqual(new[] { "。", "！", "？", "!", "?" }, config.Ui.SentenceBreakTriggers);
+        Assert.IsTrue(config.Startup.ClickAtValidationEnabled);
+        Assert.IsFalse(config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled);
+        Assert.IsFalse(config.Startup.ClickOnStartTimeoutRetryEnabled);
+        CollectionAssert.AreEqual(new[] { "。", "！", "？", "!", "?" }, config.Text.SentenceBreakTriggers);
         Assert.AreEqual(BootValidationMode.Required, config.Validation.BootValidation);
         Assert.AreEqual(RequestValidationMode.Strict, config.Validation.RequestValidation);
     }
@@ -54,40 +54,43 @@ public class AppConfigValidationTests
         // 必須セクションnullを拒否
         AppConfig config = new AppConfig
         {
-            Server = null,
+            Queue = null,
             Audio = null,
-            Prepare = null,
+            Startup = null,
+            Hook = null,
             Ui = null,
-            TextTransform = null,
+            InputTiming = null,
+            Text = null,
+            Debug = null,
             Validation = null
         };
 
         InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
             ReflectionTestHelper.InvokeCoreStatic("AppConfigValidator", "Validate", config));
 
-        StringAssert.Contains(ex.Message, "server は null にできません");
+        StringAssert.Contains(ex.Message, "queue は null にできません");
     }
 
     [TestMethod]
     public void Validate_InvalidNumericValues_Throw()
     {
         // 数値境界を検証
-        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Server.MaxQueuedJobs = -1));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Queue.MaxQueuedJobs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.PollIntervalMs = 0));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.StartConfirmTimeoutMs = 0));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.StartConfirmMaxRetries = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.StopConfirmMs = 0));
-        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.ActionDelayMs = -1));
-        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.BootValidationMaxRetries = -1));
-        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.BootValidationRetryIntervalMs = -1));
-        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.PostTypeWaitPerCharMs = -1));
-        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.PostTypeWaitMinMs = -1));
-        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.SequentialMoveToStartKeyDelayBaseMs = -1));
-        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.DeleteKeyDelayBaseMs = -1));
-        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.ClearInputMaxPasses = 0));
-        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.HookCommandTimeoutMs = 0));
-        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.HookConnectTimeoutMs = 0));
-        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Prepare.HookConnectTotalWaitMs = 0));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.ActionDelayMs = -1));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Startup.BootValidationMaxRetries = -1));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Startup.BootValidationRetryIntervalMs = -1));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.PostTypeWaitPerCharMs = -1));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.PostTypeWaitMinMs = -1));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.SequentialMoveToStartKeyDelayBaseMs = -1));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.DeleteKeyDelayBaseMs = -1));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.ClearInputMaxPasses = 0));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Hook.HookCommandTimeoutMs = 0));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Hook.HookConnectTimeoutMs = 0));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Hook.HookConnectTotalWaitMs = 0));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Ui.DelayBeforePlayShortcutMs = -1));
     }
 
@@ -133,16 +136,16 @@ public class AppConfigValidationTests
     {
         // 起動検証文字列nullを拒否
         InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
-            ValidateWith(config => config.Prepare.BootValidationText = null));
+            ValidateWith(config => config.Startup.BootValidationText = null));
 
-        StringAssert.Contains(ex.Message, "prepare.bootValidationText");
+        StringAssert.Contains(ex.Message, "startup.bootValidationText");
     }
 
     [TestMethod]
     public void Validate_EmptyBootValidationText_IsAllowed()
     {
         // 空文字は許可
-        ValidateWith(config => config.Prepare.BootValidationText = string.Empty);
+        ValidateWith(config => config.Startup.BootValidationText = string.Empty);
     }
 
     [TestMethod]
@@ -150,12 +153,12 @@ public class AppConfigValidationTests
     {
         // 区切りトリガーの不正値を拒否
         InvalidOperationException nullEx = Assert.ThrowsException<InvalidOperationException>(() =>
-            ValidateWith(config => config.Ui.SentenceBreakTriggers = null));
-        StringAssert.Contains(nullEx.Message, "ui.sentenceBreakTriggers");
+            ValidateWith(config => config.Text.SentenceBreakTriggers = null));
+        StringAssert.Contains(nullEx.Message, "text.sentenceBreakTriggers");
 
         InvalidOperationException emptyEx = Assert.ThrowsException<InvalidOperationException>(() =>
-            ValidateWith(config => config.Ui.SentenceBreakTriggers = new List<string> { string.Empty }));
-        StringAssert.Contains(emptyEx.Message, "ui.sentenceBreakTriggers[0]");
+            ValidateWith(config => config.Text.SentenceBreakTriggers = new List<string> { string.Empty }));
+        StringAssert.Contains(emptyEx.Message, "text.sentenceBreakTriggers[0]");
     }
 
     [TestMethod]
@@ -163,16 +166,16 @@ public class AppConfigValidationTests
     {
         // 区切りトリガーのnull要素を拒否
         InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
-            ValidateWith(config => config.Ui.SentenceBreakTriggers = new List<string> { null }));
+            ValidateWith(config => config.Text.SentenceBreakTriggers = new List<string> { null }));
 
-        StringAssert.Contains(ex.Message, "ui.sentenceBreakTriggers[0]");
+        StringAssert.Contains(ex.Message, "text.sentenceBreakTriggers[0]");
     }
 
     [TestMethod]
     public void Validate_MultiCharacterSentenceBreakTrigger_IsAllowed()
     {
         // 複数文字トリガーを許可
-        ValidateWith(config => config.Ui.SentenceBreakTriggers = new List<string> { "。", "。、。" });
+        ValidateWith(config => config.Text.SentenceBreakTriggers = new List<string> { "。", "。、。" });
     }
 
     [TestMethod]
@@ -180,9 +183,9 @@ public class AppConfigValidationTests
     {
         // 置換ルールnullを拒否
         InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
-            ValidateWith(config => config.TextTransform.ReplaceRules = null));
+            ValidateWith(config => config.Text.ReplaceRules = null));
 
-        StringAssert.Contains(ex.Message, "textTransform.replaceRules");
+        StringAssert.Contains(ex.Message, "text.replaceRules");
     }
 
     [TestMethod]
@@ -191,22 +194,22 @@ public class AppConfigValidationTests
         // 下限境界値を許容
         ValidateWith(config =>
         {
-            config.Server.MaxQueuedJobs = 0;
+            config.Queue.MaxQueuedJobs = 0;
             config.Audio.PollIntervalMs = 1;
             config.Audio.StartConfirmTimeoutMs = 1;
             config.Audio.StartConfirmMaxRetries = 0;
             config.Audio.StopConfirmMs = 1;
-            config.Prepare.ActionDelayMs = 0;
-            config.Prepare.BootValidationMaxRetries = 0;
-            config.Prepare.BootValidationRetryIntervalMs = 0;
-            config.Prepare.PostTypeWaitPerCharMs = 0;
-            config.Prepare.PostTypeWaitMinMs = 0;
-            config.Prepare.SequentialMoveToStartKeyDelayBaseMs = 0;
-            config.Prepare.DeleteKeyDelayBaseMs = 0;
-            config.Prepare.ClearInputMaxPasses = 1;
-            config.Prepare.HookCommandTimeoutMs = 1;
-            config.Prepare.HookConnectTimeoutMs = 1;
-            config.Prepare.HookConnectTotalWaitMs = 1;
+            config.InputTiming.ActionDelayMs = 0;
+            config.Startup.BootValidationMaxRetries = 0;
+            config.Startup.BootValidationRetryIntervalMs = 0;
+            config.InputTiming.PostTypeWaitPerCharMs = 0;
+            config.InputTiming.PostTypeWaitMinMs = 0;
+            config.InputTiming.SequentialMoveToStartKeyDelayBaseMs = 0;
+            config.InputTiming.DeleteKeyDelayBaseMs = 0;
+            config.InputTiming.ClearInputMaxPasses = 1;
+            config.Hook.HookCommandTimeoutMs = 1;
+            config.Hook.HookConnectTimeoutMs = 1;
+            config.Hook.HookConnectTotalWaitMs = 1;
             config.Ui.DelayBeforePlayShortcutMs = 0;
         });
     }
@@ -215,10 +218,14 @@ public class AppConfigValidationTests
     public void Validate_EachNullSection_ThrowsMatchingMessage()
     {
         // 各必須セクション名を確認
+        StringAssert.Contains(AssertSectionNullThrows(config => config.Queue = null).Message, "queue は null");
         StringAssert.Contains(AssertSectionNullThrows(config => config.Audio = null).Message, "audio は null");
-        StringAssert.Contains(AssertSectionNullThrows(config => config.Prepare = null).Message, "prepare は null");
+        StringAssert.Contains(AssertSectionNullThrows(config => config.Startup = null).Message, "startup は null");
+        StringAssert.Contains(AssertSectionNullThrows(config => config.Hook = null).Message, "hook は null");
         StringAssert.Contains(AssertSectionNullThrows(config => config.Ui = null).Message, "ui は null");
-        StringAssert.Contains(AssertSectionNullThrows(config => config.TextTransform = null).Message, "textTransform は null");
+        StringAssert.Contains(AssertSectionNullThrows(config => config.InputTiming = null).Message, "inputTiming は null");
+        StringAssert.Contains(AssertSectionNullThrows(config => config.Text = null).Message, "text は null");
+        StringAssert.Contains(AssertSectionNullThrows(config => config.Debug = null).Message, "debug は null");
         StringAssert.Contains(AssertSectionNullThrows(config => config.Validation = null).Message, "validation は null");
     }
 

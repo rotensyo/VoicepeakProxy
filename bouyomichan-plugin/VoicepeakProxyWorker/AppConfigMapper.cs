@@ -15,9 +15,9 @@ internal static class AppConfigMapper
 
         AppConfig config = new AppConfig();
         // core既定値を欠損補完に利用
-        PrepareConfig defaults = new AppConfig().Prepare;
+        HookConfig defaults = new AppConfig().Hook;
 
-        config.Server.MaxQueuedJobs = data.Server.MaxQueuedJobs;
+        config.Queue.MaxQueuedJobs = data.Queue.MaxQueuedJobs;
 
         config.Audio.PeakThreshold = data.Audio.PeakThreshold;
         config.Audio.PollIntervalMs = data.Audio.PollIntervalMs;
@@ -26,45 +26,48 @@ internal static class AppConfigMapper
         config.Audio.StopConfirmMs = data.Audio.StopConfirmMs;
         config.Audio.MaxSpeakingDurationSec = data.Audio.MaxSpeakingDurationSec;
 
-        config.Prepare.BootValidationText = data.Prepare.BootValidationText ?? string.Empty;
-        config.Prepare.BootValidationMaxRetries = data.Prepare.BootValidationMaxRetries;
-        config.Prepare.BootValidationRetryIntervalMs = data.Prepare.BootValidationRetryIntervalMs;
-        config.Prepare.CharDelayBaseMs = data.Prepare.CharDelayBaseMs;
-        config.Prepare.ActionDelayMs = data.Prepare.ActionDelayMs;
-        config.Prepare.PostTypeWaitPerCharMs = data.Prepare.PostTypeWaitPerCharMs;
-        config.Prepare.PostTypeWaitMinMs = data.Prepare.PostTypeWaitMinMs;
-        config.Prepare.SequentialMoveToStartKeyDelayBaseMs = data.Prepare.SequentialMoveToStartKeyDelayBaseMs;
-        config.Prepare.DeleteKeyDelayBaseMs = data.Prepare.DeleteKeyDelayBaseMs;
-        config.Prepare.ClearInputMaxPasses = data.Prepare.ClearInputMaxPasses;
-        config.Prepare.HookCommandTimeoutMs = data.Prepare.HookCommandTimeoutMs > 0
-            ? data.Prepare.HookCommandTimeoutMs
+        config.Startup.BootValidationText = data.Startup.BootValidationText ?? string.Empty;
+        config.Startup.BootValidationMaxRetries = data.Startup.BootValidationMaxRetries;
+        config.Startup.BootValidationRetryIntervalMs = data.Startup.BootValidationRetryIntervalMs;
+        config.Startup.ClickAtValidationEnabled = data.Startup.ClickAtValidationEnabled;
+        config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled = data.Startup.ClickBeforeTextFocusWhenUninitializedEnabled;
+        config.Startup.ClickOnStartTimeoutRetryEnabled = data.Startup.ClickOnStartTimeoutRetryEnabled;
+
+        config.Hook.HookCommandTimeoutMs = data.Hook.HookCommandTimeoutMs > 0
+            ? data.Hook.HookCommandTimeoutMs
             : defaults.HookCommandTimeoutMs;
-        config.Prepare.HookConnectTimeoutMs = data.Prepare.HookConnectTimeoutMs > 0
-            ? data.Prepare.HookConnectTimeoutMs
+        config.Hook.HookConnectTimeoutMs = data.Hook.HookConnectTimeoutMs > 0
+            ? data.Hook.HookConnectTimeoutMs
             : defaults.HookConnectTimeoutMs;
-        config.Prepare.HookConnectTotalWaitMs = data.Prepare.HookConnectTotalWaitMs > 0
-            ? data.Prepare.HookConnectTotalWaitMs
+        config.Hook.HookConnectTotalWaitMs = data.Hook.HookConnectTotalWaitMs > 0
+            ? data.Hook.HookConnectTotalWaitMs
             : defaults.HookConnectTotalWaitMs;
 
         config.Ui.MoveToStartShortcut = data.Ui.MoveToStartShortcut ?? string.Empty;
         config.Ui.PlayShortcut = data.Ui.PlayShortcut ?? string.Empty;
         config.Ui.DelayBeforePlayShortcutMs = data.Ui.DelayBeforePlayShortcutMs;
-        config.Ui.ClickAtValidationEnabled = data.Ui.ClickAtValidationEnabled;
-        config.Ui.ClickBeforeTextFocusWhenUninitializedEnabled = data.Ui.ClickBeforeTextFocusWhenUninitializedEnabled;
-        config.Ui.ClickOnStartTimeoutRetryEnabled = data.Ui.ClickOnStartTimeoutRetryEnabled;
-        config.Ui.SendEnterAfterSentenceBreak = data.Ui.SendEnterAfterSentenceBreak;
-        config.Ui.SentenceBreakTriggers = new List<string>();
-        for (int i = 0; i < data.Ui.SentenceBreakTriggers.Count; i++)
+
+        config.InputTiming.CharDelayBaseMs = data.InputTiming.CharDelayBaseMs;
+        config.InputTiming.ActionDelayMs = data.InputTiming.ActionDelayMs;
+        config.InputTiming.PostTypeWaitPerCharMs = data.InputTiming.PostTypeWaitPerCharMs;
+        config.InputTiming.PostTypeWaitMinMs = data.InputTiming.PostTypeWaitMinMs;
+        config.InputTiming.SequentialMoveToStartKeyDelayBaseMs = data.InputTiming.SequentialMoveToStartKeyDelayBaseMs;
+        config.InputTiming.DeleteKeyDelayBaseMs = data.InputTiming.DeleteKeyDelayBaseMs;
+        config.InputTiming.ClearInputMaxPasses = data.InputTiming.ClearInputMaxPasses;
+
+        config.Text.SendEnterAfterSentenceBreak = data.Text.SendEnterAfterSentenceBreak;
+        config.Text.SentenceBreakTriggers = new List<string>();
+        for (int i = 0; i < data.Text.SentenceBreakTriggers.Count; i++)
         {
-            string token = data.Ui.SentenceBreakTriggers[i] ?? string.Empty;
-            config.Ui.SentenceBreakTriggers.Add(token);
+            string token = data.Text.SentenceBreakTriggers[i] ?? string.Empty;
+            config.Text.SentenceBreakTriggers.Add(token);
         }
 
-        config.TextTransform.ReplaceRules = new List<ReplaceRule>();
-        for (int i = 0; i < data.TextTransform.ReplaceRules.Count; i++)
+        config.Text.ReplaceRules = new List<ReplaceRule>();
+        for (int i = 0; i < data.Text.ReplaceRules.Count; i++)
         {
-            ReplaceRuleData rule = data.TextTransform.ReplaceRules[i] ?? new ReplaceRuleData();
-            config.TextTransform.ReplaceRules.Add(new ReplaceRule
+            ReplaceRuleData rule = data.Text.ReplaceRules[i] ?? new ReplaceRuleData();
+            config.Text.ReplaceRules.Add(new ReplaceRule
             {
                 From = rule.From ?? string.Empty,
                 To = rule.To ?? string.Empty
@@ -86,7 +89,7 @@ internal static class AppConfigMapper
         AppConfig config = source ?? new AppConfig();
         AppConfigData data = new AppConfigData();
 
-        data.Server.MaxQueuedJobs = config.Server.MaxQueuedJobs;
+        data.Queue.MaxQueuedJobs = config.Queue.MaxQueuedJobs;
 
         data.Audio.PeakThreshold = config.Audio.PeakThreshold;
         data.Audio.PollIntervalMs = config.Audio.PollIntervalMs;
@@ -95,38 +98,41 @@ internal static class AppConfigMapper
         data.Audio.StopConfirmMs = config.Audio.StopConfirmMs;
         data.Audio.MaxSpeakingDurationSec = config.Audio.MaxSpeakingDurationSec;
 
-        data.Prepare.BootValidationText = config.Prepare.BootValidationText ?? string.Empty;
-        data.Prepare.BootValidationMaxRetries = config.Prepare.BootValidationMaxRetries;
-        data.Prepare.BootValidationRetryIntervalMs = config.Prepare.BootValidationRetryIntervalMs;
-        data.Prepare.CharDelayBaseMs = config.Prepare.CharDelayBaseMs;
-        data.Prepare.ActionDelayMs = config.Prepare.ActionDelayMs;
-        data.Prepare.PostTypeWaitPerCharMs = config.Prepare.PostTypeWaitPerCharMs;
-        data.Prepare.PostTypeWaitMinMs = config.Prepare.PostTypeWaitMinMs;
-        data.Prepare.SequentialMoveToStartKeyDelayBaseMs = config.Prepare.SequentialMoveToStartKeyDelayBaseMs;
-        data.Prepare.DeleteKeyDelayBaseMs = config.Prepare.DeleteKeyDelayBaseMs;
-        data.Prepare.ClearInputMaxPasses = config.Prepare.ClearInputMaxPasses;
-        data.Prepare.HookCommandTimeoutMs = config.Prepare.HookCommandTimeoutMs;
-        data.Prepare.HookConnectTimeoutMs = config.Prepare.HookConnectTimeoutMs;
-        data.Prepare.HookConnectTotalWaitMs = config.Prepare.HookConnectTotalWaitMs;
+        data.Startup.BootValidationText = config.Startup.BootValidationText ?? string.Empty;
+        data.Startup.BootValidationMaxRetries = config.Startup.BootValidationMaxRetries;
+        data.Startup.BootValidationRetryIntervalMs = config.Startup.BootValidationRetryIntervalMs;
+        data.Startup.ClickAtValidationEnabled = config.Startup.ClickAtValidationEnabled;
+        data.Startup.ClickBeforeTextFocusWhenUninitializedEnabled = config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled;
+        data.Startup.ClickOnStartTimeoutRetryEnabled = config.Startup.ClickOnStartTimeoutRetryEnabled;
+
+        data.Hook.HookCommandTimeoutMs = config.Hook.HookCommandTimeoutMs;
+        data.Hook.HookConnectTimeoutMs = config.Hook.HookConnectTimeoutMs;
+        data.Hook.HookConnectTotalWaitMs = config.Hook.HookConnectTotalWaitMs;
 
         data.Ui.MoveToStartShortcut = config.Ui.MoveToStartShortcut ?? string.Empty;
         data.Ui.PlayShortcut = config.Ui.PlayShortcut ?? string.Empty;
         data.Ui.DelayBeforePlayShortcutMs = config.Ui.DelayBeforePlayShortcutMs;
-        data.Ui.ClickAtValidationEnabled = config.Ui.ClickAtValidationEnabled;
-        data.Ui.ClickBeforeTextFocusWhenUninitializedEnabled = config.Ui.ClickBeforeTextFocusWhenUninitializedEnabled;
-        data.Ui.ClickOnStartTimeoutRetryEnabled = config.Ui.ClickOnStartTimeoutRetryEnabled;
-        data.Ui.SendEnterAfterSentenceBreak = config.Ui.SendEnterAfterSentenceBreak;
-        data.Ui.SentenceBreakTriggers = new List<string>();
-        for (int i = 0; i < config.Ui.SentenceBreakTriggers.Count; i++)
+
+        data.InputTiming.CharDelayBaseMs = config.InputTiming.CharDelayBaseMs;
+        data.InputTiming.ActionDelayMs = config.InputTiming.ActionDelayMs;
+        data.InputTiming.PostTypeWaitPerCharMs = config.InputTiming.PostTypeWaitPerCharMs;
+        data.InputTiming.PostTypeWaitMinMs = config.InputTiming.PostTypeWaitMinMs;
+        data.InputTiming.SequentialMoveToStartKeyDelayBaseMs = config.InputTiming.SequentialMoveToStartKeyDelayBaseMs;
+        data.InputTiming.DeleteKeyDelayBaseMs = config.InputTiming.DeleteKeyDelayBaseMs;
+        data.InputTiming.ClearInputMaxPasses = config.InputTiming.ClearInputMaxPasses;
+
+        data.Text.SendEnterAfterSentenceBreak = config.Text.SendEnterAfterSentenceBreak;
+        data.Text.SentenceBreakTriggers = new List<string>();
+        for (int i = 0; i < config.Text.SentenceBreakTriggers.Count; i++)
         {
-            data.Ui.SentenceBreakTriggers.Add(config.Ui.SentenceBreakTriggers[i] ?? string.Empty);
+            data.Text.SentenceBreakTriggers.Add(config.Text.SentenceBreakTriggers[i] ?? string.Empty);
         }
 
-        data.TextTransform.ReplaceRules = new List<ReplaceRuleData>();
-        for (int i = 0; i < config.TextTransform.ReplaceRules.Count; i++)
+        data.Text.ReplaceRules = new List<ReplaceRuleData>();
+        for (int i = 0; i < config.Text.ReplaceRules.Count; i++)
         {
-            ReplaceRule rule = config.TextTransform.ReplaceRules[i] ?? new ReplaceRule();
-            data.TextTransform.ReplaceRules.Add(new ReplaceRuleData
+            ReplaceRule rule = config.Text.ReplaceRules[i] ?? new ReplaceRule();
+            data.Text.ReplaceRules.Add(new ReplaceRuleData
             {
                 From = rule.From ?? string.Empty,
                 To = rule.To ?? string.Empty

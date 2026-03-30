@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Windows.Automation;
@@ -100,10 +101,13 @@ public class UiControllerTests
         // 未prime時だけ入力前primeを許可
         UiConfig ui = new UiConfig
         {
-            MoveToStartShortcut = "Ctrl+Up",
+            MoveToStartShortcut = "Ctrl+Up"
+        };
+        StartupConfig startup = new StartupConfig
+        {
             ClickBeforeTextFocusWhenUninitializedEnabled = true
         };
-        VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
+        VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi(), startup: startup);
         Process process = Process.GetCurrentProcess();
         IntPtr hwnd = new IntPtr(123);
 
@@ -119,22 +123,16 @@ public class UiControllerTests
     public void ShouldAttemptPrimeInputContext_StartTimeoutRetry_UsesDedicatedFlag()
     {
         // 再試行時修正クリックは専用フラグで制御
-        UiConfig disabled = new UiConfig
-        {
-            MoveToStartShortcut = "Ctrl+Up",
-            ClickOnStartTimeoutRetryEnabled = false
-        };
-        UiConfig enabled = new UiConfig
-        {
-            MoveToStartShortcut = "Ctrl+Up",
-            ClickOnStartTimeoutRetryEnabled = true
-        };
+        UiConfig disabled = new UiConfig { MoveToStartShortcut = "Ctrl+Up" };
+        StartupConfig disabledStartup = new StartupConfig { ClickOnStartTimeoutRetryEnabled = false };
+        UiConfig enabled = new UiConfig { MoveToStartShortcut = "Ctrl+Up" };
+        StartupConfig enabledStartup = new StartupConfig { ClickOnStartTimeoutRetryEnabled = true };
         Process process = Process.GetCurrentProcess();
         IntPtr hwnd = new IntPtr(123);
 
-        Assert.IsFalse(CreateController(disabled, new FakeVoicepeakProcessApi())
+        Assert.IsFalse(CreateController(disabled, new FakeVoicepeakProcessApi(), startup: disabledStartup)
             .ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.StartTimeoutRetry));
-        Assert.IsTrue(CreateController(enabled, new FakeVoicepeakProcessApi())
+        Assert.IsTrue(CreateController(enabled, new FakeVoicepeakProcessApi(), startup: enabledStartup)
             .ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.StartTimeoutRetry));
     }
 
@@ -234,14 +232,17 @@ public class UiControllerTests
             {
                 MoveToStartShortcut = "F3"
             };
-            PrepareConfig prepare = new PrepareConfig
+            InputTimingConfig inputTiming = new InputTimingConfig
             {
                 ClearInputMaxPasses = 2,
                 DeleteKeyDelayBaseMs = 0
             };
             VoicepeakUiController controller = new VoicepeakUiController(
                 ui,
-                prepare,
+                inputTiming,
+                new StartupConfig(),
+                new HookConfig(),
+                new TextConfig(),
                 new DebugConfig(),
                 new AppLogger(new TestLogger()),
                 new FakeVoicepeakProcessApi());
@@ -264,10 +265,13 @@ public class UiControllerTests
         {
             UiConfig ui = new UiConfig
             {
+            };
+            TextConfig text = new TextConfig
+            {
                 SendEnterAfterSentenceBreak = false
             };
             TestLogger logger = new TestLogger();
-            object controller = ReflectionTestHelper.CreateVoicepeakUiController(ui, new DebugConfig(), logger);
+            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new StartupConfig(), new HookConfig(), text, new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
 
             bool result = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "TypeText", window.Handle, "A。B", 0);
@@ -286,14 +290,15 @@ public class UiControllerTests
         {
             UiConfig ui = new UiConfig
             {
-                SendEnterAfterSentenceBreak = true
             };
-            ui.SentenceBreakTriggers.Clear();
-            ui.SentenceBreakTriggers.Add("。");
-            ui.SentenceBreakTriggers.Add("。、。");
+            TextConfig text = new TextConfig
+            {
+                SendEnterAfterSentenceBreak = true,
+                SentenceBreakTriggers = new List<string> { "。", "。、。" }
+            };
 
             TestLogger logger = new TestLogger();
-            object controller = ReflectionTestHelper.CreateVoicepeakUiController(ui, new DebugConfig(), logger);
+            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new StartupConfig(), new HookConfig(), text, new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
 
             bool result = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "TypeText", window.Handle, "A。、。B。C", 0);
@@ -312,13 +317,15 @@ public class UiControllerTests
         {
             UiConfig ui = new UiConfig
             {
-                SendEnterAfterSentenceBreak = true
             };
-            ui.SentenceBreakTriggers.Clear();
-            ui.SentenceBreakTriggers.Add("。");
+            TextConfig text = new TextConfig
+            {
+                SendEnterAfterSentenceBreak = true,
+                SentenceBreakTriggers = new List<string> { "。" }
+            };
 
             TestLogger logger = new TestLogger();
-            object controller = ReflectionTestHelper.CreateVoicepeakUiController(ui, new DebugConfig(), logger);
+            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new StartupConfig(), new HookConfig(), text, new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
 
             bool result = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "TypeText", window.Handle, "A。B。", 0);
@@ -337,13 +344,15 @@ public class UiControllerTests
         {
             UiConfig ui = new UiConfig
             {
-                SendEnterAfterSentenceBreak = true
             };
-            ui.SentenceBreakTriggers.Clear();
-            ui.SentenceBreakTriggers.Add("。");
+            TextConfig text = new TextConfig
+            {
+                SendEnterAfterSentenceBreak = true,
+                SentenceBreakTriggers = new List<string> { "。" }
+            };
 
             TestLogger logger = new TestLogger();
-            object controller = ReflectionTestHelper.CreateVoicepeakUiController(ui, new DebugConfig(), logger);
+            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new StartupConfig(), new HookConfig(), text, new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
 
             bool result = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "TypeText", window.Handle, "A。。。B", 0);
@@ -362,14 +371,15 @@ public class UiControllerTests
         {
             UiConfig ui = new UiConfig
             {
-                SendEnterAfterSentenceBreak = true
             };
-            ui.SentenceBreakTriggers.Clear();
-            ui.SentenceBreakTriggers.Add("!");
-            ui.SentenceBreakTriggers.Add("?");
+            TextConfig text = new TextConfig
+            {
+                SendEnterAfterSentenceBreak = true,
+                SentenceBreakTriggers = new List<string> { "!", "?" }
+            };
 
             TestLogger logger = new TestLogger();
-            object controller = ReflectionTestHelper.CreateVoicepeakUiController(ui, new DebugConfig(), logger);
+            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new StartupConfig(), new HookConfig(), text, new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
 
             bool result = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "TypeText", window.Handle, "A!?B", 0);
@@ -676,11 +686,14 @@ public class UiControllerTests
         {
             UiConfig ui = new UiConfig
             {
-                MoveToStartShortcut = "Ctrl+Up",
+                MoveToStartShortcut = "Ctrl+Up"
+            };
+            TextConfig text = new TextConfig
+            {
                 SendEnterAfterSentenceBreak = true
             };
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
-            VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
+            VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi(), text: text);
 
             Assert.IsTrue(controller.TypeText(window.Handle, "A。B。C", 0));
             window.Messages.Clear();
@@ -794,8 +807,23 @@ public class UiControllerTests
         Assert.AreEqual((uint)0, (uint)ReflectionTestHelper.GetField(controller, "_modifierIsolationSessionProcessId"));
     }
 
-    private static VoicepeakUiController CreateController(UiConfig ui, IVoicepeakProcessApi processApi)
+    private static VoicepeakUiController CreateController(
+        UiConfig ui,
+        IVoicepeakProcessApi processApi,
+        InputTimingConfig inputTiming = null,
+        StartupConfig startup = null,
+        HookConfig hook = null,
+        TextConfig text = null,
+        DebugConfig debug = null)
     {
-        return new VoicepeakUiController(ui, new DebugConfig(), new AppLogger(new TestLogger()), processApi);
+        return new VoicepeakUiController(
+            ui,
+            inputTiming ?? new InputTimingConfig(),
+            startup ?? new StartupConfig(),
+            hook ?? new HookConfig(),
+            text ?? new TextConfig(),
+            debug ?? new DebugConfig(),
+            new AppLogger(new TestLogger()),
+            processApi);
     }
 }

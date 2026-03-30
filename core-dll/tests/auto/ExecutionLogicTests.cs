@@ -60,9 +60,9 @@ public class ExecutionLogicTests
         AppConfig config = new AppConfig();
         config.Audio.StopConfirmMs = 300;
         config.Ui.DelayBeforePlayShortcutMs = 60;
-        config.Prepare.CharDelayBaseMs = 1;
-        config.Prepare.PostTypeWaitPerCharMs = 4;
-        config.Prepare.PostTypeWaitMinMs = 100;
+        config.InputTiming.CharDelayBaseMs = 1;
+        config.InputTiming.PostTypeWaitPerCharMs = 4;
+        config.InputTiming.PostTypeWaitMinMs = 100;
         TestLogger logger = new TestLogger();
 
         int actual = (int)ReflectionTestHelper.InvokeCoreStatic(

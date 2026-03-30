@@ -103,25 +103,29 @@ namespace Plugin_VoicepeakProxy
         public SettingsBase Setting { get { return _state; } }
 
         public GeneralTab P01General;
-        public ServerTab P02Server;
-        public AudioTab P03Audio;
-        public PrepareTab P04Prepare;
-        public UiTab P05Ui;
-        public TextTransformTab P06TextTransform;
-        public ValidationTab P07Validation;
-        public DebugTab P08Debug;
+        public StartupTab P02Startup;
+        public HookTab P03Hook;
+        public UiTab P04Ui;
+        public InputTimingTab P05InputTiming;
+        public AudioTab P06Audio;
+        public TextTab P07Text;
+        public QueueTab P08Queue;
+        public ValidationTab P09Validation;
+        public DebugTab P10Debug;
 
         public PluginSettingFormData(PluginSettingsState state)
         {
             _state = state;
             P01General = new GeneralTab(_state);
-            P02Server = new ServerTab(_state);
-            P03Audio = new AudioTab(_state);
-            P04Prepare = new PrepareTab(_state);
-            P05Ui = new UiTab(_state);
-            P06TextTransform = new TextTransformTab(_state);
-            P07Validation = new ValidationTab(_state);
-            P08Debug = new DebugTab(_state);
+            P02Startup = new StartupTab(_state);
+            P03Hook = new HookTab(_state);
+            P04Ui = new UiTab(_state);
+            P05InputTiming = new InputTimingTab(_state);
+            P06Audio = new AudioTab(_state);
+            P07Text = new TextTab(_state);
+            P08Queue = new QueueTab(_state);
+            P09Validation = new ValidationTab(_state);
+            P10Debug = new DebugTab(_state);
         }
     }
 
@@ -170,24 +174,24 @@ namespace Plugin_VoicepeakProxy
 
     }
 
-    // Server設定タブ
-    internal sealed class ServerTab : TabBase
+    // Queue設定タブ
+    internal sealed class QueueTab : TabBase
     {
-        public ServerTab(PluginSettingsState state) : base(state)
+        public QueueTab(PluginSettingsState state) : base(state)
         {
         }
 
         public override string GetName()
         {
-            return "Server";
+            return "Queue";
         }
 
-        [Category("Server")]
+        [Category("Queue")]
         [DisplayName("01)maxQueuedJobs")]
         public int MaxQueuedJobs
         {
-            get { return State.Settings.AppConfig.Server.MaxQueuedJobs; }
-            set { State.Settings.AppConfig.Server.MaxQueuedJobs = value; }
+            get { return State.Settings.AppConfig.Queue.MaxQueuedJobs; }
+            set { State.Settings.AppConfig.Queue.MaxQueuedJobs = value; }
         }
     }
 
@@ -252,120 +256,101 @@ namespace Plugin_VoicepeakProxy
         }
     }
 
-    // Prepare設定タブ
-    internal sealed class PrepareTab : TabBase
+    // Startup設定タブ
+    internal sealed class StartupTab : TabBase
     {
-        public PrepareTab(PluginSettingsState state) : base(state)
+        public StartupTab(PluginSettingsState state) : base(state)
         {
         }
 
         public override string GetName()
         {
-            return "Prepare";
+            return "Startup";
         }
 
-        [Category("Prepare")]
+        [Category("Startup")]
         [DisplayName("01)bootValidationText")]
         public string BootValidationText
         {
-            get { return State.Settings.AppConfig.Prepare.BootValidationText; }
-            set { State.Settings.AppConfig.Prepare.BootValidationText = value ?? string.Empty; }
+            get { return State.Settings.AppConfig.Startup.BootValidationText; }
+            set { State.Settings.AppConfig.Startup.BootValidationText = value ?? string.Empty; }
         }
 
-        [Category("Prepare")]
+        [Category("Startup")]
         [DisplayName("02)bootValidationMaxRetries")]
         public int BootValidationMaxRetries
         {
-            get { return State.Settings.AppConfig.Prepare.BootValidationMaxRetries; }
-            set { State.Settings.AppConfig.Prepare.BootValidationMaxRetries = value; }
+            get { return State.Settings.AppConfig.Startup.BootValidationMaxRetries; }
+            set { State.Settings.AppConfig.Startup.BootValidationMaxRetries = value; }
         }
 
-        [Category("Prepare")]
+        [Category("Startup")]
         [DisplayName("03)bootValidationRetryIntervalMs")]
         public int BootValidationRetryIntervalMs
         {
-            get { return State.Settings.AppConfig.Prepare.BootValidationRetryIntervalMs; }
-            set { State.Settings.AppConfig.Prepare.BootValidationRetryIntervalMs = value; }
+            get { return State.Settings.AppConfig.Startup.BootValidationRetryIntervalMs; }
+            set { State.Settings.AppConfig.Startup.BootValidationRetryIntervalMs = value; }
         }
 
-        [Category("Prepare")]
-        [DisplayName("04)charDelayBaseMs")]
-        public int CharDelayBaseMs
+        [Category("Startup")]
+        [DisplayName("04)clickAtValidationEnabled")]
+        public bool ClickAtValidationEnabled
         {
-            get { return State.Settings.AppConfig.Prepare.CharDelayBaseMs; }
-            set { State.Settings.AppConfig.Prepare.CharDelayBaseMs = value; }
+            get { return State.Settings.AppConfig.Startup.ClickAtValidationEnabled; }
+            set { State.Settings.AppConfig.Startup.ClickAtValidationEnabled = value; }
         }
 
-        [Category("Prepare")]
-        [DisplayName("05)actionDelayMs")]
-        public int ActionDelayMs
+        [Category("Startup")]
+        [DisplayName("05)clickBeforeTextFocusWhenUninitializedEnabled")]
+        public bool ClickBeforeTextFocusWhenUninitializedEnabled
         {
-            get { return State.Settings.AppConfig.Prepare.ActionDelayMs; }
-            set { State.Settings.AppConfig.Prepare.ActionDelayMs = value; }
+            get { return State.Settings.AppConfig.Startup.ClickBeforeTextFocusWhenUninitializedEnabled; }
+            set { State.Settings.AppConfig.Startup.ClickBeforeTextFocusWhenUninitializedEnabled = value; }
         }
 
-        [Category("Prepare")]
-        [DisplayName("06)postTypeWaitPerCharMs")]
-        public int PostTypeWaitPerCharMs
+        [Category("Startup")]
+        [DisplayName("06)clickOnStartTimeoutRetryEnabled")]
+        public bool ClickOnStartTimeoutRetryEnabled
         {
-            get { return State.Settings.AppConfig.Prepare.PostTypeWaitPerCharMs; }
-            set { State.Settings.AppConfig.Prepare.PostTypeWaitPerCharMs = value; }
+            get { return State.Settings.AppConfig.Startup.ClickOnStartTimeoutRetryEnabled; }
+            set { State.Settings.AppConfig.Startup.ClickOnStartTimeoutRetryEnabled = value; }
         }
+    }
 
-        [Category("Prepare")]
-        [DisplayName("07)postTypeWaitMinMs")]
-        public int PostTypeWaitMinMs
+    // Hook設定タブ
+    internal sealed class HookTab : TabBase
+    {
+        public HookTab(PluginSettingsState state) : base(state)
         {
-            get { return State.Settings.AppConfig.Prepare.PostTypeWaitMinMs; }
-            set { State.Settings.AppConfig.Prepare.PostTypeWaitMinMs = value; }
         }
 
-        [Category("Prepare")]
-        [DisplayName("08)sequentialMoveToStartKeyDelayBaseMs")]
-        public int SequentialMoveToStartKeyDelayBaseMs
+        public override string GetName()
         {
-            get { return State.Settings.AppConfig.Prepare.SequentialMoveToStartKeyDelayBaseMs; }
-            set { State.Settings.AppConfig.Prepare.SequentialMoveToStartKeyDelayBaseMs = value; }
+            return "Hook";
         }
 
-        [Category("Prepare")]
-        [DisplayName("09)deleteKeyDelayBaseMs")]
-        public int DeleteKeyDelayBaseMs
-        {
-            get { return State.Settings.AppConfig.Prepare.DeleteKeyDelayBaseMs; }
-            set { State.Settings.AppConfig.Prepare.DeleteKeyDelayBaseMs = value; }
-        }
-
-        [Category("Prepare")]
-        [DisplayName("10)clearInputMaxPasses")]
-        public int ClearInputMaxPasses
-        {
-            get { return State.Settings.AppConfig.Prepare.ClearInputMaxPasses; }
-            set { State.Settings.AppConfig.Prepare.ClearInputMaxPasses = value; }
-        }
-
-        [Category("Prepare")]
-        [DisplayName("11)hookCommandTimeoutMs")]
+        [Category("Hook")]
+        [DisplayName("01)hookCommandTimeoutMs")]
         public int HookCommandTimeoutMs
         {
-            get { return State.Settings.AppConfig.Prepare.HookCommandTimeoutMs; }
-            set { State.Settings.AppConfig.Prepare.HookCommandTimeoutMs = value; }
+            get { return State.Settings.AppConfig.Hook.HookCommandTimeoutMs; }
+            set { State.Settings.AppConfig.Hook.HookCommandTimeoutMs = value; }
         }
 
-        [Category("Prepare")]
-        [DisplayName("12)hookConnectTimeoutMs")]
+        [Category("Hook")]
+        [DisplayName("02)hookConnectTimeoutMs")]
         public int HookConnectTimeoutMs
         {
-            get { return State.Settings.AppConfig.Prepare.HookConnectTimeoutMs; }
-            set { State.Settings.AppConfig.Prepare.HookConnectTimeoutMs = value; }
+            get { return State.Settings.AppConfig.Hook.HookConnectTimeoutMs; }
+            set { State.Settings.AppConfig.Hook.HookConnectTimeoutMs = value; }
         }
 
-        [Category("Prepare")]
-        [DisplayName("13)hookConnectTotalWaitMs")]
+        [Category("Hook")]
+        [DisplayName("03)hookConnectTotalWaitMs")]
         public int HookConnectTotalWaitMs
         {
-            get { return State.Settings.AppConfig.Prepare.HookConnectTotalWaitMs; }
-            set { State.Settings.AppConfig.Prepare.HookConnectTotalWaitMs = value; }
+            get { return State.Settings.AppConfig.Hook.HookConnectTotalWaitMs; }
+            set { State.Settings.AppConfig.Hook.HookConnectTotalWaitMs = value; }
         }
     }
 
@@ -378,10 +363,10 @@ namespace Plugin_VoicepeakProxy
 
         public override string GetName()
         {
-            return "UI";
+            return "Ui";
         }
 
-        [Category("UI")]
+        [Category("Ui")]
         [DisplayName("01)moveToStartShortcut")]
         public string MoveToStartShortcut
         {
@@ -389,7 +374,7 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Ui.MoveToStartShortcut = value ?? string.Empty; }
         }
 
-        [Category("UI")]
+        [Category("Ui")]
         [DisplayName("02)playShortcut")]
         public string PlayShortcut
         {
@@ -397,77 +382,122 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Ui.PlayShortcut = value ?? string.Empty; }
         }
 
-        [Category("UI")]
+        [Category("Ui")]
         [DisplayName("03)delayBeforePlayShortcutMs")]
         public int DelayBeforePlayShortcutMs
         {
             get { return State.Settings.AppConfig.Ui.DelayBeforePlayShortcutMs; }
             set { State.Settings.AppConfig.Ui.DelayBeforePlayShortcutMs = value; }
         }
+    }
 
-        [Category("UI")]
-        [DisplayName("04)clickAtValidationEnabled")]
-        public bool ClickAtValidationEnabled
+    // InputTiming設定タブ
+    internal sealed class InputTimingTab : TabBase
+    {
+        public InputTimingTab(PluginSettingsState state) : base(state)
         {
-            get { return State.Settings.AppConfig.Ui.ClickAtValidationEnabled; }
-            set { State.Settings.AppConfig.Ui.ClickAtValidationEnabled = value; }
         }
 
-        [Category("UI")]
-        [DisplayName("05)clickBeforeTextFocusWhenUninitializedEnabled")]
-        public bool ClickBeforeTextFocusWhenUninitializedEnabled
+        public override string GetName()
         {
-            get { return State.Settings.AppConfig.Ui.ClickBeforeTextFocusWhenUninitializedEnabled; }
-            set { State.Settings.AppConfig.Ui.ClickBeforeTextFocusWhenUninitializedEnabled = value; }
+            return "InputTiming";
         }
 
-        [Category("UI")]
-        [DisplayName("06)clickOnStartTimeoutRetryEnabled")]
-        public bool ClickOnStartTimeoutRetryEnabled
+        [Category("InputTiming")]
+        [DisplayName("01)charDelayBaseMs")]
+        public int CharDelayBaseMs
         {
-            get { return State.Settings.AppConfig.Ui.ClickOnStartTimeoutRetryEnabled; }
-            set { State.Settings.AppConfig.Ui.ClickOnStartTimeoutRetryEnabled = value; }
+            get { return State.Settings.AppConfig.InputTiming.CharDelayBaseMs; }
+            set { State.Settings.AppConfig.InputTiming.CharDelayBaseMs = value; }
         }
 
-        [Category("UI")]
-        [DisplayName("07)sendEnterAfterSentenceBreak")]
+        [Category("InputTiming")]
+        [DisplayName("02)deleteKeyDelayBaseMs")]
+        public int DeleteKeyDelayBaseMs
+        {
+            get { return State.Settings.AppConfig.InputTiming.DeleteKeyDelayBaseMs; }
+            set { State.Settings.AppConfig.InputTiming.DeleteKeyDelayBaseMs = value; }
+        }
+
+        [Category("InputTiming")]
+        [DisplayName("03)actionDelayMs")]
+        public int ActionDelayMs
+        {
+            get { return State.Settings.AppConfig.InputTiming.ActionDelayMs; }
+            set { State.Settings.AppConfig.InputTiming.ActionDelayMs = value; }
+        }
+
+        [Category("InputTiming")]
+        [DisplayName("04)sequentialMoveToStartKeyDelayBaseMs")]
+        public int SequentialMoveToStartKeyDelayBaseMs
+        {
+            get { return State.Settings.AppConfig.InputTiming.SequentialMoveToStartKeyDelayBaseMs; }
+            set { State.Settings.AppConfig.InputTiming.SequentialMoveToStartKeyDelayBaseMs = value; }
+        }
+
+        [Category("InputTiming")]
+        [DisplayName("05)postTypeWaitPerCharMs")]
+        public int PostTypeWaitPerCharMs
+        {
+            get { return State.Settings.AppConfig.InputTiming.PostTypeWaitPerCharMs; }
+            set { State.Settings.AppConfig.InputTiming.PostTypeWaitPerCharMs = value; }
+        }
+
+        [Category("InputTiming")]
+        [DisplayName("06)postTypeWaitMinMs")]
+        public int PostTypeWaitMinMs
+        {
+            get { return State.Settings.AppConfig.InputTiming.PostTypeWaitMinMs; }
+            set { State.Settings.AppConfig.InputTiming.PostTypeWaitMinMs = value; }
+        }
+
+        [Category("InputTiming")]
+        [DisplayName("07)clearInputMaxPasses")]
+        public int ClearInputMaxPasses
+        {
+            get { return State.Settings.AppConfig.InputTiming.ClearInputMaxPasses; }
+            set { State.Settings.AppConfig.InputTiming.ClearInputMaxPasses = value; }
+        }
+    }
+
+    // Text設定タブ
+    internal sealed class TextTab : TabBase
+    {
+        public TextTab(PluginSettingsState state) : base(state)
+        {
+        }
+
+        public override string GetName()
+        {
+            return "Text";
+        }
+
+        [Category("Text")]
+        [DisplayName("01)sendEnterAfterSentenceBreak")]
         public bool SendEnterAfterSentenceBreak
         {
-            get { return State.Settings.AppConfig.Ui.SendEnterAfterSentenceBreak; }
-            set { State.Settings.AppConfig.Ui.SendEnterAfterSentenceBreak = value; }
+            get { return State.Settings.AppConfig.Text.SendEnterAfterSentenceBreak; }
+            set { State.Settings.AppConfig.Text.SendEnterAfterSentenceBreak = value; }
         }
 
-        [Category("UI")]
-        [DisplayName("08)sentenceBreakTriggers(改行区切り)")]
+        [Category("Text")]
+        [DisplayName("02)sentenceBreakTriggers(改行区切り)")]
         [Description("1行に1トリガーを指定します")]
         [Editor(typeof(System.ComponentModel.Design.MultilineStringEditor), typeof(System.Drawing.Design.UITypeEditor))]
         public string SentenceBreakTriggersText
         {
             get
             {
-                return TabTextHelper.JoinLines(State.Settings.AppConfig.Ui.SentenceBreakTriggers);
+                return TabTextHelper.JoinLines(State.Settings.AppConfig.Text.SentenceBreakTriggers);
             }
             set
             {
-                State.Settings.AppConfig.Ui.SentenceBreakTriggers = TabTextHelper.SplitLines(value);
+                State.Settings.AppConfig.Text.SentenceBreakTriggers = TabTextHelper.SplitLines(value);
             }
         }
-    }
 
-    // 置換設定タブ
-    internal sealed class TextTransformTab : TabBase
-    {
-        public TextTransformTab(PluginSettingsState state) : base(state)
-        {
-        }
-
-        public override string GetName()
-        {
-            return "TextTransform";
-        }
-
-        [Category("TextTransform")]
-        [DisplayName("01)replaceRules(from=>to,改行区切り)")]
+        [Category("Text")]
+        [DisplayName("03)replaceRules(from=>to,改行区切り)")]
         [Description("例: 。=>。　。")]
         [Editor(typeof(System.ComponentModel.Design.MultilineStringEditor), typeof(System.Drawing.Design.UITypeEditor))]
         public string ReplaceRulesText
@@ -475,7 +505,7 @@ namespace Plugin_VoicepeakProxy
             get
             {
                 StringBuilder builder = new StringBuilder();
-                List<ReplaceRuleData> rules = State.Settings.AppConfig.TextTransform.ReplaceRules;
+                List<ReplaceRuleData> rules = State.Settings.AppConfig.Text.ReplaceRules;
                 for (int i = 0; i < rules.Count; i++)
                 {
                     ReplaceRuleData rule = rules[i] ?? new ReplaceRuleData();
@@ -519,7 +549,7 @@ namespace Plugin_VoicepeakProxy
                     rules.Add(rule);
                 }
 
-                State.Settings.AppConfig.TextTransform.ReplaceRules = rules;
+                State.Settings.AppConfig.Text.ReplaceRules = rules;
             }
         }
     }

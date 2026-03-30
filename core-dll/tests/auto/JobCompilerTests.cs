@@ -69,7 +69,7 @@ public class JobCompilerTests
     {
         // 置換ルール適用順を固定
         AppConfig config = new AppConfig();
-        config.TextTransform.ReplaceRules = new List<ReplaceRule>
+        config.Text.ReplaceRules = new List<ReplaceRule>
         {
             new ReplaceRule { From = "a", To = "b" },
             new ReplaceRule { From = "b", To = "c" }

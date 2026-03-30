@@ -162,7 +162,7 @@ public class VoicepeakOneShotCoreTests
         ui.ShouldAttemptPrimeInputContextHandler = (_, _, reason) => reason == InputContextPrimeReason.StartTimeoutRetry;
         AppConfig config = CreateConfig();
         config.Ui.MoveToStartShortcut = "Ctrl+Up";
-        config.Ui.ClickOnStartTimeoutRetryEnabled = true;
+        config.Startup.ClickOnStartTimeoutRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 2;
         config.Audio.StopConfirmMs = 1;
@@ -184,7 +184,7 @@ public class VoicepeakOneShotCoreTests
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
         AppConfig config = CreateConfig();
         config.Ui.MoveToStartShortcut = "Ctrl+Up";
-        config.Ui.ClickBeforeTextFocusWhenUninitializedEnabled = true;
+        config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled = true;
 
         SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), RequestValidationMode.Strict, ui, audio);
 

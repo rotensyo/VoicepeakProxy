@@ -47,31 +47,35 @@ namespace BouyomiVoicepeakBridge.Shared
     // コア設定のルート
     public sealed class AppConfigData
     {
-        public ServerConfigData Server { get; set; }
+        public QueueConfigData Queue { get; set; }
         public AudioConfigData Audio { get; set; }
-        public PrepareConfigData Prepare { get; set; }
+        public StartupConfigData Startup { get; set; }
+        public HookConfigData Hook { get; set; }
         public UiConfigData Ui { get; set; }
-        public TextTransformConfigData TextTransform { get; set; }
-        public DebugConfigData Debug { get; set; }
+        public InputTimingConfigData InputTiming { get; set; }
+        public TextConfigData Text { get; set; }
         public ValidationConfigData Validation { get; set; }
+        public DebugConfigData Debug { get; set; }
 
         public AppConfigData()
         {
-            Server = new ServerConfigData();
+            Queue = new QueueConfigData();
             Audio = new AudioConfigData();
-            Prepare = new PrepareConfigData();
+            Startup = new StartupConfigData();
+            Hook = new HookConfigData();
             Ui = new UiConfigData();
-            TextTransform = new TextTransformConfigData();
-            Debug = new DebugConfigData();
+            InputTiming = new InputTimingConfigData();
+            Text = new TextConfigData();
             Validation = new ValidationConfigData();
+            Debug = new DebugConfigData();
         }
 
         // 不足項目を既定値で補完
         public void Normalize()
         {
-            if (Server == null)
+            if (Queue == null)
             {
-                Server = new ServerConfigData();
+                Queue = new QueueConfigData();
             }
 
             if (Audio == null)
@@ -79,9 +83,14 @@ namespace BouyomiVoicepeakBridge.Shared
                 Audio = new AudioConfigData();
             }
 
-            if (Prepare == null)
+            if (Startup == null)
             {
-                Prepare = new PrepareConfigData();
+                Startup = new StartupConfigData();
+            }
+
+            if (Hook == null)
+            {
+                Hook = new HookConfigData();
             }
 
             if (Ui == null)
@@ -89,14 +98,14 @@ namespace BouyomiVoicepeakBridge.Shared
                 Ui = new UiConfigData();
             }
 
-            if (TextTransform == null)
+            if (InputTiming == null)
             {
-                TextTransform = new TextTransformConfigData();
+                InputTiming = new InputTimingConfigData();
             }
 
-            if (Debug == null)
+            if (Text == null)
             {
-                Debug = new DebugConfigData();
+                Text = new TextConfigData();
             }
 
             if (Validation == null)
@@ -104,8 +113,12 @@ namespace BouyomiVoicepeakBridge.Shared
                 Validation = new ValidationConfigData();
             }
 
-            Ui.Normalize();
-            TextTransform.Normalize();
+            if (Debug == null)
+            {
+                Debug = new DebugConfigData();
+            }
+
+            Text.Normalize();
         }
     }
 
@@ -132,8 +145,8 @@ namespace BouyomiVoicepeakBridge.Shared
         public RequestValidationModeOption RequestValidation { get; set; }
     }
 
-    // サーバ関連設定
-    public sealed class ServerConfigData
+    // キュー関連設定
+    public sealed class QueueConfigData
     {
         public int MaxQueuedJobs { get; set; }
     }
@@ -149,19 +162,20 @@ namespace BouyomiVoicepeakBridge.Shared
         public int MaxSpeakingDurationSec { get; set; }
     }
 
-    // 入力準備関連設定
-    public sealed class PrepareConfigData
+    // 起動時処理関連設定
+    public sealed class StartupConfigData
     {
         public string BootValidationText { get; set; }
         public int BootValidationMaxRetries { get; set; }
         public int BootValidationRetryIntervalMs { get; set; }
-        public int CharDelayBaseMs { get; set; }
-        public int ActionDelayMs { get; set; }
-        public int PostTypeWaitPerCharMs { get; set; }
-        public int PostTypeWaitMinMs { get; set; }
-        public int SequentialMoveToStartKeyDelayBaseMs { get; set; }
-        public int DeleteKeyDelayBaseMs { get; set; }
-        public int ClearInputMaxPasses { get; set; }
+        public bool ClickAtValidationEnabled { get; set; }
+        public bool ClickBeforeTextFocusWhenUninitializedEnabled { get; set; }
+        public bool ClickOnStartTimeoutRetryEnabled { get; set; }
+    }
+
+    // フック関連設定
+    public sealed class HookConfigData
+    {
         public int HookCommandTimeoutMs { get; set; }
         public int HookConnectTimeoutMs { get; set; }
         public int HookConnectTotalWaitMs { get; set; }
@@ -173,15 +187,31 @@ namespace BouyomiVoicepeakBridge.Shared
         public string MoveToStartShortcut { get; set; }
         public string PlayShortcut { get; set; }
         public int DelayBeforePlayShortcutMs { get; set; }
-        public bool ClickAtValidationEnabled { get; set; }
-        public bool ClickBeforeTextFocusWhenUninitializedEnabled { get; set; }
-        public bool ClickOnStartTimeoutRetryEnabled { get; set; }
+    }
+
+    // 入力タイミング関連設定
+    public sealed class InputTimingConfigData
+    {
+        public int CharDelayBaseMs { get; set; }
+        public int ActionDelayMs { get; set; }
+        public int PostTypeWaitPerCharMs { get; set; }
+        public int PostTypeWaitMinMs { get; set; }
+        public int SequentialMoveToStartKeyDelayBaseMs { get; set; }
+        public int DeleteKeyDelayBaseMs { get; set; }
+        public int ClearInputMaxPasses { get; set; }
+    }
+
+    // テキスト処理設定
+    public sealed class TextConfigData
+    {
         public bool SendEnterAfterSentenceBreak { get; set; }
         public List<string> SentenceBreakTriggers { get; set; }
+        public List<ReplaceRuleData> ReplaceRules { get; set; }
 
-        public UiConfigData()
+        public TextConfigData()
         {
             SentenceBreakTriggers = new List<string>();
+            ReplaceRules = new List<ReplaceRuleData>();
         }
 
         // 不足項目を既定値で補完
@@ -191,6 +221,11 @@ namespace BouyomiVoicepeakBridge.Shared
             {
                 SentenceBreakTriggers = new List<string>();
             }
+
+            if (ReplaceRules == null)
+            {
+                ReplaceRules = new List<ReplaceRuleData>();
+            }
         }
     }
 
@@ -199,26 +234,6 @@ namespace BouyomiVoicepeakBridge.Shared
     {
         public bool LogTextCandidates { get; set; }
         public bool LogModifierHookStats { get; set; }
-    }
-
-    // 置換設定
-    public sealed class TextTransformConfigData
-    {
-        public List<ReplaceRuleData> ReplaceRules { get; set; }
-
-        public TextTransformConfigData()
-        {
-            ReplaceRules = new List<ReplaceRuleData>();
-        }
-
-        // 不足項目を既定値で補完
-        public void Normalize()
-        {
-            if (ReplaceRules == null)
-            {
-                ReplaceRules = new List<ReplaceRuleData>();
-            }
-        }
     }
 
     // 置換ルール
