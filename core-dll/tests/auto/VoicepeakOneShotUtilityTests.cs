@@ -45,6 +45,23 @@ public class VoicepeakOneShotUtilityTests
     }
 
     [TestMethod]
+    public void ValidateInputOnceCore_MultipleProcesses_ReturnsStatus()
+    {
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ProcessCountHandler = () => 2
+        };
+
+        ValidateInputOnceResult result = VoicepeakOneShot.ValidateInputOnceCore(
+            new AppConfig(),
+            new AppLogger(new TestLogger()),
+            ui,
+            new FakeAudioSessionReader());
+
+        Assert.AreEqual(ValidateInputOnceStatus.MultipleProcesses, result.Status);
+    }
+
+    [TestMethod]
     public void ValidateInputOnceCore_TargetResolveFailure_DoesNotRecountProcess()
     {
         FakeVoicepeakUiController ui = new FakeVoicepeakUiController
@@ -194,6 +211,20 @@ public class VoicepeakOneShotUtilityTests
         ClearInputOnceResult result = VoicepeakOneShot.ClearInputOnceCore(new AppConfig(), new AppLogger(new TestLogger()), ui);
 
         Assert.AreEqual(ClearInputOnceStatus.ProcessNotFound, result.Status);
+    }
+
+    [TestMethod]
+    public void ClearInputOnceCore_TargetNotFound_ReturnsStatus()
+    {
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ProcessCountHandler = () => 1,
+            ResolveTargetHandler = () => (false, null, IntPtr.Zero)
+        };
+
+        ClearInputOnceResult result = VoicepeakOneShot.ClearInputOnceCore(new AppConfig(), new AppLogger(new TestLogger()), ui);
+
+        Assert.AreEqual(ClearInputOnceStatus.TargetNotFound, result.Status);
     }
 
     [TestMethod]

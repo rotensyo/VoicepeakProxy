@@ -250,7 +250,6 @@ internal sealed class VoicepeakEngine : IDisposable
             {
                 Segment seg = job.Segments[i];
                 bool isLast = i == job.Segments.Count - 1;
-                bool recoveryClickUsed = false;
                 _log.Info($"segment_start jobId={job.JobId} index={i}");
 
             lock (_gate)
@@ -300,104 +299,93 @@ internal sealed class VoicepeakEngine : IDisposable
                 return;
             }
 
-            for (int startAttempt = 0; startAttempt <= _config.Audio.StartConfirmMaxRetries; startAttempt++)
-            {
-                if (!_ui.PrepareForPlayback(process, hwnd, _config.InputTiming.ActionDelayMs))
+            StartConfirmLoopResult loopResult = JobExecutionCore.RunStartConfirmLoop(
+                _config,
+                _ui,
+                _audio,
+                process,
+                hwnd,
+                _log,
+                () => _stopping || _appCts.IsCancellationRequested,
+                () => _interruptRequested,
+                () => ConsumeInterruptIfAny(log: false),
+                attempt => _log.Warn($"start_confirm_retry jobId={job.JobId} index={i} attempt={attempt}"),
+                () =>
                 {
-                    DropJob(job, "move_to_start_failed");
-                    JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: false);
-                    return;
-                }
-
-                if (!_ui.PressPlay(hwnd))
-                {
-                    DropJob(job, "play_failed");
-                    JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: false);
-                    return;
-                }
-
-                _log.Info($"play_pressed jobId={job.JobId} index={i}");
-
-                lock (_gate)
-                {
-                    _state = WorkerState.Speaking;
-                }
-
-                SpeakMonitorResult speakResult = JobExecutionCore.MonitorSpeaking(
-                    _config,
-                    _ui,
-                    _audio,
-                    process,
-                    hwnd,
-                    _log,
-                    () => _stopping || _appCts.IsCancellationRequested,
-                    () => _interruptRequested,
-                    () => ConsumeInterruptIfAny(log: false));
-                if (speakResult.Kind == SpeakMonitorKind.Completed)
-                {
-                    _log.Info($"speak_end_confirmed jobId={job.JobId} index={i}");
+                    _log.Info($"play_pressed jobId={job.JobId} index={i}");
                     lock (_gate)
                     {
-                        _state = WorkerState.Stopping;
+                        _state = WorkerState.Speaking;
                     }
-
-                    int trailing = isLast
-                        ? JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(_config, job.TrailingPauseMs, "trailing", job.JobId, i, null, _log)
-                        : 0;
-                    if (trailing > 0)
-                    {
-                        long waitUntil = speakResult.SegEndAtMs + trailing;
-                        MonoClock.SleepUntil(waitUntil, () => _stopping || _appCts.IsCancellationRequested || _interruptRequested);
-                    }
-
-                    if (_interruptRequested)
-                    {
-                        ConsumeInterruptIfAny(log: false);
-                        _log.Info("interrupt_applied state=Stopping");
-                        DropJob(job, "interrupt");
-                        return;
-                    }
-
-                    break;
+                });
+            if (loopResult.Kind == StartConfirmLoopKind.Completed)
+            {
+                _log.Info($"speak_end_confirmed jobId={job.JobId} index={i}");
+                lock (_gate)
+                {
+                    _state = WorkerState.Stopping;
                 }
 
-                if (speakResult.Kind == SpeakMonitorKind.Interrupted)
+                int trailing = isLast
+                    ? JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(_config, job.TrailingPauseMs, "trailing", job.JobId, i, null, _log)
+                    : 0;
+                if (trailing > 0)
                 {
-                    _log.Info("interrupt_applied state=Speaking");
+                    long waitUntil = loopResult.SegEndAtMs + trailing;
+                    MonoClock.SleepUntil(waitUntil, () => _stopping || _appCts.IsCancellationRequested || _interruptRequested);
+                }
+
+                if (_interruptRequested)
+                {
+                    ConsumeInterruptIfAny(log: false);
+                    _log.Info("interrupt_applied state=Stopping");
                     DropJob(job, "interrupt");
                     return;
                 }
 
-                if (speakResult.Kind == SpeakMonitorKind.StartTimeout)
-                {
-                    bool shouldRetry = JobExecutionCore.HandleStartTimeoutRetry(_config, _ui, process, hwnd, startAttempt, ref recoveryClickUsed);
-                    if (shouldRetry)
-                    {
-                        _log.Warn($"start_confirm_retry jobId={job.JobId} index={i} attempt={startAttempt + 1}");
-                        continue;
-                    }
-
-                    _log.Error("monitor_timeout reason=start_confirm");
-                    DropJob(job, "start_confirm_failed");
-                    JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: false);
-                    return;
-                }
-
-                if (speakResult.Kind == SpeakMonitorKind.MaxDuration)
-                {
-                    _log.Error("monitor_timeout reason=max_duration");
-                    DropJob(job, "max_speaking_duration");
-                    JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: false);
-                    return;
-                }
-
-                if (speakResult.Kind == SpeakMonitorKind.ProcessLost)
-                {
-                    OnProcessLost();
-                    DropJob(job, "process_lost");
-                    return;
-                }
+                continue;
             }
+
+            if (loopResult.Kind == StartConfirmLoopKind.Interrupted)
+            {
+                _log.Info("interrupt_applied state=Speaking");
+                DropJob(job, "interrupt");
+                return;
+            }
+
+            if (loopResult.Kind == StartConfirmLoopKind.MoveToStartFailed)
+            {
+                DropJob(job, "move_to_start_failed");
+                JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: false);
+                return;
+            }
+
+            if (loopResult.Kind == StartConfirmLoopKind.PlayFailed)
+            {
+                DropJob(job, "play_failed");
+                JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: false);
+                return;
+            }
+
+            if (loopResult.Kind == StartConfirmLoopKind.StartConfirmTimeout)
+            {
+                _log.Error("monitor_timeout reason=start_confirm");
+                DropJob(job, "start_confirm_failed");
+                JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: false);
+                return;
+            }
+
+            if (loopResult.Kind == StartConfirmLoopKind.MaxDuration)
+            {
+                _log.Error("monitor_timeout reason=max_duration");
+                DropJob(job, "max_speaking_duration");
+                JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: false);
+                return;
+            }
+
+            OnProcessLost();
+            DropJob(job, "process_lost");
+            return;
             }
 
             JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: true);
@@ -489,19 +477,12 @@ internal sealed class VoicepeakEngine : IDisposable
     private void LogTargetResolveFailure()
     {
         int processCount = _ui.GetVoicepeakProcessCount();
-        if (processCount <= 0)
-        {
-            _log.Error("voicepeak.exe が起動していません。");
-            return;
-        }
-
-        if (processCount > 1)
-        {
-            _log.Error($"voicepeak.exe が複数起動しています。1つだけ起動してください。（検出数: {processCount}）");
-            return;
-        }
-
-        _log.Error("対象ウィンドウを取得できませんでした。アプリの状態を確認してください。");
+        ResolveTargetFailureReason reason = processCount <= 0
+            ? ResolveTargetFailureReason.ProcessNotFound
+            : processCount > 1
+                ? ResolveTargetFailureReason.MultipleProcesses
+                : ResolveTargetFailureReason.TargetNotFound;
+        ResolveTargetFailureMapper.LogFailure(_log, reason, processCount);
     }
 
     private static string EscapeForJson(string s)

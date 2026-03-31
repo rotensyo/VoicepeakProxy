@@ -351,151 +351,16 @@ public static class VoicepeakOneShot
         IVoicepeakUiController ui,
         IAudioSessionReader audio)
     {
-        Job job;
-        try
-        {
-            if (request == null)
-            {
-                throw new InvalidOperationException("request は null にできません");
-            }
-
-            SpeakRequest runtimeRequest = new SpeakRequest
-            {
-                Text = PauseTokenParser.StripTokens(request.Text),
-                Mode = EnqueueMode.Queue,
-                Interrupt = false
-            };
-            job = JobCompiler.Compile(runtimeRequest, config, validation);
-        }
-        catch (Exception ex)
-        {
-            return new SpeakOnceResult
-            {
-                Status = SpeakOnceStatus.InvalidRequest,
-                SegmentsExecuted = 0,
-                ErrorMessage = ex.Message
-            };
-        }
-
-        log.Info($"job_received jobId={job.JobId} mode={job.Mode} interrupt={job.Interrupt} source=oneshot");
-
-        ResolveTargetResult resolved = ui.TryResolveTargetDetailed();
-        if (!resolved.Success)
-        {
-            return BuildSpeakResolveTargetFailedResult(resolved, log);
-        }
-
-        Process process = resolved.Process;
-        IntPtr hwnd = resolved.MainHwnd;
-
-        if (!TryBeginModifierIsolationSession(ui, process.Id, "oneshot_speak_once", log))
-        {
-            log.Warn($"job_dropped jobId={job.JobId} reason=modifier_guard_unavailable_fatal");
-            return new SpeakOnceResult
-            {
-                Status = SpeakOnceStatus.ProcessLost,
-                SegmentsExecuted = 0,
-                ErrorMessage = ModifierGuardUnavailableFatalReason
-            };
-        }
-
-        int executed = 0;
-        SpeakOnceResult result;
-        bool sessionEnded;
-        try
-        {
-            for (int i = 0; i < job.Segments.Count; i++)
-            {
-                Segment seg = job.Segments[i];
-                log.Info($"segment_start jobId={job.JobId} index={i}");
-
-            long segmentStartAt = MonoClock.NowMs();
-            bool prepared = JobExecutionCore.PrepareSegment(config, ui, process, hwnd, seg.Text, log, false);
-            long readyAt = MonoClock.NowMs();
-            if (!prepared)
-            {
-                log.Warn($"job_dropped jobId={job.JobId} reason=prepare_failed");
-                ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, false);
-                    result = new SpeakOnceResult { Status = SpeakOnceStatus.PrepareFailed, SegmentsExecuted = executed };
-                    goto SpeakOnceCore_Exit;
-            }
-
-            int adjustedPausePreMs = JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(config, seg.PausePreMs, "pre", job.JobId, i, seg.Text, log);
-            long scheduledAt = segmentStartAt + adjustedPausePreMs;
-            long playAt = Math.Max(scheduledAt, readyAt);
-            MonoClock.SleepUntil(playAt, () => false);
-
-            if (!ui.IsAlive(process))
-            {
-                log.Error("対象プロセスが終了したため処理を中断しました。");
-                log.Warn($"job_dropped jobId={job.JobId} reason=process_lost");
-                    result = new SpeakOnceResult { Status = SpeakOnceStatus.ProcessLost, SegmentsExecuted = executed };
-                    goto SpeakOnceCore_Exit;
-            }
-
-            if (!ui.PrepareForPlayback(process, hwnd, config.InputTiming.ActionDelayMs))
-            {
-                log.Warn($"job_dropped jobId={job.JobId} reason=move_to_start_failed");
-                ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, false);
-                    result = new SpeakOnceResult { Status = SpeakOnceStatus.MoveToStartFailed, SegmentsExecuted = executed };
-                    goto SpeakOnceCore_Exit;
-            }
-
-            if (!ui.PressPlay(hwnd))
-            {
-                log.Warn($"job_dropped jobId={job.JobId} reason=play_failed");
-                ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, false);
-                    result = new SpeakOnceResult { Status = SpeakOnceStatus.PlayFailed, SegmentsExecuted = executed };
-                    goto SpeakOnceCore_Exit;
-            }
-
-            log.Info($"play_pressed jobId={job.JobId} index={i}");
-            StartConfirmResult startConfirm = MonitorStartConfirm(config, ui, audio, process, log);
-            if (startConfirm == StartConfirmResult.Confirmed)
-            {
-                log.Info($"speak_start_confirmed jobId={job.JobId} index={i}");
-                executed++;
-                continue;
-            }
-
-            if (startConfirm == StartConfirmResult.Timeout)
-            {
-                log.Error("monitor_timeout reason=start_confirm");
-                log.Warn($"job_dropped jobId={job.JobId} reason=start_confirm_failed");
-                ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, false);
-                    result = new SpeakOnceResult { Status = SpeakOnceStatus.StartConfirmTimeout, SegmentsExecuted = executed };
-                    goto SpeakOnceCore_Exit;
-            }
-
-            log.Warn($"job_dropped jobId={job.JobId} reason=process_lost");
-                result = new SpeakOnceResult { Status = SpeakOnceStatus.ProcessLost, SegmentsExecuted = executed };
-                goto SpeakOnceCore_Exit;
-            }
-
-            result = new SpeakOnceResult
-            {
-                Status = SpeakOnceStatus.Completed,
-                SegmentsExecuted = executed
-            };
-SpeakOnceCore_Exit:
-            ;
-        }
-        finally
-        {
-            sessionEnded = TryEndModifierIsolationSession(ui, "oneshot_speak_once", log);
-        }
-
-        if (!sessionEnded)
-        {
-            return new SpeakOnceResult
-            {
-                Status = SpeakOnceStatus.ProcessLost,
-                SegmentsExecuted = executed,
-                ErrorMessage = ModifierGuardReleaseFailedFatalReason
-            };
-        }
-
-        return result;
+        return ExecuteSpeakCore(
+            config,
+            request,
+            log,
+            validation,
+            ui,
+            audio,
+            waitForCompletion: false,
+            stripPauseTokens: true,
+            operationName: "oneshot_speak_once");
     }
 
     // 単発実行
@@ -531,30 +396,34 @@ SpeakOnceCore_Exit:
         IVoicepeakUiController ui,
         IAudioSessionReader audio)
     {
-        Job job;
-        try
-        {
-            if (request == null)
-            {
-                throw new InvalidOperationException("request は null にできません");
-            }
+        return ExecuteSpeakCore(
+            config,
+            request,
+            log,
+            validation,
+            ui,
+            audio,
+            waitForCompletion: true,
+            stripPauseTokens: false,
+            operationName: "oneshot_speak_wait");
+    }
 
-            SpeakRequest runtimeRequest = new SpeakRequest
-            {
-                Text = request.Text,
-                Mode = EnqueueMode.Queue,
-                Interrupt = false
-            };
-            job = JobCompiler.Compile(runtimeRequest, config, validation);
-        }
-        catch (Exception ex)
+    // 単発実行の共通本体
+    private static SpeakOnceResult ExecuteSpeakCore(
+        AppConfig config,
+        SpeakOnceRequest request,
+        AppLogger log,
+        RequestValidationMode validation,
+        IVoicepeakUiController ui,
+        IAudioSessionReader audio,
+        bool waitForCompletion,
+        bool stripPauseTokens,
+        string operationName)
+    {
+        Job job;
+        if (!TryCompileSpeakJob(request, config, validation, stripPauseTokens, out job, out SpeakOnceResult invalidRequestResult))
         {
-            return new SpeakOnceResult
-            {
-                Status = SpeakOnceStatus.InvalidRequest,
-                SegmentsExecuted = 0,
-                ErrorMessage = ex.Message
-            };
+            return invalidRequestResult;
         }
 
         log.Info($"job_received jobId={job.JobId} mode={job.Mode} interrupt={job.Interrupt} source=oneshot");
@@ -568,7 +437,7 @@ SpeakOnceCore_Exit:
         Process process = resolved.Process;
         IntPtr hwnd = resolved.MainHwnd;
 
-        if (!TryBeginModifierIsolationSession(ui, process.Id, "oneshot_speak_wait", log))
+        if (!TryBeginModifierIsolationSession(ui, process.Id, operationName, log))
         {
             log.Warn($"job_dropped jobId={job.JobId} reason=modifier_guard_unavailable_fatal");
             return new SpeakOnceResult
@@ -580,7 +449,7 @@ SpeakOnceCore_Exit:
         }
 
         int executed = 0;
-        SpeakOnceResult result;
+        SpeakOnceResult result = null;
         bool sessionEnded;
         try
         {
@@ -588,123 +457,105 @@ SpeakOnceCore_Exit:
             {
                 Segment seg = job.Segments[i];
                 bool isLast = i == job.Segments.Count - 1;
-                bool recoveryClickUsed = false;
                 log.Info($"segment_start jobId={job.JobId} index={i}");
 
-            long segmentStartAt = MonoClock.NowMs();
-            bool prepared = JobExecutionCore.PrepareSegment(config, ui, process, hwnd, seg.Text, log, false);
-            long readyAt = MonoClock.NowMs();
-            if (!prepared)
-            {
-                log.Warn($"job_dropped jobId={job.JobId} reason=prepare_failed");
-                ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, false);
+                if (!TryPrepareSpeakSegment(config, ui, process, hwnd, seg, log, job.JobId, i))
+                {
                     result = new SpeakOnceResult { Status = SpeakOnceStatus.PrepareFailed, SegmentsExecuted = executed };
-                    goto SpeakOnceWaitCore_Exit;
-            }
+                    break;
+                }
 
-            int adjustedPausePreMs = JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(config, seg.PausePreMs, "pre", job.JobId, i, seg.Text, log);
-            long scheduledAt = segmentStartAt + adjustedPausePreMs;
-            long playAt = Math.Max(scheduledAt, readyAt);
-            MonoClock.SleepUntil(playAt, () => false);
-
-            if (!ui.IsAlive(process))
-            {
-                log.Error("対象プロセスが終了したため処理を中断しました。");
-                log.Warn($"job_dropped jobId={job.JobId} reason=process_lost");
+                if (!ui.IsAlive(process))
+                {
+                    log.Error("対象プロセスが終了したため処理を中断しました。");
+                    log.Warn($"job_dropped jobId={job.JobId} reason=process_lost");
                     result = new SpeakOnceResult { Status = SpeakOnceStatus.ProcessLost, SegmentsExecuted = executed };
-                    goto SpeakOnceWaitCore_Exit;
-            }
+                    break;
+                }
 
-            for (int startAttempt = 0; startAttempt <= config.Audio.StartConfirmMaxRetries; startAttempt++)
-            {
+                if (waitForCompletion)
+                {
+                    StartConfirmLoopResult loopResult = JobExecutionCore.RunStartConfirmLoop(
+                        config,
+                        ui,
+                        audio,
+                        process,
+                        hwnd,
+                        log,
+                        () => false,
+                        () => false,
+                        null,
+                        attempt => log.Warn($"start_confirm_retry jobId={job.JobId} index={i} attempt={attempt}"),
+                        () => log.Info($"play_pressed jobId={job.JobId} index={i}"));
+                    if (loopResult.Kind == StartConfirmLoopKind.Completed)
+                    {
+                        log.Info($"speak_end_confirmed jobId={job.JobId} index={i}");
+                        executed++;
+
+                        int trailing = isLast
+                            ? JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(config, job.TrailingPauseMs, "trailing", job.JobId, i, null, log)
+                            : 0;
+                        if (trailing > 0)
+                        {
+                            long waitUntil = loopResult.SegEndAtMs + trailing;
+                            MonoClock.SleepUntil(waitUntil, () => false);
+                        }
+
+                        continue;
+                    }
+
+                    result = BuildSpeakWaitFailureResult(config, ui, process, hwnd, loopResult, executed, job.JobId, log);
+                    break;
+                }
+
                 if (!ui.PrepareForPlayback(process, hwnd, config.InputTiming.ActionDelayMs))
                 {
                     log.Warn($"job_dropped jobId={job.JobId} reason=move_to_start_failed");
-                    JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, false, killFocusAfterClear: false);
-                        result = new SpeakOnceResult { Status = SpeakOnceStatus.MoveToStartFailed, SegmentsExecuted = executed };
-                        goto SpeakOnceWaitCore_Exit;
+                    ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, false);
+                    result = new SpeakOnceResult { Status = SpeakOnceStatus.MoveToStartFailed, SegmentsExecuted = executed };
+                    break;
                 }
 
                 if (!ui.PressPlay(hwnd))
                 {
                     log.Warn($"job_dropped jobId={job.JobId} reason=play_failed");
-                    JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, false, killFocusAfterClear: false);
-                        result = new SpeakOnceResult { Status = SpeakOnceStatus.PlayFailed, SegmentsExecuted = executed };
-                        goto SpeakOnceWaitCore_Exit;
-                }
-
-                log.Info($"play_pressed jobId={job.JobId} index={i}");
-                SpeakMonitorResult speakResult = JobExecutionCore.MonitorSpeaking(
-                    config,
-                    ui,
-                    audio,
-                    process,
-                    hwnd,
-                    log,
-                    () => false,
-                    () => false,
-                    null);
-                if (speakResult.Kind == SpeakMonitorKind.Completed)
-                {
-                    log.Info($"speak_end_confirmed jobId={job.JobId} index={i}");
-                    executed++;
-
-                    int trailing = isLast
-                        ? JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(config, job.TrailingPauseMs, "trailing", job.JobId, i, null, log)
-                        : 0;
-                    if (trailing > 0)
-                    {
-                        long waitUntil = speakResult.SegEndAtMs + trailing;
-                        MonoClock.SleepUntil(waitUntil, () => false);
-                    }
-
+                    ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, false);
+                    result = new SpeakOnceResult { Status = SpeakOnceStatus.PlayFailed, SegmentsExecuted = executed };
                     break;
                 }
 
-                if (speakResult.Kind == SpeakMonitorKind.StartTimeout)
+                log.Info($"play_pressed jobId={job.JobId} index={i}");
+                StartConfirmResult startConfirm = MonitorStartConfirm(config, ui, audio, process, log);
+                if (startConfirm == StartConfirmResult.Confirmed)
                 {
-                    bool shouldRetry = JobExecutionCore.HandleStartTimeoutRetry(config, ui, process, hwnd, startAttempt, ref recoveryClickUsed);
-                    if (shouldRetry)
-                    {
-                        log.Warn($"start_confirm_retry jobId={job.JobId} index={i} attempt={startAttempt + 1}");
-                        continue;
-                    }
-
-                    log.Error("monitor_timeout reason=start_confirm");
-                    log.Warn($"job_dropped jobId={job.JobId} reason=start_confirm_failed");
-                    JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, false, killFocusAfterClear: false);
-                        result = new SpeakOnceResult { Status = SpeakOnceStatus.StartConfirmTimeout, SegmentsExecuted = executed };
-                        goto SpeakOnceWaitCore_Exit;
+                    log.Info($"speak_start_confirmed jobId={job.JobId} index={i}");
+                    executed++;
+                    continue;
                 }
 
-                if (speakResult.Kind == SpeakMonitorKind.MaxDuration)
+                if (startConfirm == StartConfirmResult.Timeout)
                 {
-                    log.Error("monitor_timeout reason=max_duration");
-                    log.Warn($"job_dropped jobId={job.JobId} reason=max_speaking_duration");
-                    JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, false, killFocusAfterClear: false);
-                        result = new SpeakOnceResult { Status = SpeakOnceStatus.MaxSpeakingDurationExceeded, SegmentsExecuted = executed };
-                        goto SpeakOnceWaitCore_Exit;
+                    log.Error("monitor_timeout reason=start_confirm");
+                    log.Warn($"job_dropped jobId={job.JobId} reason=start_confirm_failed");
+                    ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, false);
+                    result = new SpeakOnceResult { Status = SpeakOnceStatus.StartConfirmTimeout, SegmentsExecuted = executed };
+                    break;
                 }
 
                 log.Warn($"job_dropped jobId={job.JobId} reason=process_lost");
-                    result = new SpeakOnceResult { Status = SpeakOnceStatus.ProcessLost, SegmentsExecuted = executed };
-                    goto SpeakOnceWaitCore_Exit;
+                result = new SpeakOnceResult { Status = SpeakOnceStatus.ProcessLost, SegmentsExecuted = executed };
+                break;
             }
 
-                continue;
-            }
-
-            result = new SpeakOnceResult
+            result ??= new SpeakOnceResult
             {
                 Status = SpeakOnceStatus.Completed,
                 SegmentsExecuted = executed
             };
-SpeakOnceWaitCore_Exit:
-            ;
         }
         finally
         {
-            sessionEnded = TryEndModifierIsolationSession(ui, "oneshot_speak_wait", log);
+            sessionEnded = TryEndModifierIsolationSession(ui, operationName, log);
         }
 
         if (!sessionEnded)
@@ -718,6 +569,118 @@ SpeakOnceWaitCore_Exit:
         }
 
         return result;
+    }
+
+    // 単発実行のジョブ生成を共通化
+    private static bool TryCompileSpeakJob(
+        SpeakOnceRequest request,
+        AppConfig config,
+        RequestValidationMode validation,
+        bool stripPauseTokens,
+        out Job job,
+        out SpeakOnceResult invalidRequestResult)
+    {
+        job = null;
+        invalidRequestResult = null;
+        try
+        {
+            if (request == null)
+            {
+                throw new InvalidOperationException("request は null にできません");
+            }
+
+            SpeakRequest runtimeRequest = new SpeakRequest
+            {
+                Text = stripPauseTokens ? PauseTokenParser.StripTokens(request.Text) : request.Text,
+                Mode = EnqueueMode.Queue,
+                Interrupt = false
+            };
+            job = JobCompiler.Compile(runtimeRequest, config, validation);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            invalidRequestResult = new SpeakOnceResult
+            {
+                Status = SpeakOnceStatus.InvalidRequest,
+                SegmentsExecuted = 0,
+                ErrorMessage = ex.Message
+            };
+            return false;
+        }
+    }
+
+    // セグメント準備と事前待機を共通化
+    private static bool TryPrepareSpeakSegment(
+        AppConfig config,
+        IVoicepeakUiController ui,
+        Process process,
+        IntPtr hwnd,
+        Segment segment,
+        AppLogger log,
+        string jobId,
+        int segmentIndex)
+    {
+        long segmentStartAt = MonoClock.NowMs();
+        bool prepared = JobExecutionCore.PrepareSegment(config, ui, process, hwnd, segment.Text, log, false);
+        long readyAt = MonoClock.NowMs();
+        if (!prepared)
+        {
+            log.Warn($"job_dropped jobId={jobId} reason=prepare_failed");
+            ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, false);
+            return false;
+        }
+
+        int adjustedPausePreMs = JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(config, segment.PausePreMs, "pre", jobId, segmentIndex, segment.Text, log);
+        long scheduledAt = segmentStartAt + adjustedPausePreMs;
+        long playAt = Math.Max(scheduledAt, readyAt);
+        MonoClock.SleepUntil(playAt, () => false);
+        return true;
+    }
+
+    // 待機付き単発実行の失敗結果を構築
+    private static SpeakOnceResult BuildSpeakWaitFailureResult(
+        AppConfig config,
+        IVoicepeakUiController ui,
+        Process process,
+        IntPtr hwnd,
+        StartConfirmLoopResult loopResult,
+        int executed,
+        string jobId,
+        AppLogger log)
+    {
+        if (loopResult.Kind == StartConfirmLoopKind.MoveToStartFailed)
+        {
+            log.Warn($"job_dropped jobId={jobId} reason=move_to_start_failed");
+            JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, false, killFocusAfterClear: false);
+            return new SpeakOnceResult { Status = SpeakOnceStatus.MoveToStartFailed, SegmentsExecuted = executed };
+        }
+
+        if (loopResult.Kind == StartConfirmLoopKind.PlayFailed)
+        {
+            log.Warn($"job_dropped jobId={jobId} reason=play_failed");
+            JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, false, killFocusAfterClear: false);
+            return new SpeakOnceResult { Status = SpeakOnceStatus.PlayFailed, SegmentsExecuted = executed };
+        }
+
+        if (loopResult.Kind == StartConfirmLoopKind.StartConfirmTimeout)
+        {
+            log.Error("monitor_timeout reason=start_confirm");
+            log.Warn($"job_dropped jobId={jobId} reason=start_confirm_failed");
+            JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, false, killFocusAfterClear: false);
+            return new SpeakOnceResult { Status = SpeakOnceStatus.StartConfirmTimeout, SegmentsExecuted = executed };
+        }
+
+        if (loopResult.Kind == StartConfirmLoopKind.MaxDuration)
+        {
+            log.Error("monitor_timeout reason=max_duration");
+            log.Warn($"job_dropped jobId={jobId} reason=max_speaking_duration");
+            JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, false, killFocusAfterClear: false);
+            return new SpeakOnceResult { Status = SpeakOnceStatus.MaxSpeakingDurationExceeded, SegmentsExecuted = executed };
+        }
+
+        log.Warn($"job_dropped jobId={jobId} reason=process_lost");
+        return new SpeakOnceResult { Status = SpeakOnceStatus.ProcessLost, SegmentsExecuted = executed };
     }
 
     // 修飾キー中立化セッションを開始
@@ -780,58 +743,68 @@ SpeakOnceWaitCore_Exit:
     // 対象解決失敗をSpeakOnce結果へ変換
     private static SpeakOnceResult BuildSpeakResolveTargetFailedResult(ResolveTargetResult resolved, AppLogger log)
     {
-        if (resolved.FailureReason == ResolveTargetFailureReason.ProcessNotFound)
+        ResolveTargetFailureReason reason = ResolveTargetFailureMapper.NormalizeReason(resolved);
+        ResolveTargetFailureMapper.LogFailure(log, reason, resolved?.ProcessCount ?? 0);
+        return new SpeakOnceResult
         {
-            log.Error("voicepeak.exe が起動していません。");
-            return new SpeakOnceResult { Status = SpeakOnceStatus.ProcessNotFound, SegmentsExecuted = 0 };
-        }
-
-        if (resolved.FailureReason == ResolveTargetFailureReason.MultipleProcesses)
-        {
-            log.Error($"voicepeak.exe が複数起動しています。1つだけ起動してください。（検出数: {resolved.ProcessCount}）");
-            return new SpeakOnceResult { Status = SpeakOnceStatus.MultipleProcesses, SegmentsExecuted = 0 };
-        }
-
-        log.Error("対象ウィンドウを取得できませんでした。アプリの状態を確認してください。");
-        return new SpeakOnceResult { Status = SpeakOnceStatus.TargetNotFound, SegmentsExecuted = 0 };
+            Status = MapSpeakResolveTargetFailureStatus(reason),
+            SegmentsExecuted = 0
+        };
     }
 
     // 対象解決失敗をValidate結果へ変換
     private static ValidateInputOnceResult BuildValidateInputResolveTargetFailedResult(ResolveTargetResult resolved, AppLogger log)
     {
-        if (resolved.FailureReason == ResolveTargetFailureReason.ProcessNotFound)
+        ResolveTargetFailureReason reason = ResolveTargetFailureMapper.NormalizeReason(resolved);
+        ResolveTargetFailureMapper.LogFailure(log, reason, resolved?.ProcessCount ?? 0);
+        return new ValidateInputOnceResult
         {
-            log.Error("voicepeak.exe が起動していません。");
-            return new ValidateInputOnceResult { Status = ValidateInputOnceStatus.ProcessNotFound };
-        }
-
-        if (resolved.FailureReason == ResolveTargetFailureReason.MultipleProcesses)
-        {
-            log.Error($"voicepeak.exe が複数起動しています。1つだけ起動してください。（検出数: {resolved.ProcessCount}）");
-            return new ValidateInputOnceResult { Status = ValidateInputOnceStatus.MultipleProcesses };
-        }
-
-        log.Error("対象ウィンドウを取得できませんでした。アプリの状態を確認してください。");
-        return new ValidateInputOnceResult { Status = ValidateInputOnceStatus.TargetNotFound };
+            Status = MapValidateResolveTargetFailureStatus(reason)
+        };
     }
 
     // 対象解決失敗をClearInput結果へ変換
     private static ClearInputOnceResult BuildClearInputResolveTargetFailedResult(ResolveTargetResult resolved, AppLogger log)
     {
-        if (resolved.FailureReason == ResolveTargetFailureReason.ProcessNotFound)
+        ResolveTargetFailureReason reason = ResolveTargetFailureMapper.NormalizeReason(resolved);
+        ResolveTargetFailureMapper.LogFailure(log, reason, resolved?.ProcessCount ?? 0);
+        return new ClearInputOnceResult
         {
-            log.Error("voicepeak.exe が起動していません。");
-            return new ClearInputOnceResult { Status = ClearInputOnceStatus.ProcessNotFound };
-        }
+            Status = MapClearResolveTargetFailureStatus(reason)
+        };
+    }
 
-        if (resolved.FailureReason == ResolveTargetFailureReason.MultipleProcesses)
+    // 対象解決失敗理由をSpeak結果へ変換
+    private static SpeakOnceStatus MapSpeakResolveTargetFailureStatus(ResolveTargetFailureReason reason)
+    {
+        return reason switch
         {
-            log.Error($"voicepeak.exe が複数起動しています。1つだけ起動してください。（検出数: {resolved.ProcessCount}）");
-            return new ClearInputOnceResult { Status = ClearInputOnceStatus.MultipleProcesses };
-        }
+            ResolveTargetFailureReason.ProcessNotFound => SpeakOnceStatus.ProcessNotFound,
+            ResolveTargetFailureReason.MultipleProcesses => SpeakOnceStatus.MultipleProcesses,
+            _ => SpeakOnceStatus.TargetNotFound
+        };
+    }
 
-        log.Error("対象ウィンドウを取得できませんでした。アプリの状態を確認してください。");
-        return new ClearInputOnceResult { Status = ClearInputOnceStatus.TargetNotFound };
+    // 対象解決失敗理由をValidate結果へ変換
+    private static ValidateInputOnceStatus MapValidateResolveTargetFailureStatus(ResolveTargetFailureReason reason)
+    {
+        return reason switch
+        {
+            ResolveTargetFailureReason.ProcessNotFound => ValidateInputOnceStatus.ProcessNotFound,
+            ResolveTargetFailureReason.MultipleProcesses => ValidateInputOnceStatus.MultipleProcesses,
+            _ => ValidateInputOnceStatus.TargetNotFound
+        };
+    }
+
+    // 対象解決失敗理由をClear結果へ変換
+    private static ClearInputOnceStatus MapClearResolveTargetFailureStatus(ResolveTargetFailureReason reason)
+    {
+        return reason switch
+        {
+            ResolveTargetFailureReason.ProcessNotFound => ClearInputOnceStatus.ProcessNotFound,
+            ResolveTargetFailureReason.MultipleProcesses => ClearInputOnceStatus.MultipleProcesses,
+            _ => ClearInputOnceStatus.TargetNotFound
+        };
     }
 
     private enum StartConfirmResult

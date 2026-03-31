@@ -108,115 +108,32 @@ internal static class AppConfigValidator
     // 起動前に設定値を検証
     public static void Validate(AppConfig config)
     {
-        if (config == null)
-        {
-            throw new InvalidOperationException("config は null にできません");
-        }
+        EnsureNotNull(config, "config は null にできません");
+        EnsureNotNull(config.Queue, "queue は null にできません");
+        EnsureNotNull(config.Audio, "audio は null にできません");
+        EnsureNotNull(config.Startup, "startup は null にできません");
+        EnsureNotNull(config.Hook, "hook は null にできません");
+        EnsureNotNull(config.Ui, "ui は null にできません");
+        EnsureNotNull(config.InputTiming, "inputTiming は null にできません");
+        EnsureNotNull(config.Text, "text は null にできません");
+        EnsureNotNull(config.Debug, "debug は null にできません");
+        EnsureNotNull(config.Validation, "validation は null にできません");
 
-        if (config.Queue == null)
-        {
-            throw new InvalidOperationException("queue は null にできません");
-        }
+        EnsureNonNegative(config.Queue.MaxQueuedJobs, "queue.maxQueuedJobs は 0 以上で指定してください");
+        EnsurePositive(config.Audio.PollIntervalMs, "audio.pollIntervalMs は 1 以上で指定してください");
+        EnsurePositive(config.Audio.StartConfirmTimeoutMs, "audio.startConfirmTimeoutMs は 1 以上で指定してください");
+        EnsureNonNegative(config.Audio.StartConfirmMaxRetries, "audio.startConfirmMaxRetries は 0 以上で指定してください");
+        EnsurePositive(config.Audio.StopConfirmMs, "audio.stopConfirmMs は 1 以上で指定してください");
 
-        if (config.Audio == null)
-        {
-            throw new InvalidOperationException("audio は null にできません");
-        }
+        EnsureNotNull(config.Startup.BootValidationText, "startup.bootValidationText は null にできません");
+        EnsureNonNegative(config.Startup.BootValidationMaxRetries, "startup.bootValidationMaxRetries は 0 以上で指定してください");
+        EnsureNonNegative(config.Startup.BootValidationRetryIntervalMs, "startup.bootValidationRetryIntervalMs は 0 以上で指定してください");
 
-        if (config.Startup == null)
-        {
-            throw new InvalidOperationException("startup は null にできません");
-        }
+        EnsurePositive(config.Hook.HookCommandTimeoutMs, "hook.hookCommandTimeoutMs は 1 以上で指定してください");
+        EnsurePositive(config.Hook.HookConnectTimeoutMs, "hook.hookConnectTimeoutMs は 1 以上で指定してください");
+        EnsurePositive(config.Hook.HookConnectTotalWaitMs, "hook.hookConnectTotalWaitMs は 1 以上で指定してください");
 
-        if (config.Hook == null)
-        {
-            throw new InvalidOperationException("hook は null にできません");
-        }
-
-        if (config.Ui == null)
-        {
-            throw new InvalidOperationException("ui は null にできません");
-        }
-
-        if (config.InputTiming == null)
-        {
-            throw new InvalidOperationException("inputTiming は null にできません");
-        }
-
-        if (config.Text == null)
-        {
-            throw new InvalidOperationException("text は null にできません");
-        }
-
-        if (config.Debug == null)
-        {
-            throw new InvalidOperationException("debug は null にできません");
-        }
-
-        if (config.Validation == null)
-        {
-            throw new InvalidOperationException("validation は null にできません");
-        }
-
-        if (config.Queue.MaxQueuedJobs < 0)
-        {
-            throw new InvalidOperationException("queue.maxQueuedJobs は 0 以上で指定してください");
-        }
-
-        if (config.Audio.PollIntervalMs <= 0)
-        {
-            throw new InvalidOperationException("audio.pollIntervalMs は 1 以上で指定してください");
-        }
-
-        if (config.Audio.StartConfirmTimeoutMs <= 0)
-        {
-            throw new InvalidOperationException("audio.startConfirmTimeoutMs は 1 以上で指定してください");
-        }
-
-        if (config.Audio.StartConfirmMaxRetries < 0)
-        {
-            throw new InvalidOperationException("audio.startConfirmMaxRetries は 0 以上で指定してください");
-        }
-
-        if (config.Audio.StopConfirmMs <= 0)
-        {
-            throw new InvalidOperationException("audio.stopConfirmMs は 1 以上で指定してください");
-        }
-
-        if (config.Startup.BootValidationText == null)
-        {
-            throw new InvalidOperationException("startup.bootValidationText は null にできません");
-        }
-
-        if (config.Startup.BootValidationMaxRetries < 0)
-        {
-            throw new InvalidOperationException("startup.bootValidationMaxRetries は 0 以上で指定してください");
-        }
-
-        if (config.Startup.BootValidationRetryIntervalMs < 0)
-        {
-            throw new InvalidOperationException("startup.bootValidationRetryIntervalMs は 0 以上で指定してください");
-        }
-
-        if (config.Hook.HookCommandTimeoutMs <= 0)
-        {
-            throw new InvalidOperationException("hook.hookCommandTimeoutMs は 1 以上で指定してください");
-        }
-
-        if (config.Hook.HookConnectTimeoutMs <= 0)
-        {
-            throw new InvalidOperationException("hook.hookConnectTimeoutMs は 1 以上で指定してください");
-        }
-
-        if (config.Hook.HookConnectTotalWaitMs <= 0)
-        {
-            throw new InvalidOperationException("hook.hookConnectTotalWaitMs は 1 以上で指定してください");
-        }
-
-        if (config.Ui.DelayBeforePlayShortcutMs < 0)
-        {
-            throw new InvalidOperationException("ui.delayBeforePlayShortcutMs は 0 以上で指定してください");
-        }
+        EnsureNonNegative(config.Ui.DelayBeforePlayShortcutMs, "ui.delayBeforePlayShortcutMs は 0 以上で指定してください");
 
         if (!VoicepeakUiController.IsValidMoveToStartShortcut(config.Ui.MoveToStartShortcut))
         {
@@ -228,35 +145,12 @@ internal static class AppConfigValidator
             throw new InvalidOperationException("ui.playShortcut は修飾なしキーのみ指定できます（例: F3, Space, Home）");
         }
 
-        if (config.InputTiming.ActionDelayMs < 0)
-        {
-            throw new InvalidOperationException("inputTiming.actionDelayMs は 0 以上で指定してください");
-        }
-
-        if (config.InputTiming.PostTypeWaitPerCharMs < 0)
-        {
-            throw new InvalidOperationException("inputTiming.postTypeWaitPerCharMs は 0 以上で指定してください");
-        }
-
-        if (config.InputTiming.PostTypeWaitMinMs < 0)
-        {
-            throw new InvalidOperationException("inputTiming.postTypeWaitMinMs は 0 以上で指定してください");
-        }
-
-        if (config.InputTiming.SequentialMoveToStartKeyDelayBaseMs < 0)
-        {
-            throw new InvalidOperationException("inputTiming.sequentialMoveToStartKeyDelayBaseMs は 0 以上で指定してください");
-        }
-
-        if (config.InputTiming.DeleteKeyDelayBaseMs < 0)
-        {
-            throw new InvalidOperationException("inputTiming.deleteKeyDelayBaseMs は 0 以上で指定してください");
-        }
-
-        if (config.InputTiming.ClearInputMaxPasses <= 0)
-        {
-            throw new InvalidOperationException("inputTiming.clearInputMaxPasses は 1 以上で指定してください");
-        }
+        EnsureNonNegative(config.InputTiming.ActionDelayMs, "inputTiming.actionDelayMs は 0 以上で指定してください");
+        EnsureNonNegative(config.InputTiming.PostTypeWaitPerCharMs, "inputTiming.postTypeWaitPerCharMs は 0 以上で指定してください");
+        EnsureNonNegative(config.InputTiming.PostTypeWaitMinMs, "inputTiming.postTypeWaitMinMs は 0 以上で指定してください");
+        EnsureNonNegative(config.InputTiming.SequentialMoveToStartKeyDelayBaseMs, "inputTiming.sequentialMoveToStartKeyDelayBaseMs は 0 以上で指定してください");
+        EnsureNonNegative(config.InputTiming.DeleteKeyDelayBaseMs, "inputTiming.deleteKeyDelayBaseMs は 0 以上で指定してください");
+        EnsurePositive(config.InputTiming.ClearInputMaxPasses, "inputTiming.clearInputMaxPasses は 1 以上で指定してください");
 
         if (config.Text.SentenceBreakTriggers == null)
         {
@@ -275,6 +169,33 @@ internal static class AppConfigValidator
         if (config.Text.ReplaceRules == null)
         {
             throw new InvalidOperationException("text.replaceRules は null にできません");
+        }
+    }
+
+    // null禁止を検証
+    private static void EnsureNotNull(object value, string message)
+    {
+        if (value == null)
+        {
+            throw new InvalidOperationException(message);
+        }
+    }
+
+    // 0以上を検証
+    private static void EnsureNonNegative(int value, string message)
+    {
+        if (value < 0)
+        {
+            throw new InvalidOperationException(message);
+        }
+    }
+
+    // 1以上を検証
+    private static void EnsurePositive(int value, string message)
+    {
+        if (value <= 0)
+        {
+            throw new InvalidOperationException(message);
         }
     }
 }

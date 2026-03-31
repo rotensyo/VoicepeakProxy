@@ -33,6 +33,39 @@ internal readonly struct SpeakMonitorResult
     public static SpeakMonitorResult ProcessLost() => new SpeakMonitorResult(SpeakMonitorKind.ProcessLost, 0);
 }
 
+// 開始確認ループ結果の種類
+internal enum StartConfirmLoopKind
+{
+    Completed,
+    Interrupted,
+    MoveToStartFailed,
+    PlayFailed,
+    StartConfirmTimeout,
+    MaxDuration,
+    ProcessLost
+}
+
+// 開始確認ループ結果を保持
+internal readonly struct StartConfirmLoopResult
+{
+    public StartConfirmLoopKind Kind { get; }
+    public long SegEndAtMs { get; }
+
+    private StartConfirmLoopResult(StartConfirmLoopKind kind, long segEndAtMs)
+    {
+        Kind = kind;
+        SegEndAtMs = segEndAtMs;
+    }
+
+    public static StartConfirmLoopResult Completed(long segEndAtMs) => new StartConfirmLoopResult(StartConfirmLoopKind.Completed, segEndAtMs);
+    public static StartConfirmLoopResult Interrupted() => new StartConfirmLoopResult(StartConfirmLoopKind.Interrupted, 0);
+    public static StartConfirmLoopResult MoveToStartFailed() => new StartConfirmLoopResult(StartConfirmLoopKind.MoveToStartFailed, 0);
+    public static StartConfirmLoopResult PlayFailed() => new StartConfirmLoopResult(StartConfirmLoopKind.PlayFailed, 0);
+    public static StartConfirmLoopResult StartConfirmTimeout() => new StartConfirmLoopResult(StartConfirmLoopKind.StartConfirmTimeout, 0);
+    public static StartConfirmLoopResult MaxDuration() => new StartConfirmLoopResult(StartConfirmLoopKind.MaxDuration, 0);
+    public static StartConfirmLoopResult ProcessLost() => new StartConfirmLoopResult(StartConfirmLoopKind.ProcessLost, 0);
+}
+
 // 入力検証結果を保持
 internal readonly struct InputValidateResult
 {
@@ -270,6 +303,81 @@ internal static class JobExecutionCore
         return true;
     }
 
+    // 開始確認リトライループを共通化
+    public static StartConfirmLoopResult RunStartConfirmLoop(
+        AppConfig config,
+        IVoicepeakUiController ui,
+        IAudioSessionReader audio,
+        Process process,
+        IntPtr hwnd,
+        AppLogger log,
+        Func<bool> stopRequested,
+        Func<bool> interruptRequested,
+        Action onInterrupt,
+        Action<int> onRetry,
+        Action onPlayPressed)
+    {
+        bool recoveryClickUsed = false;
+        for (int startAttempt = 0; startAttempt <= config.Audio.StartConfirmMaxRetries; startAttempt++)
+        {
+            if (!ui.PrepareForPlayback(process, hwnd, config.InputTiming.ActionDelayMs))
+            {
+                return StartConfirmLoopResult.MoveToStartFailed();
+            }
+
+            if (!ui.PressPlay(hwnd))
+            {
+                return StartConfirmLoopResult.PlayFailed();
+            }
+
+            onPlayPressed?.Invoke();
+
+            SpeakMonitorResult speakResult = MonitorSpeaking(
+                config,
+                ui,
+                audio,
+                process,
+                hwnd,
+                log,
+                stopRequested,
+                interruptRequested,
+                onInterrupt);
+            if (speakResult.Kind == SpeakMonitorKind.Completed)
+            {
+                return StartConfirmLoopResult.Completed(speakResult.SegEndAtMs);
+            }
+
+            if (speakResult.Kind == SpeakMonitorKind.Interrupted)
+            {
+                return StartConfirmLoopResult.Interrupted();
+            }
+
+            if (speakResult.Kind == SpeakMonitorKind.StartTimeout)
+            {
+                bool shouldRetry = HandleStartTimeoutRetry(config, ui, process, hwnd, startAttempt, ref recoveryClickUsed);
+                if (shouldRetry)
+                {
+                    onRetry?.Invoke(startAttempt + 1);
+                    continue;
+                }
+
+                return StartConfirmLoopResult.StartConfirmTimeout();
+            }
+
+            if (speakResult.Kind == SpeakMonitorKind.MaxDuration)
+            {
+                return StartConfirmLoopResult.MaxDuration();
+            }
+
+            if (speakResult.Kind == SpeakMonitorKind.ProcessLost)
+            {
+                return StartConfirmLoopResult.ProcessLost();
+            }
+        }
+
+        return StartConfirmLoopResult.StartConfirmTimeout();
+    }
+
     // 起動時検証相当の入力と発話確認を実行
     public static BootValidationRunResult RunBootValidationFlow(
         AppConfig config,
@@ -321,62 +429,46 @@ internal static class JobExecutionCore
             return BootValidationRunResult.Completed(bootValidate);
         }
 
-        bool recoveryClickUsed = false;
-        for (int startAttempt = 0; startAttempt <= config.Audio.StartConfirmMaxRetries; startAttempt++)
+        StartConfirmLoopResult loopResult = RunStartConfirmLoop(
+            config,
+            ui,
+            audio,
+            process,
+            hwnd,
+            log,
+            () => false,
+            () => false,
+            null,
+            attempt => log.Warn($"boot_start_confirm_retry attempt={attempt}"),
+            null);
+        if (loopResult.Kind == StartConfirmLoopKind.Completed)
         {
-            if (!ui.PrepareForPlayback(process, hwnd, config.InputTiming.ActionDelayMs))
-            {
-                log.Error("起動時動作チェック失敗: 先頭移動ショートカットの実行に失敗しました。");
-                return BootValidationRunResult.MoveToStartFailed(bootValidate);
-            }
+            ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, true);
+            log.Info("boot_validation_ok");
+            return BootValidationRunResult.Completed(bootValidate);
+        }
 
-            if (!ui.PressPlay(hwnd))
-            {
-                log.Error("起動時動作チェック失敗: 再生ボタンの押下に失敗しました。");
-                return BootValidationRunResult.PlayFailed(bootValidate);
-            }
+        if (loopResult.Kind == StartConfirmLoopKind.MoveToStartFailed)
+        {
+            log.Error("起動時動作チェック失敗: 先頭移動ショートカットの実行に失敗しました。");
+            return BootValidationRunResult.MoveToStartFailed(bootValidate);
+        }
 
-            SpeakMonitorResult speakResult = MonitorSpeaking(
-                config,
-                ui,
-                audio,
-                process,
-                hwnd,
-                log,
-                () => false,
-                () => false,
-                null);
+        if (loopResult.Kind == StartConfirmLoopKind.PlayFailed)
+        {
+            log.Error("起動時動作チェック失敗: 再生ボタンの押下に失敗しました。");
+            return BootValidationRunResult.PlayFailed(bootValidate);
+        }
 
-            if (speakResult.Kind == SpeakMonitorKind.Completed)
-            {
-                ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, true);
-                log.Info("boot_validation_ok");
-                return BootValidationRunResult.Completed(bootValidate);
-            }
+        if (loopResult.Kind == StartConfirmLoopKind.MaxDuration)
+        {
+            log.Error("起動時動作チェック失敗: 音声の終了が確認できませんでした。");
+            return BootValidationRunResult.MaxDuration(bootValidate);
+        }
 
-            if (speakResult.Kind == SpeakMonitorKind.StartTimeout)
-            {
-                bool hasNextAttempt = HandleStartTimeoutRetry(config, ui, process, hwnd, startAttempt, ref recoveryClickUsed);
-                if (hasNextAttempt)
-                {
-                    log.Warn($"boot_start_confirm_retry attempt={startAttempt + 1}");
-                    continue;
-                }
-
-                log.Error("起動時動作チェック失敗: 音声の再生が確認できませんでした。");
-                return BootValidationRunResult.StartConfirmTimeout(bootValidate);
-            }
-
-            if (speakResult.Kind == SpeakMonitorKind.MaxDuration)
-            {
-                log.Error("起動時動作チェック失敗: 音声の終了が確認できませんでした。");
-                return BootValidationRunResult.MaxDuration(bootValidate);
-            }
-
-            if (speakResult.Kind == SpeakMonitorKind.ProcessLost)
-            {
-                return BootValidationRunResult.ProcessLost(bootValidate);
-            }
+        if (loopResult.Kind == StartConfirmLoopKind.ProcessLost)
+        {
+            return BootValidationRunResult.ProcessLost(bootValidate);
         }
 
         log.Error("起動時動作チェック失敗: 音声の再生が確認できませんでした。");

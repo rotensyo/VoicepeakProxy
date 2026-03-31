@@ -30,6 +30,41 @@ internal sealed class ResolveTargetResult
     public int ProcessCount { get; set; }
 }
 
+// 対象解決失敗を共通表現へ変換
+internal static class ResolveTargetFailureMapper
+{
+    // 対象解決失敗をログへ出力
+    public static void LogFailure(AppLogger log, ResolveTargetFailureReason reason, int processCount)
+    {
+        if (reason == ResolveTargetFailureReason.ProcessNotFound)
+        {
+            log.Error("voicepeak.exe が起動していません。");
+            return;
+        }
+
+        if (reason == ResolveTargetFailureReason.MultipleProcesses)
+        {
+            log.Error($"voicepeak.exe が複数起動しています。1つだけ起動してください。（検出数: {processCount}）");
+            return;
+        }
+
+        log.Error("対象ウィンドウを取得できませんでした。アプリの状態を確認してください。");
+    }
+
+    // 解決結果から失敗理由を正規化
+    public static ResolveTargetFailureReason NormalizeReason(ResolveTargetResult resolved)
+    {
+        if (resolved == null)
+        {
+            return ResolveTargetFailureReason.TargetNotFound;
+        }
+
+        return resolved.FailureReason == ResolveTargetFailureReason.None
+            ? ResolveTargetFailureReason.TargetNotFound
+            : resolved.FailureReason;
+    }
+}
+
 // UI操作の依存を抽象化
 internal interface IVoicepeakUiController
 {
