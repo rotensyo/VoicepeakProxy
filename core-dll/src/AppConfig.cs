@@ -85,7 +85,6 @@ public sealed class QueueConfig
 public sealed class ValidationConfig
 {
     public BootValidationMode BootValidation { get; set; } = BootValidationMode.Required;
-    public RequestValidationMode RequestValidation { get; set; } = RequestValidationMode.Strict;
 }
 
 // デバッグ関連設定

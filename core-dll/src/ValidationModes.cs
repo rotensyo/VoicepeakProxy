@@ -7,11 +7,3 @@ public enum BootValidationMode
     Optional,
     Disabled
 }
-
-// リクエスト検証の実行方針
-public enum RequestValidationMode
-{
-    Strict,
-    Lenient,
-    Disabled
-}

@@ -110,7 +110,7 @@ namespace Plugin_VoicepeakProxy
         public AudioTab P06Audio;
         public TextTab P07Text;
         // public QueueTab P08Queue;
-        public ValidationTab P09Validation;
+        // public ValidationTab P09Validation;
         public DebugTab P10Debug;
 
         public PluginSettingFormData(PluginSettingsState state)
@@ -124,7 +124,7 @@ namespace Plugin_VoicepeakProxy
             P06Audio = new AudioTab(_state);
             P07Text = new TextTab(_state);
             // P08Queue = new QueueTab(_state);
-            P09Validation = new ValidationTab(_state);
+            // P09Validation = new ValidationTab(_state);
             P10Debug = new DebugTab(_state);
         }
     }
@@ -579,36 +579,6 @@ namespace Plugin_VoicepeakProxy
                 State.Settings.AppConfig.Text.ReplaceRules = rules;
             }
         }
-    }
-
-    // 検証設定タブ
-    internal sealed class ValidationTab : TabBase
-    {
-        public ValidationTab(PluginSettingsState state) : base(state)
-        {
-        }
-
-        public override string GetName()
-        {
-            return "Validation";
-        }
-
-        // [Category("Validation")]
-        // [DisplayName("01)bootValidation")]
-        // public BootValidationModeOption BootValidation
-        // {
-        //     get { return State.Settings.AppConfig.Validation.BootValidation; }
-        //     set { State.Settings.AppConfig.Validation.BootValidation = value; }
-        // }
-
-        // [Category("Validation")]
-        // [DisplayName("01)requestValidation")]
-        // [Description("入力文字列がnullだった場合、エラーにするか空文字にするかを選択します。")]
-        // public RequestValidationModeOption RequestValidation
-        // {
-        //     get { return State.Settings.AppConfig.Validation.RequestValidation; }
-        //     set { State.Settings.AppConfig.Validation.RequestValidation = value; }
-        // }
     }
 
     // デバッグ設定タブ

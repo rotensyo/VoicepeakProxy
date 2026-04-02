@@ -220,7 +220,7 @@ public class VoicepeakEngineExecuteJobTests
 
     private static object CreateJob(string text)
     {
-        return JobCompiler.Compile(new SpeakRequest { Text = text, Mode = EnqueueMode.Queue }, new AppConfig(), RequestValidationMode.Strict);
+        return JobCompiler.Compile(new SpeakRequest { Text = text, Mode = EnqueueMode.Queue }, new AppConfig());
     }
 
     private static AppConfig CreateConfig()

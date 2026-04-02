@@ -35,7 +35,6 @@ public class AppConfigValidationTests
         Assert.IsFalse(config.Ui.ClickOnInputFailureRetryEnabled);
         CollectionAssert.AreEqual(new[] { "。", "！", "？", "!", "?" }, config.Text.SentenceBreakTriggers);
         Assert.AreEqual(BootValidationMode.Required, config.Validation.BootValidation);
-        Assert.AreEqual(RequestValidationMode.Strict, config.Validation.RequestValidation);
     }
 
     [TestMethod]

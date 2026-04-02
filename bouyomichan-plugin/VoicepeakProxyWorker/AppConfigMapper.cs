@@ -74,7 +74,6 @@ internal static class AppConfigMapper
 
         config.Queue.MaxQueuedJobs = data.Queue.MaxQueuedJobs;
         config.Validation.BootValidation = MapBootValidation(data.Validation.BootValidation);
-        config.Validation.RequestValidation = RequestValidationMode.Strict;
 
         config.Debug.LogTextCandidates = data.Debug.LogTextCandidates;
         config.Debug.LogModifierHookStats = data.Debug.LogModifierHookStats;
@@ -139,7 +138,6 @@ internal static class AppConfigMapper
         data.Queue.MaxQueuedJobs = config.Queue.MaxQueuedJobs;
 
         data.Validation.BootValidation = MapBootValidationBack(config.Validation.BootValidation);
-        data.Validation.RequestValidation = RequestValidationModeOption.Strict;
 
         data.Debug.LogTextCandidates = config.Debug.LogTextCandidates;
         data.Debug.LogModifierHookStats = config.Debug.LogModifierHookStats;

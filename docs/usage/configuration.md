@@ -123,8 +123,6 @@
 
 - `BootValidation` (`default: Required`)
   - 起動時バリデーション失敗をどう扱うかを指定します(`Required`/`Optional`/`Disabled`)
-- `RequestValidation` (`default: Strict`)
-  - 現在は`Strict`固定です
 
 ## DebugConfig
 

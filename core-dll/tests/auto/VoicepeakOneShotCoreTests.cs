@@ -13,7 +13,7 @@ public class VoicepeakOneShotCoreTests
     {
         FakeVoicepeakUiController ui = new FakeVoicepeakUiController { ProcessCountHandler = () => 0 };
 
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(CreateConfig(), new SpeakOnceRequest { Text = "hello" }, new AppLogger(new TestLogger()), RequestValidationMode.Strict, ui, new FakeAudioSessionReader());
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(CreateConfig(), new SpeakOnceRequest { Text = "hello" }, new AppLogger(new TestLogger()), ui, new FakeAudioSessionReader());
 
         Assert.AreEqual(SpeakOnceStatus.ProcessNotFound, result.Status);
     }
@@ -23,7 +23,7 @@ public class VoicepeakOneShotCoreTests
     {
         FakeVoicepeakUiController ui = new FakeVoicepeakUiController { ProcessCountHandler = () => 2 };
 
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(CreateConfig(), new SpeakOnceRequest { Text = "hello" }, new AppLogger(new TestLogger()), RequestValidationMode.Strict, ui, new FakeAudioSessionReader());
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(CreateConfig(), new SpeakOnceRequest { Text = "hello" }, new AppLogger(new TestLogger()), ui, new FakeAudioSessionReader());
 
         Assert.AreEqual(SpeakOnceStatus.MultipleProcesses, result.Status);
     }
@@ -41,7 +41,6 @@ public class VoicepeakOneShotCoreTests
             CreateConfig(),
             new SpeakOnceRequest { Text = "A" },
             new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
             ui,
             new FakeAudioSessionReader());
 
@@ -66,7 +65,6 @@ public class VoicepeakOneShotCoreTests
             CreateConfig(),
             new SpeakOnceRequest { Text = "A" },
             new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
             ui,
             new FakeAudioSessionReader());
 
@@ -93,7 +91,6 @@ public class VoicepeakOneShotCoreTests
             CreateConfig(),
             new SpeakOnceRequest { Text = "A" },
             new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
             ui,
             new FakeAudioSessionReader());
 
@@ -105,7 +102,7 @@ public class VoicepeakOneShotCoreTests
     [TestMethod]
     public void SpeakOnceWaitCore_InvalidRequest_ReturnsStatusAndMessage()
     {
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(CreateConfig(), null, new AppLogger(new TestLogger()), RequestValidationMode.Strict, new FakeVoicepeakUiController(), new FakeAudioSessionReader());
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(CreateConfig(), null, new AppLogger(new TestLogger()), new FakeVoicepeakUiController(), new FakeAudioSessionReader());
 
         Assert.AreEqual(SpeakOnceStatus.InvalidRequest, result.Status);
         StringAssert.Contains(result.ErrorMessage, "request は null");
@@ -123,7 +120,7 @@ public class VoicepeakOneShotCoreTests
         AppConfig config = CreateConfig();
         config.Audio.StopConfirmMs = 2;
 
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), RequestValidationMode.Strict, ui, audio);
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), ui, audio);
 
         Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
         Assert.IsTrue(result.Succeeded);
@@ -144,7 +141,6 @@ public class VoicepeakOneShotCoreTests
             CreateConfig(),
             new SpeakOnceRequest { Text = "A" },
             new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
             ui,
             new FakeAudioSessionReader());
 
@@ -170,7 +166,7 @@ public class VoicepeakOneShotCoreTests
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 1;
 
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), RequestValidationMode.Strict, ui, audio);
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), ui, audio);
 
         Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
         Assert.AreEqual(2, ui.PressPlayCalls);
@@ -196,7 +192,7 @@ public class VoicepeakOneShotCoreTests
         config.Audio.StartConfirmMaxRetries = 2;
         config.Audio.StopConfirmMs = 1;
 
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), RequestValidationMode.Strict, ui, audio);
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), ui, audio);
 
         Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
         Assert.AreEqual(0, ui.TryPrimeInputContextCalls);
@@ -215,7 +211,7 @@ public class VoicepeakOneShotCoreTests
         config.Ui.MoveToStartShortcut = "Ctrl+Up";
         config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled = true;
 
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), RequestValidationMode.Strict, ui, audio);
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), ui, audio);
 
         Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
         CollectionAssert.AreEqual(new[] { false }, ui.PrepareForTextInputCompositePrimeFlags);
@@ -233,7 +229,7 @@ public class VoicepeakOneShotCoreTests
         AppConfig config = CreateConfig();
         config.Audio.StartConfirmTimeoutMs = 200;
 
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), RequestValidationMode.Strict, ui, audio);
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), ui, audio);
 
         Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
         Assert.AreEqual(1, result.SegmentsExecuted);
@@ -252,7 +248,6 @@ public class VoicepeakOneShotCoreTests
             CreateConfig(),
             new SpeakOnceRequest { Text = "A" },
             new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
             ui,
             new FakeAudioSessionReader());
 
@@ -277,7 +272,6 @@ public class VoicepeakOneShotCoreTests
             CreateConfig(),
             new SpeakOnceRequest { Text = "A" },
             new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
             ui,
             audio);
 
@@ -296,7 +290,7 @@ public class VoicepeakOneShotCoreTests
         config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 3;
 
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), RequestValidationMode.Strict, ui, audio);
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), ui, audio);
 
         Assert.AreEqual(SpeakOnceStatus.StartConfirmTimeout, result.Status);
         Assert.AreEqual(1, ui.PressPlayCalls);
@@ -316,7 +310,6 @@ public class VoicepeakOneShotCoreTests
             config,
             new SpeakOnceRequest { Text = "A[[pause:100]]B[[pause:200]]C" },
             new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
             ui,
             audio);
 
@@ -345,7 +338,6 @@ public class VoicepeakOneShotCoreTests
             config,
             new SpeakOnceRequest { Text = "A[[pause:100]]B" },
             new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
             ui,
             audio);
 
@@ -365,7 +357,6 @@ public class VoicepeakOneShotCoreTests
             CreateConfig(),
             new SpeakOnceRequest { Text = "[[pause:1]]" },
             new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
             ui,
             new FakeAudioSessionReader());
 
@@ -383,7 +374,6 @@ public class VoicepeakOneShotCoreTests
             CreateConfig(),
             new SpeakOnceRequest { Text = "[[pause:1]]" },
             new AppLogger(new TestLogger()),
-            RequestValidationMode.Strict,
             new FakeVoicepeakUiController(),
             new FakeAudioSessionReader());
 

@@ -130,14 +130,6 @@ namespace BouyomiVoicepeakBridge.Shared
         Disabled
     }
 
-    // リクエスト検証方針
-    public enum RequestValidationModeOption
-    {
-        Strict,
-        Lenient,
-        Disabled
-    }
-
     // 起動時処理関連設定
 public sealed class StartupConfigData
 {
@@ -226,7 +218,6 @@ public sealed class UiConfigData
     public sealed class ValidationConfigData
     {
         public BootValidationModeOption BootValidation { get; set; }
-        public RequestValidationModeOption RequestValidation { get; set; }
     }
 
     // デバッグ設定

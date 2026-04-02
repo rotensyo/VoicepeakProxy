@@ -13,31 +13,19 @@ public class JobCompilerTests
     {
         // request nullを拒否
         InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
-            ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", new object[] { null, new AppConfig(), RequestValidationMode.Strict }));
+            ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", new object[] { null, new AppConfig() }));
 
         StringAssert.Contains(ex.Message, "request は null");
     }
 
     [TestMethod]
-    public void Compile_StrictNullText_Throws()
+    public void Compile_NullText_Throws()
     {
-        // strictでText nullを拒否
+        // Text nullを拒否
         SpeakRequest request = new SpeakRequest { Text = null, Mode = EnqueueMode.Queue };
 
         InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
-            ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", request, new AppConfig(), RequestValidationMode.Strict));
-
-        StringAssert.Contains(ex.Message, "text は null");
-    }
-
-    [TestMethod]
-    public void Compile_DisabledNullText_AlsoThrows()
-    {
-        // disabledでもText nullを拒否
-        SpeakRequest request = new SpeakRequest { Text = null, Mode = EnqueueMode.Queue };
-
-        InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
-            ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", request, new AppConfig(), RequestValidationMode.Disabled));
+            ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", request, new AppConfig()));
 
         StringAssert.Contains(ex.Message, "text は null");
     }
@@ -49,7 +37,7 @@ public class JobCompilerTests
         SpeakRequest request = new SpeakRequest { Text = string.Empty, Mode = EnqueueMode.Queue };
 
         InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
-            ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", request, new AppConfig(), RequestValidationMode.Strict));
+            ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", request, new AppConfig()));
 
         StringAssert.Contains(ex.Message, "text は空文字");
     }
@@ -60,7 +48,7 @@ public class JobCompilerTests
         // pauseのみ入力は待機専用ジョブ化
         SpeakRequest request = new SpeakRequest { Text = "[[pause:100]][[pause:200]]", Mode = EnqueueMode.Queue };
 
-        object job = ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", request, new AppConfig(), RequestValidationMode.Strict);
+        object job = ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", request, new AppConfig());
 
         Assert.AreEqual("Queue", ReflectionTestHelper.GetProperty(job, "Mode").ToString());
         CollectionAssert.AreEqual(new[] { ("", 0) }, ReflectionTestHelper.GetSegments(job));
@@ -72,8 +60,8 @@ public class JobCompilerTests
     public void Compile_Mode_UsesEnumAsIs()
     {
         // mode enumをそのまま反映
-        object nextJob = ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", new SpeakRequest { Text = "a", Mode = EnqueueMode.Next }, new AppConfig(), RequestValidationMode.Strict);
-        object flushJob = ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", new SpeakRequest { Text = "a", Mode = EnqueueMode.Flush }, new AppConfig(), RequestValidationMode.Strict);
+        object nextJob = ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", new SpeakRequest { Text = "a", Mode = EnqueueMode.Next }, new AppConfig());
+        object flushJob = ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", new SpeakRequest { Text = "a", Mode = EnqueueMode.Flush }, new AppConfig());
 
         Assert.AreEqual("Next", ReflectionTestHelper.GetProperty(nextJob, "Mode").ToString());
         Assert.AreEqual("Flush", ReflectionTestHelper.GetProperty(flushJob, "Mode").ToString());
@@ -83,8 +71,8 @@ public class JobCompilerTests
     public void Compile_NextAndFlush_PreserveInterruptFlag()
     {
         // nextとflushはinterruptを保持
-        object nextJob = ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", new SpeakRequest { Text = "hello", Mode = EnqueueMode.Next, Interrupt = true }, new AppConfig(), RequestValidationMode.Strict);
-        object flushJob = ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", new SpeakRequest { Text = "hello", Mode = EnqueueMode.Flush, Interrupt = true }, new AppConfig(), RequestValidationMode.Strict);
+        object nextJob = ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", new SpeakRequest { Text = "hello", Mode = EnqueueMode.Next, Interrupt = true }, new AppConfig());
+        object flushJob = ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", new SpeakRequest { Text = "hello", Mode = EnqueueMode.Flush, Interrupt = true }, new AppConfig());
 
         Assert.IsTrue((bool)ReflectionTestHelper.GetProperty(nextJob, "Interrupt"));
         Assert.IsTrue((bool)ReflectionTestHelper.GetProperty(flushJob, "Interrupt"));
@@ -101,7 +89,7 @@ public class JobCompilerTests
             new ReplaceRule { From = "b", To = "c" }
         };
 
-        object job = ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", new SpeakRequest { Text = "a", Mode = EnqueueMode.Queue }, config, RequestValidationMode.Strict);
+        object job = ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", new SpeakRequest { Text = "a", Mode = EnqueueMode.Queue }, config);
 
         CollectionAssert.AreEqual(new[] { ("c", 0) }, ReflectionTestHelper.GetSegments(job));
     }
@@ -116,7 +104,7 @@ public class JobCompilerTests
             Mode = EnqueueMode.Queue
         };
 
-        object job = ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", request, new AppConfig(), RequestValidationMode.Strict);
+        object job = ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", request, new AppConfig());
 
         CollectionAssert.AreEqual(new[] { ("A", 0), ("B", 300) }, ReflectionTestHelper.GetSegments(job));
         Assert.AreEqual(300, (int)ReflectionTestHelper.GetProperty(job, "TrailingPauseMs"));

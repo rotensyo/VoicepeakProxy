@@ -128,10 +128,9 @@ internal sealed class VoicepeakEngine : IDisposable
             throw new InvalidOperationException("Runtime is stopping and cannot accept new requests.");
         }
 
-        RequestValidationMode mode = RequestValidationMode.Strict;
         try
         {
-            Job job = JobCompiler.Compile(req, _config, mode);
+            Job job = JobCompiler.Compile(req, _config);
             lock (_gate)
             {
                 switch (job.Mode)

@@ -92,14 +92,12 @@ internal static class PauseTokenParser
 internal static class JobCompiler
 {
     // 入力内容を検証しながらジョブ化
-    public static Job Compile(SpeakRequest req, AppConfig config, RequestValidationMode validationMode)
+    public static Job Compile(SpeakRequest req, AppConfig config)
     {
         if (req == null)
         {
             throw new InvalidOperationException("request は null にできません");
         }
-
-        _ = validationMode;
 
         string sourceText = req.Text;
         EnqueueMode sourceMode = req.Mode;

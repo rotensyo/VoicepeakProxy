@@ -332,12 +332,10 @@ public static class VoicepeakOneShot
         AppConfigValidator.Validate(config);
         AppLogger log = new AppLogger(logger ?? new ConsoleAppLogger());
 
-        RequestValidationMode validation = RequestValidationMode.Strict;
         return SpeakOnceCore(
             config,
             request,
             log,
-            validation,
             new VoicepeakUiController(config.Ui, config.InputTiming, config.Startup, config.Hook, config.Text, config.Debug, log),
             new AudioSessionReader(log));
     }
@@ -347,7 +345,6 @@ public static class VoicepeakOneShot
         AppConfig config,
         SpeakOnceRequest request,
         AppLogger log,
-        RequestValidationMode validation,
         IVoicepeakUiController ui,
         IAudioSessionReader audio)
     {
@@ -355,7 +352,6 @@ public static class VoicepeakOneShot
             config,
             request,
             log,
-            validation,
             ui,
             audio,
             waitForCompletion: false,
@@ -377,12 +373,10 @@ public static class VoicepeakOneShot
         AppConfigValidator.Validate(config);
         AppLogger log = new AppLogger(logger ?? new ConsoleAppLogger());
 
-        RequestValidationMode validation = RequestValidationMode.Strict;
         return SpeakOnceWaitCore(
             config,
             request,
             log,
-            validation,
             new VoicepeakUiController(config.Ui, config.InputTiming, config.Startup, config.Hook, config.Text, config.Debug, log),
             new AudioSessionReader(log));
     }
@@ -392,7 +386,6 @@ public static class VoicepeakOneShot
         AppConfig config,
         SpeakOnceRequest request,
         AppLogger log,
-        RequestValidationMode validation,
         IVoicepeakUiController ui,
         IAudioSessionReader audio)
     {
@@ -400,7 +393,6 @@ public static class VoicepeakOneShot
             config,
             request,
             log,
-            validation,
             ui,
             audio,
             waitForCompletion: true,
@@ -413,7 +405,6 @@ public static class VoicepeakOneShot
         AppConfig config,
         SpeakOnceRequest request,
         AppLogger log,
-        RequestValidationMode validation,
         IVoicepeakUiController ui,
         IAudioSessionReader audio,
         bool waitForCompletion,
@@ -421,7 +412,7 @@ public static class VoicepeakOneShot
         string operationName)
     {
         Job job;
-        if (!TryCompileSpeakJob(request, config, validation, stripPauseTokens, out job, out SpeakOnceResult invalidRequestResult))
+        if (!TryCompileSpeakJob(request, config, stripPauseTokens, out job, out SpeakOnceResult invalidRequestResult))
         {
             return invalidRequestResult;
         }
@@ -588,7 +579,6 @@ public static class VoicepeakOneShot
     private static bool TryCompileSpeakJob(
         SpeakOnceRequest request,
         AppConfig config,
-        RequestValidationMode validation,
         bool stripPauseTokens,
         out Job job,
         out SpeakOnceResult invalidRequestResult)
@@ -608,7 +598,7 @@ public static class VoicepeakOneShot
                 Mode = EnqueueMode.Queue,
                 Interrupt = false
             };
-            job = JobCompiler.Compile(runtimeRequest, config, validation);
+            job = JobCompiler.Compile(runtimeRequest, config);
             return true;
         }
         catch (Exception ex)
