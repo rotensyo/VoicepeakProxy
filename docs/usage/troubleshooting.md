@@ -47,7 +47,7 @@
 - `Audio.PeakThreshold`を見直してください
 - `Audio.StartConfirmTimeoutMs`を見直してください
 - 必要に応じて`Audio.StartConfirmMaxRetries`を増やしてください
-- `MoveToStartShortcut`が`F1-F12`以外の時は`Ui.ClickOnStartTimeoutRetryEnabled`も検討してください
+- `MoveToStartShortcut`が`F1-F12`以外の時は`Ui.ClickOnInputFailureRetryEnabled`も検討してください
 
 ## `monitor_timeout reason=max_duration`
 

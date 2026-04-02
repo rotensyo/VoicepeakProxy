@@ -8,7 +8,7 @@ internal enum InputContextPrimeReason
 {
     Validation,
     BeforeTextFocusWhenUnprimed,
-    StartTimeoutRetry
+    InputFailureRetry
 }
 
 // 対象解決失敗理由
@@ -81,6 +81,7 @@ internal interface IVoicepeakUiController
     bool PrepareForPlayback(Process process, IntPtr mainHwnd, int actionDelayMs);
     bool ClearInput(Process process, IntPtr mainHwnd, int actionDelayMs, bool allowCompositePrimeBeforeTextFocusWhenUnprimed);
     bool TypeText(IntPtr mainHwnd, string text, int charDelayMs);
+    int GetVisibleInputBlockCount(IntPtr mainHwnd);
     bool PressPlay(IntPtr mainHwnd);
     bool MoveToStart(IntPtr mainHwnd, int actionDelayMs);
     bool PressDelete(IntPtr mainHwnd);

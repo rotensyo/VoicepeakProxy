@@ -21,6 +21,7 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
     public Func<string, bool> EndModifierIsolationSessionHandler { get; set; } = _ => true;
     public Func<IntPtr, ReadInputResult> ReadInputHandler { get; set; }
         = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA);
+    public Func<IntPtr, int> VisibleInputBlockCountHandler { get; set; } = _ => 1;
     public Func<ResolveTargetResult> ResolveTargetDetailedHandler { get; set; } = null;
     public Func<int, (bool Success, Process Process, IntPtr Hwnd)> ResolveByPidHandler { get; set; }
         = _ => (false, null, IntPtr.Zero);
@@ -192,6 +193,8 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
     }
 
     public ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd) => ReadInputHandler(mainHwnd);
+
+    public int GetVisibleInputBlockCount(IntPtr mainHwnd) => VisibleInputBlockCountHandler(mainHwnd);
 }
 
 internal sealed class FakeAudioSessionReader : IAudioSessionReader

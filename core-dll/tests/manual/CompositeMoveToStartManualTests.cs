@@ -136,7 +136,7 @@ public class CompositeMoveToStartManualTests
         config.Ui.MoveToStartShortcut = "Ctrl+Up";
         config.Startup.ClickAtValidationEnabled = true;
         config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled = true;
-        config.Startup.ClickOnStartTimeoutRetryEnabled = true;
+        config.Ui.ClickOnInputFailureRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 2000;
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 300;

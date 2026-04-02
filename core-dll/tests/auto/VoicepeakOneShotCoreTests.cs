@@ -177,7 +177,7 @@ public class VoicepeakOneShotCoreTests
     }
 
     [TestMethod]
-    public void SpeakOnceWaitCore_StartTimeoutRetry_CompositeRecoveryClick_CallsTryPrimeInputContextOnce()
+    public void SpeakOnceWaitCore_StartTimeoutRetry_DoesNotCallTryPrimeInputContext()
     {
         FakeVoicepeakUiController ui = CreateResolvedUi();
         FakeAudioSessionReader audio = new FakeAudioSessionReader();
@@ -189,10 +189,9 @@ public class VoicepeakOneShotCoreTests
         audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
         audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
-        ui.ShouldAttemptPrimeInputContextHandler = (_, _, reason) => reason == InputContextPrimeReason.StartTimeoutRetry;
         AppConfig config = CreateConfig();
         config.Ui.MoveToStartShortcut = "Ctrl+Up";
-        config.Startup.ClickOnStartTimeoutRetryEnabled = true;
+        config.Ui.ClickOnInputFailureRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 2;
         config.Audio.StopConfirmMs = 1;
@@ -200,7 +199,7 @@ public class VoicepeakOneShotCoreTests
         SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), RequestValidationMode.Strict, ui, audio);
 
         Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
-        CollectionAssert.AreEqual(new[] { InputContextPrimeReason.StartTimeoutRetry }, ui.PrimeReasons);
+        Assert.AreEqual(0, ui.TryPrimeInputContextCalls);
     }
 
     [TestMethod]

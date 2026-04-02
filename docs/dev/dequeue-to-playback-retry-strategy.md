@@ -60,13 +60,12 @@
 - クリック注入は明示設定された契機でのみ行います。
   - `ClickAtValidationEnabled`
   - `ClickBeforeTextFocusWhenUninitializedEnabled`
-  - `ClickOnStartTimeoutRetryEnabled`
+  - `ClickOnInputFailureRetryEnabled`
 - `PrepareForTextInput`では、未primeかつ設定有効時だけ文字入力欄フォーカス直前でprimeを試みます。
 - `PrepareForPlayback`では通常primeせず、キーボードフォーカス再付与とCtrl+Up送信だけを行います。
 - prime状態はプロセスIDとメインHWNDの組で保持します。
 - start-confirmの再試行時も`PrepareForPlayback`は毎回呼ばれます。
-  - 修正クリックは設定有効時に1回だけ追加実行します。
-  - フォーカス再付与とCtrl+Up送信は毎回実施されます。
+- フォーカス再付与とCtrl+Up送信は毎回実施されます。
 
 ## 実装上の要点
 

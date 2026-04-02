@@ -190,9 +190,9 @@ public class VoicepeakEngineTests
     }
 
     [TestMethod]
-    public void BootValidate_StartTimeoutRetry_CompositeRecoveryClick_CallsTryPrimeInputContext()
+    public void BootValidate_StartTimeoutRetry_DoesNotCallTryPrimeInputContext()
     {
-        // start timeout再試行前だけ修正クリック
+        // start timeout再試行では修正クリックしない
         FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
         FakeAudioSessionReader audio = new FakeAudioSessionReader();
         audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
@@ -201,11 +201,10 @@ public class VoicepeakEngineTests
         audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
         audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
-        ui.ShouldAttemptPrimeInputContextHandler = (_, _, reason) => reason == InputContextPrimeReason.StartTimeoutRetry;
         AppConfig config = CreateEngineConfig();
         config.Ui.MoveToStartShortcut = "Ctrl+Up";
         config.Startup.ClickAtValidationEnabled = false;
-        config.Startup.ClickOnStartTimeoutRetryEnabled = true;
+        config.Ui.ClickOnInputFailureRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 1;
@@ -216,7 +215,7 @@ public class VoicepeakEngineTests
         bool result = engine.BootValidate(BootValidationMode.Required);
 
         Assert.IsTrue(result);
-        CollectionAssert.AreEqual(new[] { InputContextPrimeReason.StartTimeoutRetry }, ui.PrimeReasons);
+        Assert.AreEqual(0, ui.TryPrimeInputContextCalls);
     }
 
     [TestMethod]

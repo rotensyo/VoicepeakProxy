@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using VoicepeakProxyCore;
 using System.Diagnostics;
@@ -131,7 +132,11 @@ public class ExecutionLogicTests
     public void PrepareSegment_UsesPrepareForTextInputBeforeClearAndType()
     {
         // 入力準備の順序を固定
-        FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ReadInputHandler = _ => ReadInputResult.Ok("hello", 5, ReadInputSource.PrimaryUiA),
+            VisibleInputBlockCountHandler = _ => 1
+        };
 
         bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()), true);
 
@@ -156,10 +161,52 @@ public class ExecutionLogicTests
     }
 
     [TestMethod]
+    public void PrepareSegment_InputEmptyAfterType_PrimesAndRetypesOnce()
+    {
+        // 入力反映なし時は1回だけ修正クリックして再入力
+        Queue<ReadInputResult> reads = new Queue<ReadInputResult>();
+        reads.Enqueue(ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA));
+        reads.Enqueue(ReadInputResult.Ok("hello", 5, ReadInputSource.PrimaryUiA));
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ReadInputHandler = _ => reads.Count > 0 ? reads.Dequeue() : ReadInputResult.Ok("hello", 5, ReadInputSource.PrimaryUiA),
+            VisibleInputBlockCountHandler = _ => 1,
+            ShouldAttemptPrimeInputContextHandler = (_, _, reason) => reason == InputContextPrimeReason.InputFailureRetry
+        };
+
+        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()), true);
+
+        Assert.IsTrue(actual);
+        Assert.AreEqual(1, ui.TryPrimeInputContextCalls);
+        Assert.AreEqual(2, ui.TypedTexts.Count);
+    }
+
+    [TestMethod]
+    public void PrepareSegment_InputEmptyAfterType_NoRetryFlag_ReturnsFalse()
+    {
+        // 入力反映なしで救済無効なら失敗
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ReadInputHandler = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA),
+            VisibleInputBlockCountHandler = _ => 1,
+            ShouldAttemptPrimeInputContextHandler = (_, _, _) => false
+        };
+
+        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()), true);
+
+        Assert.IsFalse(actual);
+        Assert.AreEqual(0, ui.TryPrimeInputContextCalls);
+    }
+
+    [TestMethod]
     public void PrepareSegment_NormalizesTextBeforeTyping()
     {
         // 正規化後文字列を送信
-        FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ReadInputHandler = _ => ReadInputResult.Ok("a b", 3, ReadInputSource.PrimaryUiA),
+            VisibleInputBlockCountHandler = _ => 1
+        };
 
         bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "  a\r\n b  ", new AppLogger(new TestLogger()), true);
 
@@ -171,7 +218,11 @@ public class ExecutionLogicTests
     public void PrepareSegment_LoopContext_AllowsCompositePrimeBeforeTextFocus()
     {
         // ループ実行では入力前prime許可を渡す
-        FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ReadInputHandler = _ => ReadInputResult.Ok("hello", 5, ReadInputSource.PrimaryUiA),
+            VisibleInputBlockCountHandler = _ => 1
+        };
 
         bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()), true);
 
@@ -183,7 +234,11 @@ public class ExecutionLogicTests
     public void PrepareSegment_OneShotContext_DisablesCompositePrimeBeforeTextFocus()
     {
         // 単発実行では入力前primeを無効化
-        FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ReadInputHandler = _ => ReadInputResult.Ok("hello", 5, ReadInputSource.PrimaryUiA),
+            VisibleInputBlockCountHandler = _ => 1
+        };
 
         bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()), false);
 
@@ -192,41 +247,15 @@ public class ExecutionLogicTests
     }
 
     [TestMethod]
-    public void HandleStartTimeoutRetry_RetryAvailableAndPrimeAllowed_PrimesOnceAndReturnsTrue()
+    public void HandleStartTimeoutRetry_RetryAvailable_ReturnsTrue()
     {
-        // 再試行前の修正クリックを実行
+        // 次試行があれば再試行する
         AppConfig config = new AppConfig();
         config.Audio.StartConfirmMaxRetries = 2;
-        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
-        {
-            ShouldAttemptPrimeInputContextHandler = (_, _, reason) => reason == InputContextPrimeReason.StartTimeoutRetry
-        };
-        bool recoveryClickUsed = false;
 
-        bool actual = JobExecutionCore.HandleStartTimeoutRetry(config, ui, Process.GetCurrentProcess(), new IntPtr(123), 0, ref recoveryClickUsed);
+        bool actual = JobExecutionCore.HandleStartTimeoutRetry(config, 0);
 
         Assert.IsTrue(actual);
-        Assert.IsTrue(recoveryClickUsed);
-        CollectionAssert.AreEqual(new[] { InputContextPrimeReason.StartTimeoutRetry }, ui.PrimeReasons);
-    }
-
-    [TestMethod]
-    public void HandleStartTimeoutRetry_RetryAvailableAfterFirstClick_SkipsSecondPrimeAndReturnsTrue()
-    {
-        // 修正クリックは一度だけ実行
-        AppConfig config = new AppConfig();
-        config.Audio.StartConfirmMaxRetries = 2;
-        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
-        {
-            ShouldAttemptPrimeInputContextHandler = (_, _, reason) => reason == InputContextPrimeReason.StartTimeoutRetry
-        };
-        bool recoveryClickUsed = true;
-
-        bool actual = JobExecutionCore.HandleStartTimeoutRetry(config, ui, Process.GetCurrentProcess(), new IntPtr(123), 1, ref recoveryClickUsed);
-
-        Assert.IsTrue(actual);
-        Assert.IsTrue(recoveryClickUsed);
-        Assert.AreEqual(0, ui.TryPrimeInputContextCalls);
     }
 
     [TestMethod]
@@ -235,17 +264,10 @@ public class ExecutionLogicTests
         // 最終試行では再試行しない
         AppConfig config = new AppConfig();
         config.Audio.StartConfirmMaxRetries = 1;
-        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
-        {
-            ShouldAttemptPrimeInputContextHandler = (_, _, reason) => reason == InputContextPrimeReason.StartTimeoutRetry
-        };
-        bool recoveryClickUsed = false;
 
-        bool actual = JobExecutionCore.HandleStartTimeoutRetry(config, ui, Process.GetCurrentProcess(), new IntPtr(123), 1, ref recoveryClickUsed);
+        bool actual = JobExecutionCore.HandleStartTimeoutRetry(config, 1);
 
         Assert.IsFalse(actual);
-        Assert.IsFalse(recoveryClickUsed);
-        Assert.AreEqual(0, ui.TryPrimeInputContextCalls);
     }
 
     [TestMethod]

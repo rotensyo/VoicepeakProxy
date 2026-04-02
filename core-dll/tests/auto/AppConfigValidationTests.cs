@@ -32,7 +32,7 @@ public class AppConfigValidationTests
         Assert.AreEqual("Ctrl+Up", config.Ui.MoveToStartShortcut);
         Assert.IsTrue(config.Startup.ClickAtValidationEnabled);
         Assert.IsFalse(config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled);
-        Assert.IsFalse(config.Startup.ClickOnStartTimeoutRetryEnabled);
+        Assert.IsFalse(config.Ui.ClickOnInputFailureRetryEnabled);
         CollectionAssert.AreEqual(new[] { "。", "！", "？", "!", "?" }, config.Text.SentenceBreakTriggers);
         Assert.AreEqual(BootValidationMode.Required, config.Validation.BootValidation);
         Assert.AreEqual(RequestValidationMode.Strict, config.Validation.RequestValidation);
@@ -68,7 +68,7 @@ public class AppConfigValidationTests
         InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
             ReflectionTestHelper.InvokeCoreStatic("AppConfigValidator", "Validate", config));
 
-        StringAssert.Contains(ex.Message, "queue は null にできません");
+        StringAssert.Contains(ex.Message, "startup は null にできません");
     }
 
     [TestMethod]

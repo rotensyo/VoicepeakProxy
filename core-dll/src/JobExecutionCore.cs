@@ -187,7 +187,48 @@ internal static class JobExecutionCore
             Thread.Sleep(postTypeWaitMs);
         }
 
+        if (expected.Length > 0 && IsInputEmptyState(ui, hwnd))
+        {
+            log.Warn("prepare_failed_detail reason=typed_text_not_reflected cause=input_context_not_focused");
+            if (!ui.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.InputFailureRetry))
+            {
+                return false;
+            }
+
+            ui.TryPrimeInputContext(process, hwnd, InputContextPrimeReason.InputFailureRetry);
+            if (!ui.PrepareForTextInput(process, hwnd, config.InputTiming.ActionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed))
+            {
+                log.Warn("prepare_failed_detail reason=prepare_text_input_failed_after_retry cause=shortcut_not_applied_or_context_mismatch");
+                return false;
+            }
+
+            if (!ui.TypeText(hwnd, expected, charDelay))
+            {
+                log.Warn("prepare_failed_detail reason=type_text_failed_after_retry cause=wm_char_input_failed");
+                return false;
+            }
+
+            if (postTypeWaitMs > 0)
+            {
+                Thread.Sleep(postTypeWaitMs);
+            }
+
+            if (IsInputEmptyState(ui, hwnd))
+            {
+                log.Warn("prepare_failed_detail reason=typed_text_not_reflected_after_retry cause=input_context_not_focused");
+                return false;
+            }
+        }
+
         return true;
+    }
+
+    // 入力欄が空状態か判定
+    private static bool IsInputEmptyState(IVoicepeakUiController ui, IntPtr hwnd)
+    {
+        ReadInputResult read = ui.ReadInputTextDetailed(hwnd);
+        int visibleBlockCount = ui.GetVisibleInputBlockCount(hwnd);
+        return VoicepeakUiController.IsClearCompleted(read, visibleBlockCount);
     }
 
     // 再生開始と終了を監視
@@ -281,26 +322,10 @@ internal static class JobExecutionCore
     // 開始確認失敗後の再試行可否を判定
     public static bool HandleStartTimeoutRetry(
         AppConfig config,
-        IVoicepeakUiController ui,
-        Process process,
-        IntPtr hwnd,
-        int startAttempt,
-        ref bool recoveryClickUsed)
+        int startAttempt)
     {
         bool hasNextAttempt = startAttempt < config.Audio.StartConfirmMaxRetries;
-        if (!hasNextAttempt)
-        {
-            return false;
-        }
-
-        if (!recoveryClickUsed
-            && ui.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.StartTimeoutRetry))
-        {
-            ui.TryPrimeInputContext(process, hwnd, InputContextPrimeReason.StartTimeoutRetry);
-            recoveryClickUsed = true;
-        }
-
-        return true;
+        return hasNextAttempt;
     }
 
     // 開始確認リトライループを共通化
@@ -317,7 +342,6 @@ internal static class JobExecutionCore
         Action<int> onRetry,
         Action onPlayPressed)
     {
-        bool recoveryClickUsed = false;
         for (int startAttempt = 0; startAttempt <= config.Audio.StartConfirmMaxRetries; startAttempt++)
         {
             if (!ui.PrepareForPlayback(process, hwnd, config.InputTiming.ActionDelayMs))
@@ -354,7 +378,7 @@ internal static class JobExecutionCore
 
             if (speakResult.Kind == SpeakMonitorKind.StartTimeout)
             {
-                bool shouldRetry = HandleStartTimeoutRetry(config, ui, process, hwnd, startAttempt, ref recoveryClickUsed);
+                bool shouldRetry = HandleStartTimeoutRetry(config, startAttempt);
                 if (shouldRetry)
                 {
                     onRetry?.Invoke(startAttempt + 1);

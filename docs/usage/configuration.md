@@ -30,9 +30,6 @@
   - 初期化クリック未実行時に文字入力欄フォーカス直前のウィンドウフォーカス奪取とクリックを許可します
   - `MoveToStartShortcut`が`F1-F12`以外の場合だけ使用されます
   - `VoicepeakOneShot.SpeakOnce`/`VoicepeakOneShot.SpeakOnceWait`では使用されません
-- `ClickOnStartTimeoutRetryEnabled` (`default: false`)
-  - `StartTimeout`時に一度だけウィンドウフォーカス奪取とクリックを許可します
-  - `MoveToStartShortcut`が`F1-F12`以外の場合だけ使用されます
 
 ## HookConfig
 
@@ -54,6 +51,9 @@
   - VOICEPEAKの設定値と同じものを指定してください
 - `DelayBeforePlayShortcutMs` (`default: 60`)
   - 再生ボタンを押す前の待機時間です
+- `ClickOnInputFailureRetryEnabled` (`default: false`)
+  - 入力失敗時に一度だけウィンドウフォーカス奪取とクリックを許可します
+  - `MoveToStartShortcut`が`F1-F12`以外の場合だけ使用されます
 
 ## InputTimingConfig
 

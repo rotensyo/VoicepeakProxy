@@ -125,7 +125,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
         lock (_inputPrimeGate)
         {
-            if (reason != InputContextPrimeReason.StartTimeoutRetry && IsInputContextPrimed(process, mainHwnd))
+            if (reason != InputContextPrimeReason.InputFailureRetry && IsInputContextPrimed(process, mainHwnd))
             {
                 return true;
             }
@@ -188,6 +188,37 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 }
             }
 
+            if (ShouldAttemptPrimeInputContext(process, mainHwnd, InputContextPrimeReason.InputFailureRetry))
+            {
+                TryPrimeInputContext(process, mainHwnd, InputContextPrimeReason.InputFailureRetry);
+                if (!PrepareForTextInput(process, mainHwnd, actionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed))
+                {
+                    return false;
+                }
+
+                ClearInputState beforeRetry = ReadClearInputState(mainHwnd);
+                if (IsClearCompleted(beforeRetry.Read, beforeRetry.VisibleBlockCount))
+                {
+                    return true;
+                }
+
+                int retryPairCount = Math.Max(1, beforeRetry.VisibleBlockCount + 1);
+                int retryDeleteSteps = ComputeCompositeDeleteSteps(beforeRetry.Read, beforeRetry.VisibleBlockCount);
+                if (!ExecuteWithModifierIsolation(mainHwnd, "composite_clear_cycle", action: () =>
+                {
+                    return RunCompositeClearCycleCore(mainHwnd, retryPairCount, retryDeleteSteps, actionDelayMs);
+                }))
+                {
+                    return false;
+                }
+
+                ClearInputState afterRetry = ReadClearInputState(mainHwnd);
+                if (IsClearCompleted(afterRetry.Read, afterRetry.VisibleBlockCount))
+                {
+                    return true;
+                }
+            }
+
             return LogIncompleteClearInputAndReturnResult(ReadClearInputState(mainHwnd));
         }
 
@@ -228,7 +259,51 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             }
         }
 
+        if (ShouldAttemptPrimeInputContext(process, mainHwnd, InputContextPrimeReason.InputFailureRetry))
+        {
+            TryPrimeInputContext(process, mainHwnd, InputContextPrimeReason.InputFailureRetry);
+            if (!PrepareForTextInput(process, mainHwnd, actionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed))
+            {
+                return false;
+            }
+
+            ClearInputState beforeRetry = ReadClearInputState(mainHwnd);
+            if (IsClearCompleted(beforeRetry.Read, beforeRetry.VisibleBlockCount))
+            {
+                return true;
+            }
+
+            int retryClearSteps = ComputeNonCompositeDeleteSteps(beforeRetry.Read, beforeRetry.VisibleBlockCount);
+            if (!ExecuteWithModifierIsolation(mainHwnd, "clear_input_delete_loop", action: () =>
+            {
+                for (int i = 0; i < retryClearSteps; i++)
+                {
+                    if (!PressDeleteCore(mainHwnd))
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            }))
+            {
+                return false;
+            }
+
+            ClearInputState afterRetry = ReadClearInputState(mainHwnd);
+            if (IsClearCompleted(afterRetry.Read, afterRetry.VisibleBlockCount))
+            {
+                return true;
+            }
+        }
+
         return LogIncompleteClearInputAndReturnResult(ReadClearInputState(mainHwnd));
+    }
+
+    // 可視入力欄数を返す
+    public int GetVisibleInputBlockCount(IntPtr mainHwnd)
+    {
+        return EstimateVisibleBlockCount(mainHwnd);
     }
 
     // 完全削除判定を共通化
@@ -763,8 +838,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 return _startup.ClickAtValidationEnabled && !IsInputContextPrimed(process, mainHwnd);
             case InputContextPrimeReason.BeforeTextFocusWhenUnprimed:
                 return _startup.ClickBeforeTextFocusWhenUninitializedEnabled && !IsInputContextPrimed(process, mainHwnd);
-            case InputContextPrimeReason.StartTimeoutRetry:
-                return _startup.ClickOnStartTimeoutRetryEnabled;
+            case InputContextPrimeReason.InputFailureRetry:
+                return _ui.ClickOnInputFailureRetryEnabled;
             default:
                 return false;
         }

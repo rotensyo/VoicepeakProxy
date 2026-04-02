@@ -308,13 +308,6 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Startup.ClickBeforeTextFocusWhenUninitializedEnabled = value; }
         }
 
-        [Category("Startup")]
-        [DisplayName("06)clickOnStartTimeoutRetryEnabled")]
-        public bool ClickOnStartTimeoutRetryEnabled
-        {
-            get { return State.Settings.AppConfig.Startup.ClickOnStartTimeoutRetryEnabled; }
-            set { State.Settings.AppConfig.Startup.ClickOnStartTimeoutRetryEnabled = value; }
-        }
     }
 
     // Hook設定タブ
@@ -388,6 +381,14 @@ namespace Plugin_VoicepeakProxy
         {
             get { return State.Settings.AppConfig.Ui.DelayBeforePlayShortcutMs; }
             set { State.Settings.AppConfig.Ui.DelayBeforePlayShortcutMs = value; }
+        }
+
+        [Category("Ui")]
+        [DisplayName("04)clickOnInputFailureRetryEnabled")]
+        public bool ClickOnInputFailureRetryEnabled
+        {
+            get { return State.Settings.AppConfig.Ui.ClickOnInputFailureRetryEnabled; }
+            set { State.Settings.AppConfig.Ui.ClickOnInputFailureRetryEnabled = value; }
         }
     }
 

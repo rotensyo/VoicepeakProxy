@@ -73,7 +73,7 @@ public class VoicepeakEngineExecuteJobTests
     }
 
     [TestMethod]
-    public void ExecuteJob_StartTimeoutRetry_CompositeRecoveryClick_CallsTryPrimeInputContextOnce()
+    public void ExecuteJob_StartTimeoutRetry_DoesNotCallTryPrimeInputContext()
     {
         TestLogger logger = new TestLogger();
         FakeVoicepeakUiController ui = CreateResolvedUi();
@@ -86,10 +86,9 @@ public class VoicepeakEngineExecuteJobTests
         audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
         audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
-        ui.ShouldAttemptPrimeInputContextHandler = (_, _, reason) => reason == InputContextPrimeReason.StartTimeoutRetry;
         AppConfig config = CreateConfig();
         config.Ui.MoveToStartShortcut = "Ctrl+Up";
-        config.Startup.ClickOnStartTimeoutRetryEnabled = true;
+        config.Ui.ClickOnInputFailureRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 2;
         config.Audio.StopConfirmMs = 1;
@@ -100,7 +99,7 @@ public class VoicepeakEngineExecuteJobTests
         ReflectionTestHelper.InvokeCoreInstance(engine, "ExecuteJob", CreateJob("hello"));
 
         Assert.AreEqual(3, ui.PressPlayCalls);
-        CollectionAssert.AreEqual(new[] { InputContextPrimeReason.StartTimeoutRetry }, ui.PrimeReasons);
+        Assert.AreEqual(0, ui.TryPrimeInputContextCalls);
     }
 
     [TestMethod]
@@ -117,7 +116,7 @@ public class VoicepeakEngineExecuteJobTests
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
         AppConfig config = CreateConfig();
         config.Ui.MoveToStartShortcut = "F3";
-        config.Startup.ClickOnStartTimeoutRetryEnabled = true;
+        config.Ui.ClickOnInputFailureRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 1;

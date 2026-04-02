@@ -92,7 +92,7 @@ public class UiControllerTests
 
         Assert.IsFalse(controller.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.Validation));
         Assert.IsFalse(controller.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.BeforeTextFocusWhenUnprimed));
-        Assert.IsFalse(controller.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.StartTimeoutRetry));
+        Assert.IsFalse(controller.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.InputFailureRetry));
     }
 
     [TestMethod]
@@ -120,20 +120,18 @@ public class UiControllerTests
     }
 
     [TestMethod]
-    public void ShouldAttemptPrimeInputContext_StartTimeoutRetry_UsesDedicatedFlag()
+    public void ShouldAttemptPrimeInputContext_InputFailureRetry_UsesDedicatedFlag()
     {
-        // 再試行時修正クリックは専用フラグで制御
-        UiConfig disabled = new UiConfig { MoveToStartShortcut = "Ctrl+Up" };
-        StartupConfig disabledStartup = new StartupConfig { ClickOnStartTimeoutRetryEnabled = false };
-        UiConfig enabled = new UiConfig { MoveToStartShortcut = "Ctrl+Up" };
-        StartupConfig enabledStartup = new StartupConfig { ClickOnStartTimeoutRetryEnabled = true };
+        // 入力失敗時修正クリックは専用フラグで制御
+        UiConfig disabled = new UiConfig { MoveToStartShortcut = "Ctrl+Up", ClickOnInputFailureRetryEnabled = false };
+        UiConfig enabled = new UiConfig { MoveToStartShortcut = "Ctrl+Up", ClickOnInputFailureRetryEnabled = true };
         Process process = Process.GetCurrentProcess();
         IntPtr hwnd = new IntPtr(123);
 
-        Assert.IsFalse(CreateController(disabled, new FakeVoicepeakProcessApi(), startup: disabledStartup)
-            .ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.StartTimeoutRetry));
-        Assert.IsTrue(CreateController(enabled, new FakeVoicepeakProcessApi(), startup: enabledStartup)
-            .ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.StartTimeoutRetry));
+        Assert.IsFalse(CreateController(disabled, new FakeVoicepeakProcessApi())
+            .ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.InputFailureRetry));
+        Assert.IsTrue(CreateController(enabled, new FakeVoicepeakProcessApi())
+            .ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.InputFailureRetry));
     }
 
     [TestMethod]

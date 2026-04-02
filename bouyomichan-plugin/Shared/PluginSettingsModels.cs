@@ -139,15 +139,14 @@ namespace BouyomiVoicepeakBridge.Shared
     }
 
     // 起動時処理関連設定
-    public sealed class StartupConfigData
-    {
-        public string BootValidationText { get; set; }
-        public int BootValidationMaxRetries { get; set; }
-        public int BootValidationRetryIntervalMs { get; set; }
-        public bool ClickAtValidationEnabled { get; set; }
-        public bool ClickBeforeTextFocusWhenUninitializedEnabled { get; set; }
-        public bool ClickOnStartTimeoutRetryEnabled { get; set; }
-    }
+public sealed class StartupConfigData
+{
+    public string BootValidationText { get; set; }
+    public int BootValidationMaxRetries { get; set; }
+    public int BootValidationRetryIntervalMs { get; set; }
+    public bool ClickAtValidationEnabled { get; set; }
+    public bool ClickBeforeTextFocusWhenUninitializedEnabled { get; set; }
+}
 
     // フック関連設定
     public sealed class HookConfigData
@@ -158,12 +157,13 @@ namespace BouyomiVoicepeakBridge.Shared
     }
 
     // UI関連設定
-    public sealed class UiConfigData
-    {
-        public string MoveToStartShortcut { get; set; }
-        public string PlayShortcut { get; set; }
-        public int DelayBeforePlayShortcutMs { get; set; }
-    }
+public sealed class UiConfigData
+{
+    public string MoveToStartShortcut { get; set; }
+    public string PlayShortcut { get; set; }
+    public int DelayBeforePlayShortcutMs { get; set; }
+    public bool ClickOnInputFailureRetryEnabled { get; set; }
+}
 
     // 入力タイミング関連設定
     public sealed class InputTimingConfigData
