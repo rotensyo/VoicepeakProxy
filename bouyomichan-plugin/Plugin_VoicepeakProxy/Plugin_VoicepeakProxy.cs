@@ -38,7 +38,7 @@ namespace Plugin_VoicepeakProxy
 
         public string Name { get { return "VoicepeakProxy"; } }
 
-        public string Version { get { return "2026/03/22"; } }
+        public string Version { get { return "2026/03/22版"; } }
 
         public string Caption
         {
@@ -105,7 +105,6 @@ namespace Plugin_VoicepeakProxy
             if (bouyomi != null)
             {
                 bouyomi.TalkTaskStarted -= OnTalkTaskStarted;
-                bouyomi.EnableTalkTaskStarted = false;
             }
 
             if (workerStartThread != null)
@@ -262,7 +261,6 @@ namespace Plugin_VoicepeakProxy
             if (bouyomi != null)
             {
                 bouyomi.TalkTaskStarted -= OnTalkTaskStarted;
-                bouyomi.EnableTalkTaskStarted = false;
             }
 
             string reason = string.IsNullOrEmpty(detail) ? (capturedReason ?? "不明なエラー") : detail;
@@ -342,7 +340,6 @@ namespace Plugin_VoicepeakProxy
                 return false;
             }
 
-            _bouyomi.EnableTalkTaskStarted = true;
             _bouyomi.TalkTaskStarted += OnTalkTaskStarted;
             return true;
         }
