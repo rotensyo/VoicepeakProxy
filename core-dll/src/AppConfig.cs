@@ -6,39 +6,15 @@ namespace VoicepeakProxyCore;
 // 実行時設定のルート
 public sealed class AppConfig
 {
-    public QueueConfig Queue { get; set; } = new QueueConfig();
-    public AudioConfig Audio { get; set; } = new AudioConfig();
     public StartupConfig Startup { get; set; } = new StartupConfig();
     public HookConfig Hook { get; set; } = new HookConfig();
     public UiConfig Ui { get; set; } = new UiConfig();
     public InputTimingConfig InputTiming { get; set; } = new InputTimingConfig();
+    public AudioConfig Audio { get; set; } = new AudioConfig();
     public TextConfig Text { get; set; } = new TextConfig();
+    public QueueConfig Queue { get; set; } = new QueueConfig();
     public ValidationConfig Validation { get; set; } = new ValidationConfig();
     public DebugConfig Debug { get; set; } = new DebugConfig();
-}
-
-// 検証方針の設定
-public sealed class ValidationConfig
-{
-    public BootValidationMode BootValidation { get; set; } = BootValidationMode.Required;
-    public RequestValidationMode RequestValidation { get; set; } = RequestValidationMode.Strict;
-}
-
-// キュー関連設定
-public sealed class QueueConfig
-{
-    public int MaxQueuedJobs { get; set; } = 500;
-}
-
-// 音声監視関連設定
-public sealed class AudioConfig
-{
-    public float PeakThreshold { get; set; } = 0.000000001f;
-    public int PollIntervalMs { get; set; } = 50;
-    public int StartConfirmTimeoutMs { get; set; } = 1000;
-    public int StartConfirmMaxRetries { get; set; } = 0;
-    public int StopConfirmMs { get; set; } = 300;
-    public int MaxSpeakingDurationSec { get; set; } = 300;
 }
 
 // 起動時処理関連設定
@@ -72,12 +48,23 @@ public sealed class UiConfig
 public sealed class InputTimingConfig
 {
     public int CharDelayBaseMs { get; set; } = 0;
+    public int DeleteKeyDelayBaseMs { get; set; } = 0;
     public int ActionDelayMs { get; set; } = 5;
+    public int SequentialMoveToStartKeyDelayBaseMs { get; set; } = 5;
     public int PostTypeWaitPerCharMs { get; set; } = 5;
     public int PostTypeWaitMinMs { get; set; } = 300;
-    public int SequentialMoveToStartKeyDelayBaseMs { get; set; } = 5;
-    public int DeleteKeyDelayBaseMs { get; set; } = 0;
     public int ClearInputMaxPasses { get; set; } = 10;
+}
+
+// 音声監視関連設定
+public sealed class AudioConfig
+{
+    public float PeakThreshold { get; set; } = 0.000000001f;
+    public int PollIntervalMs { get; set; } = 50;
+    public int StartConfirmTimeoutMs { get; set; } = 1000;
+    public int StartConfirmMaxRetries { get; set; } = 0;
+    public int StopConfirmMs { get; set; } = 300;
+    public int MaxSpeakingDurationSec { get; set; } = 300;
 }
 
 // テキスト処理設定
@@ -86,6 +73,19 @@ public sealed class TextConfig
     public bool SendEnterAfterSentenceBreak { get; set; } = false;
     public List<string> SentenceBreakTriggers { get; set; } = new List<string> { "。", "！", "？", "!", "?" };
     public List<ReplaceRule> ReplaceRules { get; set; } = new List<ReplaceRule>();
+}
+
+// キュー関連設定
+public sealed class QueueConfig
+{
+    public int MaxQueuedJobs { get; set; } = 500;
+}
+
+// 検証方針の設定
+public sealed class ValidationConfig
+{
+    public BootValidationMode BootValidation { get; set; } = BootValidationMode.Required;
+    public RequestValidationMode RequestValidation { get; set; } = RequestValidationMode.Strict;
 }
 
 // デバッグ関連設定
@@ -109,21 +109,15 @@ internal static class AppConfigValidator
     public static void Validate(AppConfig config)
     {
         EnsureNotNull(config, "config は null にできません");
-        EnsureNotNull(config.Queue, "queue は null にできません");
-        EnsureNotNull(config.Audio, "audio は null にできません");
         EnsureNotNull(config.Startup, "startup は null にできません");
         EnsureNotNull(config.Hook, "hook は null にできません");
         EnsureNotNull(config.Ui, "ui は null にできません");
         EnsureNotNull(config.InputTiming, "inputTiming は null にできません");
+        EnsureNotNull(config.Audio, "audio は null にできません");
         EnsureNotNull(config.Text, "text は null にできません");
-        EnsureNotNull(config.Debug, "debug は null にできません");
+        EnsureNotNull(config.Queue, "queue は null にできません");
         EnsureNotNull(config.Validation, "validation は null にできません");
-
-        EnsureNonNegative(config.Queue.MaxQueuedJobs, "queue.maxQueuedJobs は 0 以上で指定してください");
-        EnsurePositive(config.Audio.PollIntervalMs, "audio.pollIntervalMs は 1 以上で指定してください");
-        EnsurePositive(config.Audio.StartConfirmTimeoutMs, "audio.startConfirmTimeoutMs は 1 以上で指定してください");
-        EnsureNonNegative(config.Audio.StartConfirmMaxRetries, "audio.startConfirmMaxRetries は 0 以上で指定してください");
-        EnsurePositive(config.Audio.StopConfirmMs, "audio.stopConfirmMs は 1 以上で指定してください");
+        EnsureNotNull(config.Debug, "debug は null にできません");
 
         EnsureNotNull(config.Startup.BootValidationText, "startup.bootValidationText は null にできません");
         EnsureNonNegative(config.Startup.BootValidationMaxRetries, "startup.bootValidationMaxRetries は 0 以上で指定してください");
@@ -152,6 +146,11 @@ internal static class AppConfigValidator
         EnsureNonNegative(config.InputTiming.DeleteKeyDelayBaseMs, "inputTiming.deleteKeyDelayBaseMs は 0 以上で指定してください");
         EnsurePositive(config.InputTiming.ClearInputMaxPasses, "inputTiming.clearInputMaxPasses は 1 以上で指定してください");
 
+        EnsurePositive(config.Audio.PollIntervalMs, "audio.pollIntervalMs は 1 以上で指定してください");
+        EnsurePositive(config.Audio.StartConfirmTimeoutMs, "audio.startConfirmTimeoutMs は 1 以上で指定してください");
+        EnsureNonNegative(config.Audio.StartConfirmMaxRetries, "audio.startConfirmMaxRetries は 0 以上で指定してください");
+        EnsurePositive(config.Audio.StopConfirmMs, "audio.stopConfirmMs は 1 以上で指定してください");
+
         if (config.Text.SentenceBreakTriggers == null)
         {
             throw new InvalidOperationException("text.sentenceBreakTriggers は null にできません");
@@ -170,6 +169,7 @@ internal static class AppConfigValidator
         {
             throw new InvalidOperationException("text.replaceRules は null にできません");
         }
+        EnsureNonNegative(config.Queue.MaxQueuedJobs, "queue.maxQueuedJobs は 0 以上で指定してください");
     }
 
     // null禁止を検証

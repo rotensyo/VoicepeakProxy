@@ -17,15 +17,6 @@ internal static class AppConfigMapper
         // core既定値を欠損補完に利用
         HookConfig defaults = new AppConfig().Hook;
 
-        config.Queue.MaxQueuedJobs = data.Queue.MaxQueuedJobs;
-
-        config.Audio.PeakThreshold = data.Audio.PeakThreshold;
-        config.Audio.PollIntervalMs = data.Audio.PollIntervalMs;
-        config.Audio.StartConfirmTimeoutMs = data.Audio.StartConfirmTimeoutMs;
-        config.Audio.StartConfirmMaxRetries = data.Audio.StartConfirmMaxRetries;
-        config.Audio.StopConfirmMs = data.Audio.StopConfirmMs;
-        config.Audio.MaxSpeakingDurationSec = data.Audio.MaxSpeakingDurationSec;
-
         config.Startup.BootValidationText = data.Startup.BootValidationText ?? string.Empty;
         config.Startup.BootValidationMaxRetries = data.Startup.BootValidationMaxRetries;
         config.Startup.BootValidationRetryIntervalMs = data.Startup.BootValidationRetryIntervalMs;
@@ -48,12 +39,19 @@ internal static class AppConfigMapper
         config.Ui.DelayBeforePlayShortcutMs = data.Ui.DelayBeforePlayShortcutMs;
 
         config.InputTiming.CharDelayBaseMs = data.InputTiming.CharDelayBaseMs;
+        config.InputTiming.DeleteKeyDelayBaseMs = data.InputTiming.DeleteKeyDelayBaseMs;
         config.InputTiming.ActionDelayMs = data.InputTiming.ActionDelayMs;
+        config.InputTiming.SequentialMoveToStartKeyDelayBaseMs = data.InputTiming.SequentialMoveToStartKeyDelayBaseMs;
         config.InputTiming.PostTypeWaitPerCharMs = data.InputTiming.PostTypeWaitPerCharMs;
         config.InputTiming.PostTypeWaitMinMs = data.InputTiming.PostTypeWaitMinMs;
-        config.InputTiming.SequentialMoveToStartKeyDelayBaseMs = data.InputTiming.SequentialMoveToStartKeyDelayBaseMs;
-        config.InputTiming.DeleteKeyDelayBaseMs = data.InputTiming.DeleteKeyDelayBaseMs;
         config.InputTiming.ClearInputMaxPasses = data.InputTiming.ClearInputMaxPasses;
+
+        config.Audio.PeakThreshold = data.Audio.PeakThreshold;
+        config.Audio.PollIntervalMs = data.Audio.PollIntervalMs;
+        config.Audio.StartConfirmTimeoutMs = data.Audio.StartConfirmTimeoutMs;
+        config.Audio.StartConfirmMaxRetries = data.Audio.StartConfirmMaxRetries;
+        config.Audio.StopConfirmMs = data.Audio.StopConfirmMs;
+        config.Audio.MaxSpeakingDurationSec = data.Audio.MaxSpeakingDurationSec;
 
         config.Text.SendEnterAfterSentenceBreak = data.Text.SendEnterAfterSentenceBreak;
         config.Text.SentenceBreakTriggers = new List<string>();
@@ -74,11 +72,12 @@ internal static class AppConfigMapper
             });
         }
 
-        config.Debug.LogTextCandidates = data.Debug.LogTextCandidates;
-        config.Debug.LogModifierHookStats = data.Debug.LogModifierHookStats;
-
+        config.Queue.MaxQueuedJobs = data.Queue.MaxQueuedJobs;
         config.Validation.BootValidation = MapBootValidation(data.Validation.BootValidation);
         config.Validation.RequestValidation = MapRequestValidation(data.Validation.RequestValidation);
+
+        config.Debug.LogTextCandidates = data.Debug.LogTextCandidates;
+        config.Debug.LogModifierHookStats = data.Debug.LogModifierHookStats;
 
         return config;
     }
@@ -88,15 +87,6 @@ internal static class AppConfigMapper
     {
         AppConfig config = source ?? new AppConfig();
         AppConfigData data = new AppConfigData();
-
-        data.Queue.MaxQueuedJobs = config.Queue.MaxQueuedJobs;
-
-        data.Audio.PeakThreshold = config.Audio.PeakThreshold;
-        data.Audio.PollIntervalMs = config.Audio.PollIntervalMs;
-        data.Audio.StartConfirmTimeoutMs = config.Audio.StartConfirmTimeoutMs;
-        data.Audio.StartConfirmMaxRetries = config.Audio.StartConfirmMaxRetries;
-        data.Audio.StopConfirmMs = config.Audio.StopConfirmMs;
-        data.Audio.MaxSpeakingDurationSec = config.Audio.MaxSpeakingDurationSec;
 
         data.Startup.BootValidationText = config.Startup.BootValidationText ?? string.Empty;
         data.Startup.BootValidationMaxRetries = config.Startup.BootValidationMaxRetries;
@@ -114,12 +104,19 @@ internal static class AppConfigMapper
         data.Ui.DelayBeforePlayShortcutMs = config.Ui.DelayBeforePlayShortcutMs;
 
         data.InputTiming.CharDelayBaseMs = config.InputTiming.CharDelayBaseMs;
+        data.InputTiming.DeleteKeyDelayBaseMs = config.InputTiming.DeleteKeyDelayBaseMs;
         data.InputTiming.ActionDelayMs = config.InputTiming.ActionDelayMs;
+        data.InputTiming.SequentialMoveToStartKeyDelayBaseMs = config.InputTiming.SequentialMoveToStartKeyDelayBaseMs;
         data.InputTiming.PostTypeWaitPerCharMs = config.InputTiming.PostTypeWaitPerCharMs;
         data.InputTiming.PostTypeWaitMinMs = config.InputTiming.PostTypeWaitMinMs;
-        data.InputTiming.SequentialMoveToStartKeyDelayBaseMs = config.InputTiming.SequentialMoveToStartKeyDelayBaseMs;
-        data.InputTiming.DeleteKeyDelayBaseMs = config.InputTiming.DeleteKeyDelayBaseMs;
         data.InputTiming.ClearInputMaxPasses = config.InputTiming.ClearInputMaxPasses;
+
+        data.Audio.PeakThreshold = config.Audio.PeakThreshold;
+        data.Audio.PollIntervalMs = config.Audio.PollIntervalMs;
+        data.Audio.StartConfirmTimeoutMs = config.Audio.StartConfirmTimeoutMs;
+        data.Audio.StartConfirmMaxRetries = config.Audio.StartConfirmMaxRetries;
+        data.Audio.StopConfirmMs = config.Audio.StopConfirmMs;
+        data.Audio.MaxSpeakingDurationSec = config.Audio.MaxSpeakingDurationSec;
 
         data.Text.SendEnterAfterSentenceBreak = config.Text.SendEnterAfterSentenceBreak;
         data.Text.SentenceBreakTriggers = new List<string>();
@@ -139,10 +136,13 @@ internal static class AppConfigMapper
             });
         }
 
-        data.Debug.LogTextCandidates = config.Debug.LogTextCandidates;
-        data.Debug.LogModifierHookStats = config.Debug.LogModifierHookStats;
+        data.Queue.MaxQueuedJobs = config.Queue.MaxQueuedJobs;
+
         data.Validation.BootValidation = MapBootValidationBack(config.Validation.BootValidation);
         data.Validation.RequestValidation = MapRequestValidationBack(config.Validation.RequestValidation);
+
+        data.Debug.LogTextCandidates = config.Debug.LogTextCandidates;
+        data.Debug.LogModifierHookStats = config.Debug.LogModifierHookStats;
 
         data.Normalize();
         return data;

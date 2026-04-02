@@ -4,13 +4,13 @@
 
 ## AppConfig 構造
 
-- `Queue: QueueConfig`
-- `Audio: AudioConfig`
 - `Startup: StartupConfig`
 - `Hook: HookConfig`
 - `Ui: UiConfig`
 - `InputTiming: InputTimingConfig`
+- `Audio: AudioConfig`
 - `Text: TextConfig`
+- `Queue: QueueConfig`
 - `Validation: ValidationConfig`
 - `Debug: DebugConfig`
 
