@@ -74,7 +74,7 @@ internal static class AppConfigMapper
 
         config.Queue.MaxQueuedJobs = data.Queue.MaxQueuedJobs;
         config.Validation.BootValidation = MapBootValidation(data.Validation.BootValidation);
-        config.Validation.RequestValidation = MapRequestValidation(data.Validation.RequestValidation);
+        config.Validation.RequestValidation = RequestValidationMode.Strict;
 
         config.Debug.LogTextCandidates = data.Debug.LogTextCandidates;
         config.Debug.LogModifierHookStats = data.Debug.LogModifierHookStats;
@@ -139,7 +139,7 @@ internal static class AppConfigMapper
         data.Queue.MaxQueuedJobs = config.Queue.MaxQueuedJobs;
 
         data.Validation.BootValidation = MapBootValidationBack(config.Validation.BootValidation);
-        data.Validation.RequestValidation = MapRequestValidationBack(config.Validation.RequestValidation);
+        data.Validation.RequestValidation = RequestValidationModeOption.Strict;
 
         data.Debug.LogTextCandidates = config.Debug.LogTextCandidates;
         data.Debug.LogModifierHookStats = config.Debug.LogModifierHookStats;
@@ -162,20 +162,6 @@ internal static class AppConfigMapper
         }
     }
 
-    // リクエスト検証方針を変換
-    private static RequestValidationMode MapRequestValidation(RequestValidationModeOption mode)
-    {
-        switch (mode)
-        {
-            case RequestValidationModeOption.Lenient:
-                return RequestValidationMode.Lenient;
-            case RequestValidationModeOption.Disabled:
-                return RequestValidationMode.Disabled;
-            default:
-                return RequestValidationMode.Strict;
-        }
-    }
-
     // 起動時検証方針を逆変換
     private static BootValidationModeOption MapBootValidationBack(BootValidationMode mode)
     {
@@ -190,17 +176,4 @@ internal static class AppConfigMapper
         }
     }
 
-    // リクエスト検証方針を逆変換
-    private static RequestValidationModeOption MapRequestValidationBack(RequestValidationMode mode)
-    {
-        switch (mode)
-        {
-            case RequestValidationMode.Lenient:
-                return RequestValidationModeOption.Lenient;
-            case RequestValidationMode.Disabled:
-                return RequestValidationModeOption.Disabled;
-            default:
-                return RequestValidationModeOption.Strict;
-        }
-    }
 }

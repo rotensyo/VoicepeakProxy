@@ -37,6 +37,7 @@ internal sealed class Job
     public bool Interrupt { get; set; }
     public List<Segment> Segments { get; set; } = new List<Segment>();
     public int TrailingPauseMs { get; set; }
+    public bool IsDelayOnly { get; set; }
 }
 
 // 分割後の発話セグメント
@@ -98,23 +99,14 @@ internal static class JobCompiler
             throw new InvalidOperationException("request は null にできません");
         }
 
+        _ = validationMode;
+
         string sourceText = req.Text;
         EnqueueMode sourceMode = req.Mode;
 
-        if (validationMode == RequestValidationMode.Disabled)
+        if (sourceText == null)
         {
-            sourceText ??= string.Empty;
-        }
-        else if (validationMode == RequestValidationMode.Lenient)
-        {
-            sourceText ??= string.Empty;
-        }
-        else
-        {
-            if (sourceText == null)
-            {
-                throw new InvalidOperationException("text は null にできません");
-            }
+            throw new InvalidOperationException("text は null にできません");
         }
 
         JobMode mode = sourceMode switch
@@ -163,9 +155,29 @@ internal static class JobCompiler
         }
 
         trailingPause += pendingPause;
-        if (segments.Count == 0)
+
+        int totalPause = trailingPause;
+        int speakableLength = 0;
+        for (int i = 0; i < segments.Count; i++)
         {
-            segments.Add(new Segment { Text = string.Empty, PausePreMs = 0 });
+            Segment segment = segments[i] ?? new Segment();
+            totalPause += segment.PausePreMs;
+            speakableLength += InputTextNormalizer.Normalize(segment.Text).Length;
+        }
+
+        bool isDelayOnly = false;
+        if (speakableLength == 0)
+        {
+            if (totalPause > 0)
+            {
+                isDelayOnly = true;
+                segments = new List<Segment> { new Segment { Text = string.Empty, PausePreMs = 0 } };
+                trailingPause = totalPause;
+            }
+            else
+            {
+                throw new InvalidOperationException("text は空文字にできません");
+            }
         }
 
         return new Job
@@ -173,7 +185,8 @@ internal static class JobCompiler
             Mode = mode,
             Interrupt = req.Interrupt,
             Segments = segments,
-            TrailingPauseMs = trailingPause
+            TrailingPauseMs = trailingPause,
+            IsDelayOnly = isDelayOnly
         };
     }
 

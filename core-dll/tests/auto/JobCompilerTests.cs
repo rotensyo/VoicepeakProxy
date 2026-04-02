@@ -31,15 +31,41 @@ public class JobCompilerTests
     }
 
     [TestMethod]
-    public void Compile_LenientNullText_DefaultsToQueueWithEmptyText()
+    public void Compile_DisabledNullText_AlsoThrows()
     {
-        // lenientでText nullを補完
+        // disabledでもText nullを拒否
         SpeakRequest request = new SpeakRequest { Text = null, Mode = EnqueueMode.Queue };
 
-        object job = ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", request, new AppConfig(), RequestValidationMode.Lenient);
+        InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
+            ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", request, new AppConfig(), RequestValidationMode.Disabled));
+
+        StringAssert.Contains(ex.Message, "text は null");
+    }
+
+    [TestMethod]
+    public void Compile_EmptyText_Throws()
+    {
+        // 空文字入力を拒否
+        SpeakRequest request = new SpeakRequest { Text = string.Empty, Mode = EnqueueMode.Queue };
+
+        InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
+            ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", request, new AppConfig(), RequestValidationMode.Strict));
+
+        StringAssert.Contains(ex.Message, "text は空文字");
+    }
+
+    [TestMethod]
+    public void Compile_PauseOnlyInput_CreatesDelayOnlyJob()
+    {
+        // pauseのみ入力は待機専用ジョブ化
+        SpeakRequest request = new SpeakRequest { Text = "[[pause:100]][[pause:200]]", Mode = EnqueueMode.Queue };
+
+        object job = ReflectionTestHelper.InvokeCoreStatic("JobCompiler", "Compile", request, new AppConfig(), RequestValidationMode.Strict);
 
         Assert.AreEqual("Queue", ReflectionTestHelper.GetProperty(job, "Mode").ToString());
         CollectionAssert.AreEqual(new[] { ("", 0) }, ReflectionTestHelper.GetSegments(job));
+        Assert.AreEqual(300, (int)ReflectionTestHelper.GetProperty(job, "TrailingPauseMs"));
+        Assert.IsTrue((bool)ReflectionTestHelper.GetProperty(job, "IsDelayOnly"));
     }
 
     [TestMethod]

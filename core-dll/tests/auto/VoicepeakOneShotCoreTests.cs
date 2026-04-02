@@ -355,6 +355,42 @@ public class VoicepeakOneShotCoreTests
         CollectionAssert.AreEqual(new[] { "A", "B" }, ui.TypedTexts);
     }
 
+    [TestMethod]
+    public void SpeakOnceWaitCore_PauseOnly_WaitsWithoutPlayback()
+    {
+        // pauseのみ入力は待機のみで完了
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
+
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(
+            CreateConfig(),
+            new SpeakOnceRequest { Text = "[[pause:1]]" },
+            new AppLogger(new TestLogger()),
+            RequestValidationMode.Strict,
+            ui,
+            new FakeAudioSessionReader());
+
+        Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
+        Assert.AreEqual(0, result.SegmentsExecuted);
+        Assert.AreEqual(0, ui.TryResolveTargetDetailedCalls);
+        Assert.AreEqual(0, ui.PressPlayCalls);
+    }
+
+    [TestMethod]
+    public void SpeakOnceCore_PauseOnly_ReturnsInvalidRequest()
+    {
+        // non-waitではpauseのみ入力を拒否
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(
+            CreateConfig(),
+            new SpeakOnceRequest { Text = "[[pause:1]]" },
+            new AppLogger(new TestLogger()),
+            RequestValidationMode.Strict,
+            new FakeVoicepeakUiController(),
+            new FakeAudioSessionReader());
+
+        Assert.AreEqual(SpeakOnceStatus.InvalidRequest, result.Status);
+        StringAssert.Contains(result.ErrorMessage, "text は空文字");
+    }
+
     private static AppConfig CreateConfig()
     {
         AppConfig config = new AppConfig();

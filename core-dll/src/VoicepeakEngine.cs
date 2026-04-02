@@ -128,7 +128,7 @@ internal sealed class VoicepeakEngine : IDisposable
             throw new InvalidOperationException("Runtime is stopping and cannot accept new requests.");
         }
 
-        RequestValidationMode mode = _config.Validation.RequestValidation;
+        RequestValidationMode mode = RequestValidationMode.Strict;
         try
         {
             Job job = JobCompiler.Compile(req, _config, mode);
@@ -227,6 +227,28 @@ internal sealed class VoicepeakEngine : IDisposable
     // 1ジョブを順次実行
     private void ExecuteJob(Job job)
     {
+        if (job.IsDelayOnly)
+        {
+            lock (_gate)
+            {
+                _state = WorkerState.ExecutingPrePlayWait;
+            }
+
+            _log.Info($"delay_only_start jobId={job.JobId} delayMs={job.TrailingPauseMs}");
+            long waitUntil = MonoClock.NowMs() + job.TrailingPauseMs;
+            MonoClock.SleepUntil(waitUntil, () => _stopping || _appCts.IsCancellationRequested || _interruptRequested);
+            if (_interruptRequested)
+            {
+                ConsumeInterruptIfAny(log: false);
+                _log.Info("interrupt_applied state=ExecutingPrePlayWait");
+                DropJob(job, "interrupt");
+                return;
+            }
+
+            _log.Info($"delay_only_end jobId={job.JobId}");
+            return;
+        }
+
         if (!TryResolveTarget(out Process process, out IntPtr hwnd))
         {
             LogTargetResolveFailure();

@@ -332,7 +332,7 @@ public static class VoicepeakOneShot
         AppConfigValidator.Validate(config);
         AppLogger log = new AppLogger(logger ?? new ConsoleAppLogger());
 
-        RequestValidationMode validation = config.Validation.RequestValidation;
+        RequestValidationMode validation = RequestValidationMode.Strict;
         return SpeakOnceCore(
             config,
             request,
@@ -377,7 +377,7 @@ public static class VoicepeakOneShot
         AppConfigValidator.Validate(config);
         AppLogger log = new AppLogger(logger ?? new ConsoleAppLogger());
 
-        RequestValidationMode validation = config.Validation.RequestValidation;
+        RequestValidationMode validation = RequestValidationMode.Strict;
         return SpeakOnceWaitCore(
             config,
             request,
@@ -427,6 +427,19 @@ public static class VoicepeakOneShot
         }
 
         log.Info($"job_received jobId={job.JobId} mode={job.Mode} interrupt={job.Interrupt} source=oneshot");
+
+        if (waitForCompletion && job.IsDelayOnly)
+        {
+            log.Info($"delay_only_start jobId={job.JobId} delayMs={job.TrailingPauseMs} source=oneshot");
+            long waitUntil = MonoClock.NowMs() + job.TrailingPauseMs;
+            MonoClock.SleepUntil(waitUntil, () => false);
+            log.Info($"delay_only_end jobId={job.JobId} source=oneshot");
+            return new SpeakOnceResult
+            {
+                Status = SpeakOnceStatus.Completed,
+                SegmentsExecuted = 0
+            };
+        }
 
         ResolveTargetResult resolved = ui.TryResolveTargetDetailed();
         if (!resolved.Success)

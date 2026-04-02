@@ -154,6 +154,22 @@ public class VoicepeakEngineExecuteJobTests
     }
 
     [TestMethod]
+    public void ExecuteJob_DelayOnlyJob_SkipsInputAndPlayback()
+    {
+        TestLogger logger = new TestLogger();
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        using CancellationTokenSource cts = new CancellationTokenSource();
+        VoicepeakEngine engine = CreateEngine(ui, new FakeAudioSessionReader(), logger, cts);
+
+        ReflectionTestHelper.InvokeCoreInstance(engine, "ExecuteJob", CreateJob("[[pause:1]]"));
+
+        Assert.AreEqual(0, ui.TryResolveTargetDetailedCalls);
+        Assert.AreEqual(0, ui.PrepareForTextInputCalls);
+        Assert.AreEqual(0, ui.PressPlayCalls);
+        Assert.AreEqual(0, ui.BeginModifierIsolationSessionCalls);
+    }
+
+    [TestMethod]
     public void ExecuteJob_BeginModifierIsolationSessionFails_RequestsShutdown()
     {
         TestLogger logger = new TestLogger();

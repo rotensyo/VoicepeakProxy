@@ -69,6 +69,17 @@ public class RuntimeAndOneShotTests
     }
 
     [TestMethod]
+    public void Enqueue_EmptyText_ReturnsInvalidRequest()
+    {
+        using VoicepeakRuntime runtime = VoicepeakRuntime.Start(CreateRuntimeConfig(), new TestLogger());
+
+        EnqueueResult result = runtime.Enqueue(new SpeakRequest { Text = string.Empty, Mode = EnqueueMode.Queue });
+
+        Assert.AreEqual(EnqueueStatus.InvalidRequest, result.Status);
+        StringAssert.Contains(result.ErrorMessage, "text は空文字");
+    }
+
+    [TestMethod]
     public void SpeakOnceWait_NullConfig_Throws()
     {
         Assert.ThrowsException<ArgumentNullException>(() => VoicepeakOneShot.SpeakOnceWait(null, new SpeakOnceRequest()));
