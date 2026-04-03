@@ -9,6 +9,7 @@ public sealed class AppConfig
     public StartupConfig Startup { get; set; } = new StartupConfig();
     public HookConfig Hook { get; set; } = new HookConfig();
     public UiConfig Ui { get; set; } = new UiConfig();
+    public DeprecatedConfig Deprecated { get; set; } = new DeprecatedConfig();
     public InputTimingConfig InputTiming { get; set; } = new InputTimingConfig();
     public AudioConfig Audio { get; set; } = new AudioConfig();
     public TextConfig Text { get; set; } = new TextConfig();
@@ -23,8 +24,6 @@ public sealed class StartupConfig
     public string BootValidationText { get; set; } = "初期化完了";
     public int BootValidationMaxRetries { get; set; } = 2;
     public int BootValidationRetryIntervalMs { get; set; } = 1000;
-    public bool ClickAtValidationEnabled { get; set; } = true;
-    public bool ClickBeforeTextFocusWhenUninitializedEnabled { get; set; } = false;
 }
 
 // 修飾キーフック関連設定
@@ -42,7 +41,15 @@ public sealed class UiConfig
     public string MoveToStartKey { get; set; } = "cursor up";
     public string PlayShortcut { get; set; } = "Space";
     public int DelayBeforePlayShortcutMs { get; set; } = 60;
-    public bool ClickOnInputFailureRetryEnabled { get; set; } = false;
+}
+
+// 廃止予定設定
+public sealed class DeprecatedConfig
+{
+    public bool EnableLegacyPrimeInputClick { get; set; } = false;
+    public bool LegacyPrimeClickAtValidationEnabled { get; set; } = true;
+    public bool LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled { get; set; } = false;
+    public bool LegacyPrimeClickOnInputFailureRetryEnabled { get; set; } = false;
 }
 
 // 入力タイミング関連設定
@@ -112,6 +119,7 @@ internal static class AppConfigValidator
         EnsureNotNull(config.Startup, "startup は null にできません");
         EnsureNotNull(config.Hook, "hook は null にできません");
         EnsureNotNull(config.Ui, "ui は null にできません");
+        EnsureNotNull(config.Deprecated, "deprecated は null にできません");
         EnsureNotNull(config.InputTiming, "inputTiming は null にできません");
         EnsureNotNull(config.Audio, "audio は null にできません");
         EnsureNotNull(config.Text, "text は null にできません");

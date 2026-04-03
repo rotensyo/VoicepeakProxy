@@ -188,7 +188,7 @@ public class VoicepeakOneShotCoreTests
         AppConfig config = CreateConfig();
         config.Ui.MoveToStartModifier = "ctrl";
         config.Ui.MoveToStartKey = "cursor up";
-        config.Ui.ClickOnInputFailureRetryEnabled = true;
+        config.Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 2;
         config.Audio.StopConfirmMs = 1;
@@ -211,7 +211,7 @@ public class VoicepeakOneShotCoreTests
         AppConfig config = CreateConfig();
         config.Ui.MoveToStartModifier = "ctrl";
         config.Ui.MoveToStartKey = "cursor up";
-        config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled = true;
+        config.Deprecated.LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled = true;
 
         SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), ui, audio);
 

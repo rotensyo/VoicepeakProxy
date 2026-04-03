@@ -26,7 +26,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private const int MkLButton = 0x0001;
     private readonly UiConfig _ui;
     private readonly InputTimingConfig _inputTiming;
-    private readonly StartupConfig _startup;
+    private readonly DeprecatedConfig _deprecated;
     private readonly HookConfig _hook;
     private readonly TextConfig _text;
     private readonly DebugConfig _debug;
@@ -50,7 +50,12 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     }
 
     public VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, StartupConfig startup, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log)
-        : this(ui, inputTiming, startup, hook, text, debug, log, new DefaultVoicepeakProcessApi())
+        : this(ui, inputTiming, startup, hook, text, debug, new DeprecatedConfig(), log, new DefaultVoicepeakProcessApi())
+    {
+    }
+
+    public VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, StartupConfig startup, HookConfig hook, TextConfig text, DebugConfig debug, DeprecatedConfig deprecated, AppLogger log)
+        : this(ui, inputTiming, startup, hook, text, debug, deprecated, log, new DefaultVoicepeakProcessApi())
     {
     }
 
@@ -60,11 +65,16 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     }
 
     internal VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, StartupConfig startup, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
+        : this(ui, inputTiming, startup, hook, text, debug, new DeprecatedConfig(), log, processApi)
+    {
+    }
+
+    internal VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, StartupConfig startup, HookConfig hook, TextConfig text, DebugConfig debug, DeprecatedConfig deprecated, AppLogger log, IVoicepeakProcessApi processApi)
     {
         IVoicepeakProcessApi resolvedProcessApi = processApi ?? new DefaultVoicepeakProcessApi();
         _ui = ui ?? new UiConfig();
         _inputTiming = inputTiming ?? new InputTimingConfig();
-        _startup = startup ?? new StartupConfig();
+        _deprecated = deprecated ?? new DeprecatedConfig();
         _hook = hook ?? new HookConfig();
         _text = text ?? new TextConfig();
         _debug = debug ?? new DebugConfig();
@@ -751,7 +761,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     // 旧来prime経路が必要か判定
     private bool ShouldUseLegacyPrimeForMoveToStart()
     {
-        return string.IsNullOrWhiteSpace(_ui.MoveToStartModifier)
+        return _deprecated.EnableLegacyPrimeInputClick
+            && string.IsNullOrWhiteSpace(_ui.MoveToStartModifier)
             && !IsFunctionKeyMoveToStartKey(_ui.MoveToStartKey);
     }
 
@@ -922,11 +933,11 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         switch (reason)
         {
             case InputContextPrimeReason.Validation:
-                return _startup.ClickAtValidationEnabled && !IsInputContextPrimed(process, mainHwnd);
+                return _deprecated.LegacyPrimeClickAtValidationEnabled && !IsInputContextPrimed(process, mainHwnd);
             case InputContextPrimeReason.BeforeTextFocusWhenUnprimed:
-                return _startup.ClickBeforeTextFocusWhenUninitializedEnabled && !IsInputContextPrimed(process, mainHwnd);
+                return _deprecated.LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled && !IsInputContextPrimed(process, mainHwnd);
             case InputContextPrimeReason.InputFailureRetry:
-                return _ui.ClickOnInputFailureRetryEnabled;
+                return _deprecated.LegacyPrimeClickOnInputFailureRetryEnabled;
             default:
                 return false;
         }

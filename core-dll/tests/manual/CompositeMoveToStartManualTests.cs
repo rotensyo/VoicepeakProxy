@@ -135,9 +135,10 @@ public class CompositeMoveToStartManualTests
         AppConfig config = new AppConfig();
         config.Ui.MoveToStartModifier = "ctrl";
         config.Ui.MoveToStartKey = "cursor up";
-        config.Startup.ClickAtValidationEnabled = true;
-        config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled = true;
-        config.Ui.ClickOnInputFailureRetryEnabled = true;
+        config.Deprecated.EnableLegacyPrimeInputClick = true;
+        config.Deprecated.LegacyPrimeClickAtValidationEnabled = true;
+        config.Deprecated.LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled = true;
+        config.Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 2000;
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 300;

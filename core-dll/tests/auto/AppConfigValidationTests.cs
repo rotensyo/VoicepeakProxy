@@ -31,9 +31,10 @@ public class AppConfigValidationTests
         Assert.AreEqual(8000, config.Hook.HookConnectTotalWaitMs);
         Assert.AreEqual("ctrl", config.Ui.MoveToStartModifier);
         Assert.AreEqual("cursor up", config.Ui.MoveToStartKey);
-        Assert.IsTrue(config.Startup.ClickAtValidationEnabled);
-        Assert.IsFalse(config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled);
-        Assert.IsFalse(config.Ui.ClickOnInputFailureRetryEnabled);
+        Assert.IsFalse(config.Deprecated.EnableLegacyPrimeInputClick);
+        Assert.IsTrue(config.Deprecated.LegacyPrimeClickAtValidationEnabled);
+        Assert.IsFalse(config.Deprecated.LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled);
+        Assert.IsFalse(config.Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled);
         CollectionAssert.AreEqual(new[] { "。", "！", "？", "!", "?" }, config.Text.SentenceBreakTriggers);
         Assert.AreEqual(BootValidationMode.Required, config.Validation.BootValidation);
     }

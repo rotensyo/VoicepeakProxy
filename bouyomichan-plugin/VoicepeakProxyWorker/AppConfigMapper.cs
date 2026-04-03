@@ -20,8 +20,6 @@ internal static class AppConfigMapper
         config.Startup.BootValidationText = data.Startup.BootValidationText ?? string.Empty;
         config.Startup.BootValidationMaxRetries = data.Startup.BootValidationMaxRetries;
         config.Startup.BootValidationRetryIntervalMs = data.Startup.BootValidationRetryIntervalMs;
-        config.Startup.ClickAtValidationEnabled = data.Startup.ClickAtValidationEnabled;
-        config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled = data.Startup.ClickBeforeTextFocusWhenUninitializedEnabled;
 
         config.Hook.HookCommandTimeoutMs = data.Hook.HookCommandTimeoutMs > 0
             ? data.Hook.HookCommandTimeoutMs
@@ -37,7 +35,11 @@ internal static class AppConfigMapper
         config.Ui.MoveToStartKey = data.Ui.MoveToStartKey ?? string.Empty;
         config.Ui.PlayShortcut = data.Ui.PlayShortcut ?? string.Empty;
         config.Ui.DelayBeforePlayShortcutMs = data.Ui.DelayBeforePlayShortcutMs;
-        config.Ui.ClickOnInputFailureRetryEnabled = data.Ui.ClickOnInputFailureRetryEnabled;
+
+        config.Deprecated.EnableLegacyPrimeInputClick = data.Deprecated.EnableLegacyPrimeInputClick;
+        config.Deprecated.LegacyPrimeClickAtValidationEnabled = data.Deprecated.LegacyPrimeClickAtValidationEnabled;
+        config.Deprecated.LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled = data.Deprecated.LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled;
+        config.Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled = data.Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled;
 
         config.InputTiming.CharDelayBaseMs = data.InputTiming.CharDelayBaseMs;
         config.InputTiming.DeleteKeyDelayBaseMs = data.InputTiming.DeleteKeyDelayBaseMs;
@@ -91,8 +93,6 @@ internal static class AppConfigMapper
         data.Startup.BootValidationText = config.Startup.BootValidationText ?? string.Empty;
         data.Startup.BootValidationMaxRetries = config.Startup.BootValidationMaxRetries;
         data.Startup.BootValidationRetryIntervalMs = config.Startup.BootValidationRetryIntervalMs;
-        data.Startup.ClickAtValidationEnabled = config.Startup.ClickAtValidationEnabled;
-        data.Startup.ClickBeforeTextFocusWhenUninitializedEnabled = config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled;
 
         data.Hook.HookCommandTimeoutMs = config.Hook.HookCommandTimeoutMs;
         data.Hook.HookConnectTimeoutMs = config.Hook.HookConnectTimeoutMs;
@@ -102,7 +102,11 @@ internal static class AppConfigMapper
         data.Ui.MoveToStartKey = config.Ui.MoveToStartKey ?? string.Empty;
         data.Ui.PlayShortcut = config.Ui.PlayShortcut ?? string.Empty;
         data.Ui.DelayBeforePlayShortcutMs = config.Ui.DelayBeforePlayShortcutMs;
-        data.Ui.ClickOnInputFailureRetryEnabled = config.Ui.ClickOnInputFailureRetryEnabled;
+
+        data.Deprecated.EnableLegacyPrimeInputClick = config.Deprecated.EnableLegacyPrimeInputClick;
+        data.Deprecated.LegacyPrimeClickAtValidationEnabled = config.Deprecated.LegacyPrimeClickAtValidationEnabled;
+        data.Deprecated.LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled = config.Deprecated.LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled;
+        data.Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled = config.Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled;
 
         data.InputTiming.CharDelayBaseMs = config.InputTiming.CharDelayBaseMs;
         data.InputTiming.DeleteKeyDelayBaseMs = config.InputTiming.DeleteKeyDelayBaseMs;

@@ -23,13 +23,8 @@
   - 起動時の入力検証失敗時の再試行回数です
 - `BootValidationRetryIntervalMs` (`default: 1000`)
   - 起動時入力検証の再試行待機時間です
-- `ClickAtValidationEnabled` (`default: true`)
-  - 起動時バリデーションで初期化のためのウィンドウフォーカス奪取と入力欄クリックを許可します
-  - `MoveToStartModifier`が空文字かつ`MoveToStartKey`が`F1-F12`以外の場合だけ使用されます
-- `ClickBeforeTextFocusWhenUninitializedEnabled` (`default: false`)
-  - 初期化クリック未実行時に文字入力欄フォーカス直前のウィンドウフォーカス奪取とクリックを許可します
-  - `MoveToStartModifier`が空文字かつ`MoveToStartKey`が`F1-F12`以外の場合だけ使用されます
-  - `VoicepeakOneShot.SpeakOnce`/`VoicepeakOneShot.SpeakOnceWait`では使用されません
+- クリックprime関連設定は`DeprecatedConfig`へ退避されています
+- 既定では`Deprecated.EnableLegacyPrimeInputClick=false`のため実行されません
 
 ## HookConfig
 
@@ -54,9 +49,8 @@
   - VOICEPEAKの設定値と同じものを指定してください
 - `DelayBeforePlayShortcutMs` (`default: 60`)
   - 再生ボタンを押す前の待機時間です
-- `ClickOnInputFailureRetryEnabled` (`default: false`)
-  - 入力失敗時に一度だけウィンドウフォーカス奪取とクリックを許可します
-  - `MoveToStartModifier`が空文字かつ`MoveToStartKey`が`F1-F12`以外の場合だけ使用されます
+- 入力失敗時クリック設定は`Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled`へ退避されています
+- 既定では`Deprecated.EnableLegacyPrimeInputClick=false`のため実行されません
 
 ## InputTimingConfig
 
@@ -135,6 +129,18 @@
 - `LogModifierHookStats` (`default: false`)
   - 修飾キー中立化フックの統計ログを出力します
   - `modifier_hook_stats_probe_*`と`modifier_hook_stats`を有効化します
+
+## DeprecatedConfig
+
+- `EnableLegacyPrimeInputClick` (`default: false`)
+  - 旧クリックprime経路を有効化します
+  - 既定は無効です
+- `LegacyPrimeClickAtValidationEnabled` (`default: true`)
+  - 旧経路有効時のみ、起動時バリデーションでクリックprimeを許可します
+- `LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled` (`default: false`)
+  - 旧経路有効時のみ、入力前未初期化時クリックprimeを許可します
+- `LegacyPrimeClickOnInputFailureRetryEnabled` (`default: false`)
+  - 旧経路有効時のみ、入力失敗時リトライクリックprimeを許可します
 
 ## configバリデーション
 

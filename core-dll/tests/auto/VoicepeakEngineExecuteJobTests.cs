@@ -89,7 +89,7 @@ public class VoicepeakEngineExecuteJobTests
         AppConfig config = CreateConfig();
         config.Ui.MoveToStartModifier = "ctrl";
         config.Ui.MoveToStartKey = "cursor up";
-        config.Ui.ClickOnInputFailureRetryEnabled = true;
+        config.Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 2;
         config.Audio.StopConfirmMs = 1;
@@ -118,7 +118,7 @@ public class VoicepeakEngineExecuteJobTests
         AppConfig config = CreateConfig();
         config.Ui.MoveToStartModifier = string.Empty;
         config.Ui.MoveToStartKey = "F3";
-        config.Ui.ClickOnInputFailureRetryEnabled = true;
+        config.Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 1;

@@ -301,24 +301,6 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Startup.BootValidationRetryIntervalMs = value; }
         }
 
-        [Category("Startup")]
-        [DisplayName("04)clickAtValidationEnabled")]
-        [Description("trueにすると、起動時入力検証の際に初期化のためウィンドウフォーカス奪取と入力欄クリックを行います。")]
-        public bool ClickAtValidationEnabled
-        {
-            get { return State.Settings.AppConfig.Startup.ClickAtValidationEnabled; }
-            set { State.Settings.AppConfig.Startup.ClickAtValidationEnabled = value; }
-        }
-
-        [Category("Startup")]
-        [DisplayName("05)clickBeforeTextFocusWhenUninitializedEnabled")]
-        [Description("trueにすると、初期化クリック未実行時にウィンドウフォーカス奪取と入力欄クリックを行います。")]
-        public bool ClickBeforeTextFocusWhenUninitializedEnabled
-        {
-            get { return State.Settings.AppConfig.Startup.ClickBeforeTextFocusWhenUninitializedEnabled; }
-            set { State.Settings.AppConfig.Startup.ClickBeforeTextFocusWhenUninitializedEnabled = value; }
-        }
-
     }
 
     // Hook設定タブ
@@ -375,7 +357,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Ui")]
         [DisplayName("01)moveToStartModifier")]
-        [Description("先頭移動の修飾子キーです。空文字またはctrlまたはaltを指定してください。")]
+        [Description("先頭移動の修飾子キーです。VOICEPEAKの設定値に応じて、空文字/ctrl/altのいずれかを指定してください。shiftや、ctrlとaltの複合は現在非対応です。")]
         public string MoveToStartModifier
         {
             get { return State.Settings.AppConfig.Ui.MoveToStartModifier; }
@@ -384,7 +366,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Ui")]
         [DisplayName("02)moveToStartKey")]
-        [Description("先頭移動キーです。VOICEPEAKの設定値と同じものを指定してください。例: cursor up, F3, home")]
+        [Description("先頭移動のキーです。VOICEPEAKの設定値と同じものを指定してください。例: cursor up, F3, Q")]
         public string MoveToStartKey
         {
             get { return State.Settings.AppConfig.Ui.MoveToStartKey; }
@@ -409,14 +391,6 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Ui.DelayBeforePlayShortcutMs = value; }
         }
 
-        [Category("Ui")]
-        [DisplayName("05)clickOnInputFailureRetryEnabled")]
-        [Description("文字入力失敗時に一度だけウィンドウフォーカス奪取とクリックを実行します。")]
-        public bool ClickOnInputFailureRetryEnabled
-        {
-            get { return State.Settings.AppConfig.Ui.ClickOnInputFailureRetryEnabled; }
-            set { State.Settings.AppConfig.Ui.ClickOnInputFailureRetryEnabled = value; }
-        }
     }
 
     // InputTiming設定タブ
@@ -478,7 +452,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("InputTiming")]
         [DisplayName("06)postTypeWaitMinMs")]
-        [Description("文字入力後待機時間の最小値です。文字入力完了後に再生失敗する場合は値を増やして再生前の待機時間を伸ばしてみてください。")]
+        [Description("文字入力後待機時間の最小値です。文字入力完了後に再生失敗する場合は、値を増やして再生前の待機時間を伸ばしてみてください。")]
         public int PostTypeWaitMinMs
         {
             get { return State.Settings.AppConfig.InputTiming.PostTypeWaitMinMs; }

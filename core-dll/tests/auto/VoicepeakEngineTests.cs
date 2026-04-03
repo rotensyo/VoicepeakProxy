@@ -206,8 +206,9 @@ public class VoicepeakEngineTests
         AppConfig config = CreateEngineConfig();
         config.Ui.MoveToStartModifier = "ctrl";
         config.Ui.MoveToStartKey = "cursor up";
-        config.Startup.ClickAtValidationEnabled = false;
-        config.Ui.ClickOnInputFailureRetryEnabled = true;
+        config.Deprecated.EnableLegacyPrimeInputClick = false;
+        config.Deprecated.LegacyPrimeClickAtValidationEnabled = false;
+        config.Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 1;

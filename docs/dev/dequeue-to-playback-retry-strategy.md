@@ -54,18 +54,11 @@
 - `PrepareForTextInput`と`PrepareForPlayback`は、追加のprime処理を行いません。
 - start-confirmの再試行時は、毎回通常ショートカットで先頭移動をやり直します。
 
-### 複合系(Ctrl+Up)
+### 旧クリックprime経路
 
-- `MoveToStart`は複合専用経路(`SendCompositeMoveToStart`)を使います。
-- クリック注入は明示設定された契機でのみ行います。
-  - `ClickAtValidationEnabled`
-  - `ClickBeforeTextFocusWhenUninitializedEnabled`
-  - `ClickOnInputFailureRetryEnabled`
-- `PrepareForTextInput`では、未primeかつ設定有効時だけ文字入力欄フォーカス直前でprimeを試みます。
-- `PrepareForPlayback`では通常primeせず、キーボードフォーカス再付与とCtrl+Up送信だけを行います。
-- prime状態はプロセスIDとメインHWNDの組で保持します。
-- start-confirmの再試行時も`PrepareForPlayback`は毎回呼ばれます。
-- フォーカス再付与とCtrl+Up送信は毎回実施されます。
+- クリックprimeの受け口は残っています。
+- ただし既定は`Deprecated.EnableLegacyPrimeInputClick=false`で無効です。
+- 有効化時の契機は`Deprecated.LegacyPrimeClick*`設定で制御します。
 
 ## 実装上の要点
 
