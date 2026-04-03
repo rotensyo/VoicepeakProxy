@@ -303,7 +303,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Startup")]
         [DisplayName("04)clickAtValidationEnabled")]
-        [Description("trueにすると、起動時入力検証の際に初期化のためウィンドウフォーカス奪取と入力欄クリックを行います。UiConfig.MoveToStartShortcut が F1-F12 の場合は不要なため実行されません。")]
+        [Description("trueにすると、起動時入力検証の際に初期化のためウィンドウフォーカス奪取と入力欄クリックを行います。")]
         public bool ClickAtValidationEnabled
         {
             get { return State.Settings.AppConfig.Startup.ClickAtValidationEnabled; }
@@ -312,7 +312,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Startup")]
         [DisplayName("05)clickBeforeTextFocusWhenUninitializedEnabled")]
-        [Description("trueにすると、初期化クリック未実行時にウィンドウフォーカス奪取と入力欄クリックを行います。UiConfig.MoveToStartShortcut が F1-F12 の場合は不要なため実行されません。")]
+        [Description("trueにすると、初期化クリック未実行時にウィンドウフォーカス奪取と入力欄クリックを行います。")]
         public bool ClickBeforeTextFocusWhenUninitializedEnabled
         {
             get { return State.Settings.AppConfig.Startup.ClickBeforeTextFocusWhenUninitializedEnabled; }
@@ -374,16 +374,25 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("Ui")]
-        [DisplayName("01)moveToStartShortcut")]
-        [Description("先頭移動のショートカットです。VOICEPEAKの設定値と同じものを指定してください。F1-F12のいずれかを指定した場合、ウィンドウクリックが不要になります。")]
-        public string MoveToStartShortcut
+        [DisplayName("01)moveToStartModifier")]
+        [Description("先頭移動の修飾子キーです。空文字またはctrlまたはaltを指定してください。")]
+        public string MoveToStartModifier
         {
-            get { return State.Settings.AppConfig.Ui.MoveToStartShortcut; }
-            set { State.Settings.AppConfig.Ui.MoveToStartShortcut = value ?? string.Empty; }
+            get { return State.Settings.AppConfig.Ui.MoveToStartModifier; }
+            set { State.Settings.AppConfig.Ui.MoveToStartModifier = value ?? string.Empty; }
         }
 
         [Category("Ui")]
-        [DisplayName("02)playShortcut")]
+        [DisplayName("02)moveToStartKey")]
+        [Description("先頭移動キーです。VOICEPEAKの設定値と同じものを指定してください。例: cursor up, F3, home")]
+        public string MoveToStartKey
+        {
+            get { return State.Settings.AppConfig.Ui.MoveToStartKey; }
+            set { State.Settings.AppConfig.Ui.MoveToStartKey = value ?? string.Empty; }
+        }
+
+        [Category("Ui")]
+        [DisplayName("03)playShortcut")]
         [Description("再生ショートカットです。VOICEPEAKの設定値と同じものを指定してください。仕様上 Ctrl+Space 等の複合ショートカットは使用できません。")]
         public string PlayShortcut
         {
@@ -392,7 +401,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("Ui")]
-        [DisplayName("03)delayBeforePlayShortcutMs")]
+        [DisplayName("04)delayBeforePlayShortcutMs")]
         [Description("再生ボタンを押す前の待機時間です。")]
         public int DelayBeforePlayShortcutMs
         {
@@ -401,8 +410,8 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("Ui")]
-        [DisplayName("04)clickOnInputFailureRetryEnabled")]
-        [Description("文字入力失敗時に一度だけウィンドウフォーカス奪取とクリックを実行します。UiConfig.MoveToStartShortcut が F1-F12 の場合は不要なため実行されません。")]
+        [DisplayName("05)clickOnInputFailureRetryEnabled")]
+        [Description("文字入力失敗時に一度だけウィンドウフォーカス奪取とクリックを実行します。")]
         public bool ClickOnInputFailureRetryEnabled
         {
             get { return State.Settings.AppConfig.Ui.ClickOnInputFailureRetryEnabled; }
@@ -451,7 +460,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("InputTiming")]
         [DisplayName("04)sequentialMoveToStartKeyDelayBaseMs")]
-        [Description("カーソル先頭移動時の入力待機時間です。UiConfig.MoveToStartShortcut が F1-F12 の場合は不要なため実行されません。")]
+        [Description("カーソル先頭移動時の入力待機時間です。")]
         public int SequentialMoveToStartKeyDelayBaseMs
         {
             get { return State.Settings.AppConfig.InputTiming.SequentialMoveToStartKeyDelayBaseMs; }

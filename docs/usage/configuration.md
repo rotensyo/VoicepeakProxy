@@ -25,10 +25,10 @@
   - 起動時入力検証の再試行待機時間です
 - `ClickAtValidationEnabled` (`default: true`)
   - 起動時バリデーションで初期化のためのウィンドウフォーカス奪取と入力欄クリックを許可します
-  - `MoveToStartShortcut`が`F1-F12`以外の場合だけ使用されます
+  - `MoveToStartModifier`が空文字かつ`MoveToStartKey`が`F1-F12`以外の場合だけ使用されます
 - `ClickBeforeTextFocusWhenUninitializedEnabled` (`default: false`)
   - 初期化クリック未実行時に文字入力欄フォーカス直前のウィンドウフォーカス奪取とクリックを許可します
-  - `MoveToStartShortcut`が`F1-F12`以外の場合だけ使用されます
+  - `MoveToStartModifier`が空文字かつ`MoveToStartKey`が`F1-F12`以外の場合だけ使用されます
   - `VoicepeakOneShot.SpeakOnce`/`VoicepeakOneShot.SpeakOnceWait`では使用されません
 
 ## HookConfig
@@ -42,10 +42,13 @@
 
 ## UiConfig
 
-- `MoveToStartShortcut` (`default: "Ctrl+Up"`)
-  - 先頭移動のショートカットです
+- `MoveToStartModifier` (`default: "ctrl"`)
+  - 先頭移動の修飾子キーです
+  - 空文字または`ctrl`または`alt`を指定してください
+- `MoveToStartKey` (`default: "cursor up"`)
+  - 先頭移動キーです
   - VOICEPEAKの設定値と同じものを指定してください
-  - `F1-F12`のいずれかを指定した場合、より高速かつ安定な方式で実行されます
+  - 主な指定値は`cursor up`, `cursor down`, `cursor left`, `cursor right`, `F1-F12`, `space`, `home`, `end`です
 - `PlayShortcut` (`default: "Space"`)
   - 再生ショートカットです
   - VOICEPEAKの設定値と同じものを指定してください
@@ -53,7 +56,7 @@
   - 再生ボタンを押す前の待機時間です
 - `ClickOnInputFailureRetryEnabled` (`default: false`)
   - 入力失敗時に一度だけウィンドウフォーカス奪取とクリックを許可します
-  - `MoveToStartShortcut`が`F1-F12`以外の場合だけ使用されます
+  - `MoveToStartModifier`が空文字かつ`MoveToStartKey`が`F1-F12`以外の場合だけ使用されます
 
 ## InputTimingConfig
 
@@ -66,8 +69,8 @@
 - `ActionDelayMs` (`default: 5`)
   - 文字入力欄フォーカスなどのUIアクション時の待機時間です
 - `SequentialMoveToStartKeyDelayBaseMs` (`default: 5`)
-  - 逐次`PageUp`→`Up`経路でのキー間待機です
-  - `MoveToStartShortcut`が`F1-F12`以外の場合だけ使用されます
+  - 互換で残している逐次`PageUp`→`Up`経路でのキー間待機です
+  - 通常の先頭移動処理では使用されません
 - `PostTypeWaitPerCharMs` (`default: 5`)
   - 文字入力後の待機時間算出に使う倍率です
   - 文字入力完了後に再生失敗する場合は値を増やして待機を伸ばしてください
@@ -139,7 +142,8 @@
 
 - `config`と各セクションが`null`でないこと
 - 数値設定が許容範囲にあること
-- `MoveToStartShortcut`がnull/空文字/空白でないこと
+- `MoveToStartModifier`が空文字/`ctrl`/`alt`のいずれかであること
+- `MoveToStartKey`が有効なキー形式であること
 - `PlayShortcut`が有効形式であること
 - `SentenceBreakTriggers`が`null`でなく、各要素が空文字でないこと
 - `ReplaceRules`が`null`でないこと

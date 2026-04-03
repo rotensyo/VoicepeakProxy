@@ -61,32 +61,35 @@ public class UiControllerTests
     }
 
     [TestMethod]
-    public void IsValidMoveToStartShortcut_AllowsAnyNonBlankValue()
+    public void IsValidMoveToStartModifier_ReturnsExpectedValues()
     {
-        // 先頭移動設定は非空文字列を許可
-        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsValidMoveToStartShortcut", "Ctrl+Up"));
-        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsValidMoveToStartShortcut", "Alt+Up"));
-        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsValidMoveToStartShortcut", "Delete"));
-        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsValidMoveToStartShortcut", ""));
-        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsValidMoveToStartShortcut", "   "));
-        Assert.IsFalse(VoicepeakUiController.IsValidMoveToStartShortcut(null));
+        // 先頭移動修飾子は空文字とctrlとaltを許可
+        Assert.IsTrue(VoicepeakUiController.IsValidMoveToStartModifier(string.Empty));
+        Assert.IsTrue(VoicepeakUiController.IsValidMoveToStartModifier("CTRL"));
+        Assert.IsTrue(VoicepeakUiController.IsValidMoveToStartModifier("alt"));
+        Assert.IsFalse(VoicepeakUiController.IsValidMoveToStartModifier("shift"));
+        Assert.IsFalse(VoicepeakUiController.IsValidMoveToStartModifier(null));
     }
 
     [TestMethod]
-    public void IsFunctionKeyMoveToStartShortcut_ReturnsExpectedValues()
+    public void IsValidMoveToStartKey_ReturnsExpectedValues()
     {
-        // Fキー系のみ独自ルート対象
-        Assert.IsTrue(VoicepeakUiController.IsFunctionKeyMoveToStartShortcut("F3"));
-        Assert.IsFalse(VoicepeakUiController.IsFunctionKeyMoveToStartShortcut("Ctrl+Up"));
-        Assert.IsFalse(VoicepeakUiController.IsFunctionKeyMoveToStartShortcut("Home"));
-        Assert.IsFalse(VoicepeakUiController.IsFunctionKeyMoveToStartShortcut("Delete"));
+        // 先頭移動キーは許可集合のみ有効
+        Assert.IsTrue(VoicepeakUiController.IsValidMoveToStartKey("cursor up"));
+        Assert.IsTrue(VoicepeakUiController.IsValidMoveToStartKey("CURSOR LEFT"));
+        Assert.IsTrue(VoicepeakUiController.IsValidMoveToStartKey("F3"));
+        Assert.IsTrue(VoicepeakUiController.IsValidMoveToStartKey("home"));
+        Assert.IsFalse(VoicepeakUiController.IsValidMoveToStartKey("up"));
+        Assert.IsFalse(VoicepeakUiController.IsValidMoveToStartKey("delete"));
     }
 
     [TestMethod]
     public void ShouldAttemptPrimeInputContext_FunctionShortcut_ReturnsFalse()
     {
         // Fキー独自ルートではprimeしない
-        VoicepeakUiController controller = CreateController(new UiConfig { MoveToStartShortcut = "F3" }, new FakeVoicepeakProcessApi());
+        VoicepeakUiController controller = CreateController(
+            new UiConfig { MoveToStartModifier = string.Empty, MoveToStartKey = "F3" },
+            new FakeVoicepeakProcessApi());
         Process process = Process.GetCurrentProcess();
         IntPtr hwnd = new IntPtr(123);
 
@@ -101,7 +104,8 @@ public class UiControllerTests
         // 未prime時だけ入力前primeを許可
         UiConfig ui = new UiConfig
         {
-            MoveToStartShortcut = "Ctrl+Up"
+            MoveToStartModifier = string.Empty,
+            MoveToStartKey = "cursor up"
         };
         StartupConfig startup = new StartupConfig
         {
@@ -123,8 +127,8 @@ public class UiControllerTests
     public void ShouldAttemptPrimeInputContext_InputFailureRetry_UsesDedicatedFlag()
     {
         // 入力失敗時修正クリックは専用フラグで制御
-        UiConfig disabled = new UiConfig { MoveToStartShortcut = "Ctrl+Up", ClickOnInputFailureRetryEnabled = false };
-        UiConfig enabled = new UiConfig { MoveToStartShortcut = "Ctrl+Up", ClickOnInputFailureRetryEnabled = true };
+        UiConfig disabled = new UiConfig { MoveToStartModifier = string.Empty, MoveToStartKey = "cursor up", ClickOnInputFailureRetryEnabled = false };
+        UiConfig enabled = new UiConfig { MoveToStartModifier = string.Empty, MoveToStartKey = "cursor up", ClickOnInputFailureRetryEnabled = true };
         Process process = Process.GetCurrentProcess();
         IntPtr hwnd = new IntPtr(123);
 
@@ -228,7 +232,8 @@ public class UiControllerTests
         {
             UiConfig ui = new UiConfig
             {
-                MoveToStartShortcut = "F3"
+                MoveToStartModifier = string.Empty,
+                MoveToStartKey = "F3"
             };
             InputTimingConfig inputTiming = new InputTimingConfig
             {
@@ -253,6 +258,43 @@ public class UiControllerTests
 
         Assert.AreEqual(2, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkF3));
         Assert.AreEqual(2, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkF3));
+    }
+
+    [TestMethod]
+    public void ClearInput_WithModifierShortcut_DoesNotUsePageUpPath()
+    {
+        // 修飾子ショートカット設定ではPageUp経路を使用しない
+        var messages = ReflectionTestHelper.RunInSta(() =>
+        {
+            UiConfig ui = new UiConfig
+            {
+                MoveToStartModifier = "ctrl",
+                MoveToStartKey = "cursor up"
+            };
+            InputTimingConfig inputTiming = new InputTimingConfig
+            {
+                ClearInputMaxPasses = 1,
+                DeleteKeyDelayBaseMs = 0
+            };
+            VoicepeakUiController controller = new VoicepeakUiController(
+                ui,
+                inputTiming,
+                new StartupConfig(),
+                new HookConfig(),
+                new TextConfig(),
+                new DebugConfig(),
+                new AppLogger(new TestLogger()),
+                new FakeVoicepeakProcessApi());
+
+            using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
+            bool ok = controller.ClearInput(null, window.Handle, 0, false);
+            Assert.IsFalse(ok);
+            return window.Messages.ToArray();
+        });
+
+        Assert.AreEqual(0, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkPageUp));
+        Assert.AreEqual(0, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkPageUp));
+        Assert.IsTrue(messages.Any(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkUp));
     }
 
     [TestMethod]
@@ -641,7 +683,7 @@ public class UiControllerTests
         // Space停止はKillFocusのみでフォーカス投入しない
         var messages = ReflectionTestHelper.RunInSta(() =>
         {
-            UiConfig ui = new UiConfig { PlayShortcut = "Space", DelayBeforePlayShortcutMs = 0, MoveToStartShortcut = "Ctrl+Up" };
+            UiConfig ui = new UiConfig { PlayShortcut = "Space", DelayBeforePlayShortcutMs = 0, MoveToStartModifier = "ctrl", MoveToStartKey = "cursor up" };
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
             VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
 
@@ -664,7 +706,8 @@ public class UiControllerTests
         {
             UiConfig ui = new UiConfig
             {
-                MoveToStartShortcut = "F3"
+                MoveToStartModifier = string.Empty,
+                MoveToStartKey = "F3"
             };
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
             VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
@@ -677,14 +720,15 @@ public class UiControllerTests
     }
 
     [TestMethod]
-    public void MoveToStart_CompositeShortcut_UsesPageUpAndUpByInjectedEnterCountPlusOne()
+    public void MoveToStart_CtrlModifier_UsesSingleUpStroke()
     {
-        // 複合先頭移動はEnter回数+1だけPageUpとUpを送信
+        // Ctrl修飾先頭移動はUpを単発送信
         var messages = ReflectionTestHelper.RunInSta(() =>
         {
             UiConfig ui = new UiConfig
             {
-                MoveToStartShortcut = "Ctrl+Up"
+                MoveToStartModifier = "ctrl",
+                MoveToStartKey = "cursor up"
             };
             TextConfig text = new TextConfig
             {
@@ -700,23 +744,22 @@ public class UiControllerTests
             return window.Messages.ToArray();
         });
 
-        Assert.IsTrue(messages.Any(m => m.Msg == 0x0008));
-        Assert.IsTrue(messages.Any(m => m.Msg == 0x0007));
-        Assert.AreEqual(3, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkPageUp));
-        Assert.AreEqual(3, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkPageUp));
-        Assert.AreEqual(3, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkUp));
-        Assert.AreEqual(3, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkUp));
+        Assert.AreEqual(0, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkPageUp));
+        Assert.AreEqual(0, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkPageUp));
+        Assert.AreEqual(1, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkUp));
+        Assert.AreEqual(1, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkUp));
     }
 
     [TestMethod]
-    public void MoveToStart_CompositeShortcut_SendsKillFocusAndSetFocus()
+    public void MoveToStart_CtrlModifier_DoesNotSendFocusMessages()
     {
-        // 非F系先頭移動はKillFocusとSetFocusを送信
+        // Ctrl修飾先頭移動はフォーカスメッセージを送信しない
         var messages = ReflectionTestHelper.RunInSta(() =>
         {
             UiConfig ui = new UiConfig
             {
-                MoveToStartShortcut = "Ctrl+Up"
+                MoveToStartModifier = "ctrl",
+                MoveToStartKey = "cursor up"
             };
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
             VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
@@ -726,8 +769,8 @@ public class UiControllerTests
             return window.Messages.ToArray();
         });
 
-        Assert.IsTrue(messages.Any(m => m.Msg == 0x0007), "set_focus_not_sent");
-        Assert.IsTrue(messages.Any(m => m.Msg == 0x0008), "kill_focus_not_sent");
+        Assert.IsFalse(messages.Any(m => m.Msg == 0x0007), "set_focus_sent");
+        Assert.IsFalse(messages.Any(m => m.Msg == 0x0008), "kill_focus_sent");
     }
 
     [TestMethod]
@@ -753,7 +796,7 @@ public class UiControllerTests
         var messages = ReflectionTestHelper.RunInSta(() =>
         {
             object controller = ReflectionTestHelper.CreateVoicepeakUiController(
-                new UiConfig { MoveToStartShortcut = "Ctrl+Up" },
+                new UiConfig { MoveToStartModifier = string.Empty, MoveToStartKey = "cursor up" },
                 new DebugConfig(),
                 new TestLogger());
 

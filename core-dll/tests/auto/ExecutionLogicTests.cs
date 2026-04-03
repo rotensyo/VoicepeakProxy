@@ -316,14 +316,15 @@ public class ExecutionLogicTests
     }
 
     [TestMethod]
-    public void MonitorSpeaking_InterruptRequested_WithCompositeShortcut_PressesPlayThenMovesToStart()
+    public void MonitorSpeaking_InterruptRequested_WithModifierShortcut_MovesToStartWithoutPrePlay()
     {
-        // 複合経路では停止してから先頭移動
+        // 修飾子ショートカットは先頭移動のみを実行
         FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
         FakeAudioSessionReader audio = new FakeAudioSessionReader();
         bool callbackCalled = false;
         AppConfig config = CreateMonitorConfig();
-        config.Ui.MoveToStartShortcut = "Ctrl+Up";
+        config.Ui.MoveToStartModifier = "ctrl";
+        config.Ui.MoveToStartKey = "cursor up";
 
         SpeakMonitorResult result = JobExecutionCore.MonitorSpeaking(
             config,
@@ -338,9 +339,8 @@ public class ExecutionLogicTests
 
         Assert.AreEqual(SpeakMonitorKind.Interrupted, result.Kind);
         Assert.IsTrue(callbackCalled);
-        Assert.AreEqual(1, ui.PressPlayCalls);
+        Assert.AreEqual(0, ui.PressPlayCalls);
         Assert.AreEqual(1, ui.MoveToStartCalls);
-        Assert.IsTrue(ui.CallLog.IndexOf("press_play") < ui.CallLog.IndexOf("move_to_start"));
     }
 
     [TestMethod]
@@ -441,11 +441,12 @@ public class ExecutionLogicTests
     }
 
     [TestMethod]
-    public void MonitorSpeaking_MaxDuration_WithCompositeShortcut_PressesPlayThenMovesToStart()
+    public void MonitorSpeaking_MaxDuration_WithModifierShortcut_MovesToStartWithoutPrePlay()
     {
-        // 複合経路では停止してから先頭移動
+        // 修飾子ショートカットは先頭移動のみを実行
         AppConfig config = CreateMonitorConfig();
-        config.Ui.MoveToStartShortcut = "Ctrl+Up";
+        config.Ui.MoveToStartModifier = "ctrl";
+        config.Ui.MoveToStartKey = "cursor up";
         config.Audio.MaxSpeakingDurationSec = 1;
         FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
         FakeAudioSessionReader audio = new FakeAudioSessionReader();
@@ -463,9 +464,8 @@ public class ExecutionLogicTests
             null);
 
         Assert.AreEqual(SpeakMonitorKind.MaxDuration, result.Kind);
-        Assert.AreEqual(1, ui.PressPlayCalls);
+        Assert.AreEqual(0, ui.PressPlayCalls);
         Assert.AreEqual(1, ui.MoveToStartCalls);
-        Assert.IsTrue(ui.CallLog.IndexOf("press_play") < ui.CallLog.IndexOf("move_to_start"));
     }
 
     [TestMethod]

@@ -1,12 +1,12 @@
 # Dequeueから再生までのリトライ戦略
 
-この文書は、常駐ランタイムでジョブがdequeueされてから再生が確定するまでの挙動を、先頭移動キーが単体系と複合系の場合に分けて整理したものです。
+この文書は、常駐ランタイムでジョブがdequeueされてから再生が確定するまでの挙動を、先頭移動設定に依存する分岐を含めて整理したものです。
 
 ## 対象範囲
 
 - 対象は`VoicepeakEngine.WorkerLoop`→`ExecuteJob`の区間です。
 - 単発API`VoicepeakOneShot`ではなく、キュー処理時の戦略を扱います。
-- 参照設定は`AppConfig.Ui.MoveToStartShortcut`と`AppConfig.Audio.StartConfirmMaxRetries`です。
+- 参照設定は`AppConfig.Ui.MoveToStartModifier`と`AppConfig.Ui.MoveToStartKey`と`AppConfig.Audio.StartConfirmMaxRetries`です。
 
 ## 共通フロー
 

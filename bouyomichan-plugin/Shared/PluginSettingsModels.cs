@@ -151,7 +151,8 @@ public sealed class StartupConfigData
     // UI関連設定
 public sealed class UiConfigData
 {
-    public string MoveToStartShortcut { get; set; }
+    public string MoveToStartModifier { get; set; }
+    public string MoveToStartKey { get; set; }
     public string PlayShortcut { get; set; }
     public int DelayBeforePlayShortcutMs { get; set; }
     public bool ClickOnInputFailureRetryEnabled { get; set; }

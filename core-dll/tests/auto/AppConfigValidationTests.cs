@@ -29,7 +29,8 @@ public class AppConfigValidationTests
         Assert.AreEqual(500, config.Hook.HookCommandTimeoutMs);
         Assert.AreEqual(300, config.Hook.HookConnectTimeoutMs);
         Assert.AreEqual(8000, config.Hook.HookConnectTotalWaitMs);
-        Assert.AreEqual("Ctrl+Up", config.Ui.MoveToStartShortcut);
+        Assert.AreEqual("ctrl", config.Ui.MoveToStartModifier);
+        Assert.AreEqual("cursor up", config.Ui.MoveToStartKey);
         Assert.IsTrue(config.Startup.ClickAtValidationEnabled);
         Assert.IsFalse(config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled);
         Assert.IsFalse(config.Ui.ClickOnInputFailureRetryEnabled);
@@ -94,20 +95,34 @@ public class AppConfigValidationTests
     }
 
     [TestMethod]
-    public void Validate_BlankMoveToStartShortcut_Throws()
+    public void Validate_BlankMoveToStartKey_Throws()
     {
-        // 先頭移動設定の空白を拒否
+        // 先頭移動キー設定の空白を拒否
         InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
-            ValidateWith(config => config.Ui.MoveToStartShortcut = "   "));
+            ValidateWith(config => config.Ui.MoveToStartKey = "   "));
 
-        StringAssert.Contains(ex.Message, "ui.moveToStartShortcut");
+        StringAssert.Contains(ex.Message, "ui.moveToStartKey");
     }
 
     [TestMethod]
-    public void Validate_CtrlUpMoveToStartShortcut_IsAllowed()
+    public void Validate_MoveToStartModifierAndKey_IsAllowed()
     {
-        // Ctrl+Upを許可
-        ValidateWith(config => config.Ui.MoveToStartShortcut = "Ctrl+Up");
+        // ctrlとcursor upを許可
+        ValidateWith(config =>
+        {
+            config.Ui.MoveToStartModifier = "ctrl";
+            config.Ui.MoveToStartKey = "cursor up";
+        });
+    }
+
+    [TestMethod]
+    public void Validate_InvalidMoveToStartModifier_Throws()
+    {
+        // 修飾子は空文字とctrlとalt以外を拒否
+        InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
+            ValidateWith(config => config.Ui.MoveToStartModifier = "shift"));
+
+        StringAssert.Contains(ex.Message, "ui.moveToStartModifier");
     }
 
     [TestMethod]

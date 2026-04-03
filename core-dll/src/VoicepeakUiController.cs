@@ -76,7 +76,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             _hook.HookConnectTotalWaitMs);
         _modifierIsolationCoordinator = new ModifierIsolationCoordinator(modifierKeyHookController, _log);
         _sentenceBreakTriggerIndex = BuildSentenceBreakTriggerIndex(_text);
-        WarnIfMoveToStartShortcutWillUseSequentialFallback(_ui.MoveToStartShortcut);
     }
 
     // 対象プロセスとメインウィンドウを解決
@@ -160,68 +159,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     public bool ClearInput(Process process, IntPtr mainHwnd, int actionDelayMs, bool allowCompositePrimeBeforeTextFocusWhenUnprimed)
     {
         int clearInputMaxPasses = Math.Max(1, _inputTiming.ClearInputMaxPasses);
-        bool compositeMoveToStart = UsesSequentialMoveToStartFallback(_ui.MoveToStartShortcut);
-        if (compositeMoveToStart)
-        {
-            for (int pass = 0; pass < clearInputMaxPasses; pass++)
-            {
-                ClearInputState before = ReadClearInputState(mainHwnd);
-                if (IsClearCompleted(before.Read, before.VisibleBlockCount))
-                {
-                    return true;
-                }
-
-                int pairCount = Math.Max(1, before.VisibleBlockCount + 1);
-                int deleteSteps = ComputeCompositeDeleteSteps(before.Read, before.VisibleBlockCount);
-                if (!ExecuteWithModifierIsolation(mainHwnd, "composite_clear_cycle", action: () =>
-                {
-                    return RunCompositeClearCycleCore(mainHwnd, pairCount, deleteSteps, actionDelayMs);
-                }))
-                {
-                    return false;
-                }
-
-                ClearInputState after = ReadClearInputState(mainHwnd);
-                if (IsClearCompleted(after.Read, after.VisibleBlockCount))
-                {
-                    return true;
-                }
-            }
-
-            if (ShouldAttemptPrimeInputContext(process, mainHwnd, InputContextPrimeReason.InputFailureRetry))
-            {
-                TryPrimeInputContext(process, mainHwnd, InputContextPrimeReason.InputFailureRetry);
-                if (!PrepareForTextInput(process, mainHwnd, actionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed))
-                {
-                    return false;
-                }
-
-                ClearInputState beforeRetry = ReadClearInputState(mainHwnd);
-                if (IsClearCompleted(beforeRetry.Read, beforeRetry.VisibleBlockCount))
-                {
-                    return true;
-                }
-
-                int retryPairCount = Math.Max(1, beforeRetry.VisibleBlockCount + 1);
-                int retryDeleteSteps = ComputeCompositeDeleteSteps(beforeRetry.Read, beforeRetry.VisibleBlockCount);
-                if (!ExecuteWithModifierIsolation(mainHwnd, "composite_clear_cycle", action: () =>
-                {
-                    return RunCompositeClearCycleCore(mainHwnd, retryPairCount, retryDeleteSteps, actionDelayMs);
-                }))
-                {
-                    return false;
-                }
-
-                ClearInputState afterRetry = ReadClearInputState(mainHwnd);
-                if (IsClearCompleted(afterRetry.Read, afterRetry.VisibleBlockCount))
-                {
-                    return true;
-                }
-            }
-
-            return LogIncompleteClearInputAndReturnResult(ReadClearInputState(mainHwnd));
-        }
-
         for (int pass = 0; pass < clearInputMaxPasses; pass++)
         {
             ClearInputState before = ReadClearInputState(mainHwnd);
@@ -593,13 +530,49 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return ExecuteWithModifierIsolation(mainHwnd, "move_to_start", action: () =>
         {
             SleepActionDelay(actionDelayMs);
-            if (IsFunctionKeyMoveToStartShortcut(_ui.MoveToStartShortcut))
-            {
-                return SendShortcut(mainHwnd, _ui.MoveToStartShortcut);
-            }
-
-            return SendCompositeMoveToStart(mainHwnd, actionDelayMs);
+            return SendMoveToStartShortcut(mainHwnd);
         });
+    }
+
+    // 先頭移動ショートカットを送信
+    private bool SendMoveToStartShortcut(IntPtr mainHwnd)
+    {
+        if (!TryParseMoveToStartKey(_ui.MoveToStartKey, out VirtualKey key))
+        {
+            return false;
+        }
+
+        if (!TryParseMoveToStartModifier(_ui.MoveToStartModifier, out ModifierOverrideMode mode, out bool useModifier))
+        {
+            return false;
+        }
+
+        if (!useModifier)
+        {
+            return SendKey(mainHwnd, key);
+        }
+
+        if (!_modifierIsolationCoordinator.SetModifierOverride(mainHwnd, "move_to_start", mode))
+        {
+            return false;
+        }
+
+        bool sent = false;
+        bool resetOk = true;
+        try
+        {
+            sent = SendKey(mainHwnd, key);
+        }
+        finally
+        {
+            resetOk = _modifierIsolationCoordinator.SetModifierOverride(mainHwnd, "move_to_start", ModifierOverrideMode.Neutralize);
+            if (!resetOk)
+            {
+                _log.Warn("move_to_start_override_reset_failed");
+            }
+        }
+
+        return sent && resetOk;
     }
 
     public bool PressDelete(IntPtr mainHwnd)
@@ -653,19 +626,133 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return !spec.Control && !spec.Shift && !spec.Alt;
     }
 
-    internal static bool IsValidMoveToStartShortcut(string raw)
+    internal static bool IsValidMoveToStartModifier(string raw)
     {
-        return !string.IsNullOrWhiteSpace(raw);
+        return TryParseMoveToStartModifier(raw, out _, out _);
     }
 
-    internal static bool IsFunctionKeyMoveToStartShortcut(string raw)
+    internal static bool IsValidMoveToStartKey(string raw)
     {
-        return ShortcutSpec.TryParse(raw, out ShortcutSpec spec) && spec.IsFunctionKeyOnly;
+        return TryParseMoveToStartKey(raw, out _);
     }
 
-    private static bool UsesSequentialMoveToStartFallback(string raw)
+    internal static bool ShouldPressPlayBeforeMoveToStartDuringPlayback(UiConfig ui)
     {
-        return !IsFunctionKeyMoveToStartShortcut(raw);
+        UiConfig source = ui ?? new UiConfig();
+        return string.IsNullOrWhiteSpace(source.MoveToStartModifier)
+            && !IsFunctionKeyMoveToStartKey(source.MoveToStartKey);
+    }
+
+    // 先頭移動の修飾子設定を解析
+    private static bool TryParseMoveToStartModifier(string raw, out ModifierOverrideMode mode, out bool useModifier)
+    {
+        mode = ModifierOverrideMode.Neutralize;
+        useModifier = false;
+        if (raw == null)
+        {
+            return false;
+        }
+
+        string normalized = raw.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(normalized))
+        {
+            return true;
+        }
+
+        if (normalized == "ctrl")
+        {
+            mode = ModifierOverrideMode.Ctrl;
+            useModifier = true;
+            return true;
+        }
+
+        if (normalized == "alt")
+        {
+            mode = ModifierOverrideMode.Alt;
+            useModifier = true;
+            return true;
+        }
+
+        return false;
+    }
+
+    // 先頭移動キー設定を解析
+    private static bool TryParseMoveToStartKey(string raw, out VirtualKey key)
+    {
+        key = 0;
+        string normalized = NormalizeMoveToStartKey(raw);
+        if (string.IsNullOrEmpty(normalized))
+        {
+            return false;
+        }
+
+        switch (normalized)
+        {
+            case "space":
+                key = VirtualKey.Space;
+                return true;
+            case "home":
+                key = VirtualKey.Home;
+                return true;
+            case "end":
+                key = VirtualKey.End;
+                return true;
+            case "cursor up":
+                key = VirtualKey.Up;
+                return true;
+            case "cursor down":
+                key = VirtualKey.Down;
+                return true;
+            case "cursor left":
+                key = VirtualKey.Left;
+                return true;
+            case "cursor right":
+                key = VirtualKey.Right;
+                return true;
+        }
+
+        if (normalized.Length <= 3 && normalized.StartsWith("f", StringComparison.Ordinal))
+        {
+            if (int.TryParse(normalized.Substring(1), out int fn) && fn >= 1 && fn <= 12)
+            {
+                key = (VirtualKey)((int)VirtualKey.F1 + (fn - 1));
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // 先頭移動キー文字列を正規化
+    private static string NormalizeMoveToStartKey(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return string.Empty;
+        }
+
+        string[] parts = raw.Trim().ToLowerInvariant().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(" ", parts);
+    }
+
+    // 先頭移動が単独Fキーか判定
+    private static bool IsFunctionKeyMoveToStartKey(string raw)
+    {
+        return TryParseMoveToStartKey(raw, out VirtualKey key)
+            && key >= VirtualKey.F1
+            && key <= VirtualKey.F12;
+    }
+
+    // 旧来prime経路が必要か判定
+    private bool ShouldUseLegacyPrimeForMoveToStart()
+    {
+        return string.IsNullOrWhiteSpace(_ui.MoveToStartModifier)
+            && !IsFunctionKeyMoveToStartKey(_ui.MoveToStartKey);
     }
 
     public ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd)
@@ -745,7 +832,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
     private bool FocusInputForKeyboardIfNeeded(IntPtr mainHwnd, int actionDelayMs)
     {
-        if (!UsesSequentialMoveToStartFallback(_ui.MoveToStartShortcut))
+        if (!ShouldUseLegacyPrimeForMoveToStart())
         {
             return true;
         }
@@ -827,7 +914,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
     public bool ShouldAttemptPrimeInputContext(Process process, IntPtr mainHwnd, InputContextPrimeReason reason)
     {
-        if (!UsesSequentialMoveToStartFallback(_ui.MoveToStartShortcut))
+        if (!ShouldUseLegacyPrimeForMoveToStart())
         {
             return false;
         }
@@ -970,21 +1057,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
         int pairCount = Math.Max(1, _lastInjectedEnterCount + 1);
         return SendCompositePageUpUpPairs(hwnd, pairCount);
-    }
-
-    private void WarnIfMoveToStartShortcutWillUseSequentialFallback(string shortcut)
-    {
-        if (IsFunctionKeyMoveToStartShortcut(shortcut))
-        {
-            return;
-        }
-
-        if (ShortcutSpec.TryParse(shortcut, out _) || ShortcutSpec.TryParseCompositeMoveToStart(shortcut, out _))
-        {
-            return;
-        }
-
-        _log.Warn($"move_to_start_shortcut_unrecognized_fallback_to_pageup value={SanitizeForLog(shortcut)}");
     }
 
     private bool SendCompositePageUpUpPairs(IntPtr mainHwnd, int pairCount)
@@ -1439,6 +1511,9 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         Home = 0x24,
         End = 0x23,
         Up = 0x26,
+        Down = 0x28,
+        Left = 0x25,
+        Right = 0x27,
         Control = 0x11,
         Shift = 0x10,
         Menu = 0x12

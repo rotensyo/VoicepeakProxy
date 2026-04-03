@@ -38,7 +38,8 @@ public sealed class HookConfig
 // UI操作関連設定
 public sealed class UiConfig
 {
-    public string MoveToStartShortcut { get; set; } = "Ctrl+Up";
+    public string MoveToStartModifier { get; set; } = "ctrl";
+    public string MoveToStartKey { get; set; } = "cursor up";
     public string PlayShortcut { get; set; } = "Space";
     public int DelayBeforePlayShortcutMs { get; set; } = 60;
     public bool ClickOnInputFailureRetryEnabled { get; set; } = false;
@@ -128,9 +129,14 @@ internal static class AppConfigValidator
 
         EnsureNonNegative(config.Ui.DelayBeforePlayShortcutMs, "ui.delayBeforePlayShortcutMs は 0 以上で指定してください");
 
-        if (!VoicepeakUiController.IsValidMoveToStartShortcut(config.Ui.MoveToStartShortcut))
+        if (!VoicepeakUiController.IsValidMoveToStartModifier(config.Ui.MoveToStartModifier))
         {
-            throw new InvalidOperationException("ui.moveToStartShortcut は null/空文字/空白にできません");
+            throw new InvalidOperationException("ui.moveToStartModifier は空文字/ctrl/alt のいずれかを指定してください");
+        }
+
+        if (!VoicepeakUiController.IsValidMoveToStartKey(config.Ui.MoveToStartKey))
+        {
+            throw new InvalidOperationException("ui.moveToStartKey は有効なキーを指定してください（例: cursor up, F3, home）");
         }
 
         if (!VoicepeakUiController.IsValidPlayShortcut(config.Ui.PlayShortcut))

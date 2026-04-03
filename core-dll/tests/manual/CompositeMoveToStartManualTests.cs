@@ -133,7 +133,8 @@ public class CompositeMoveToStartManualTests
     {
         // 手動確認向け設定
         AppConfig config = new AppConfig();
-        config.Ui.MoveToStartShortcut = "Ctrl+Up";
+        config.Ui.MoveToStartModifier = "ctrl";
+        config.Ui.MoveToStartKey = "cursor up";
         config.Startup.ClickAtValidationEnabled = true;
         config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled = true;
         config.Ui.ClickOnInputFailureRetryEnabled = true;

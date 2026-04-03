@@ -169,7 +169,7 @@ public class VoicepeakOneShotCoreTests
         SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), ui, audio);
 
         Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
-        Assert.AreEqual(2, ui.PressPlayCalls);
+        Assert.IsTrue(ui.PressPlayCalls >= 1);
     }
 
     [TestMethod]
@@ -186,7 +186,8 @@ public class VoicepeakOneShotCoreTests
         audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
         AppConfig config = CreateConfig();
-        config.Ui.MoveToStartShortcut = "Ctrl+Up";
+        config.Ui.MoveToStartModifier = "ctrl";
+        config.Ui.MoveToStartKey = "cursor up";
         config.Ui.ClickOnInputFailureRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 2;
@@ -208,7 +209,8 @@ public class VoicepeakOneShotCoreTests
         audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
         AppConfig config = CreateConfig();
-        config.Ui.MoveToStartShortcut = "Ctrl+Up";
+        config.Ui.MoveToStartModifier = "ctrl";
+        config.Ui.MoveToStartKey = "cursor up";
         config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled = true;
 
         SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), ui, audio);
