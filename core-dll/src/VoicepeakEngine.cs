@@ -50,7 +50,7 @@ internal sealed class VoicepeakEngine : IDisposable
         _config = config;
         _appCts = appCts;
         _log = log;
-        _ui = ui ?? new VoicepeakUiController(config.Ui, config.InputTiming, config.Startup, config.Hook, config.Text, config.Debug, _log);
+        _ui = ui ?? new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, _log);
         _audio = audio ?? new AudioSessionReader(_log);
         _worker = null;
         if (startWorker)
@@ -87,11 +87,6 @@ internal sealed class VoicepeakEngine : IDisposable
             LogTargetResolveFailure();
             _shutdownRequested = true;
             return mode == BootValidationMode.Optional;
-        }
-
-        if (_ui.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.Validation))
-        {
-            _ui.TryPrimeInputContext(process, hwnd, InputContextPrimeReason.Validation);
         }
 
         BootValidationRunResult result = JobExecutionCore.RunBootValidationFlow(
@@ -279,13 +274,13 @@ internal sealed class VoicepeakEngine : IDisposable
             }
 
             long segmentStartAt = MonoClock.NowMs();
-            bool prepared = JobExecutionCore.PrepareSegment(_config, _ui, process, hwnd, seg.Text, _log, true);
+            bool prepared = JobExecutionCore.PrepareSegment(_config, _ui, process, hwnd, seg.Text, _log);
             long readyAt = MonoClock.NowMs();
 
             if (!prepared)
             {
                 DropJob(job, "prepare_failed");
-                JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: false);
+                JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, killFocusAfterClear: false);
                 return;
             }
 
@@ -377,14 +372,14 @@ internal sealed class VoicepeakEngine : IDisposable
             if (loopResult.Kind == StartConfirmLoopKind.MoveToStartFailed)
             {
                 DropJob(job, "move_to_start_failed");
-                JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: false);
+                JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, killFocusAfterClear: false);
                 return;
             }
 
             if (loopResult.Kind == StartConfirmLoopKind.PlayFailed)
             {
                 DropJob(job, "play_failed");
-                JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: false);
+                JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, killFocusAfterClear: false);
                 return;
             }
 
@@ -392,7 +387,7 @@ internal sealed class VoicepeakEngine : IDisposable
             {
                 _log.Error("monitor_timeout reason=start_confirm");
                 DropJob(job, "start_confirm_failed");
-                JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: false);
+                JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, killFocusAfterClear: false);
                 return;
             }
 
@@ -400,7 +395,7 @@ internal sealed class VoicepeakEngine : IDisposable
             {
                 _log.Error("monitor_timeout reason=max_duration");
                 DropJob(job, "max_speaking_duration");
-                JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: false);
+                JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, killFocusAfterClear: false);
                 return;
             }
 
@@ -409,7 +404,7 @@ internal sealed class VoicepeakEngine : IDisposable
             return;
             }
 
-            JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, true, killFocusAfterClear: true);
+            JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, killFocusAfterClear: true);
         }
         finally
         {

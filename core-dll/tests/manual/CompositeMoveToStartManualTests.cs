@@ -55,7 +55,7 @@ public class CompositeMoveToStartManualTests
 
     [TestMethod]
     [TestCategory("Manual")]
-    public void CtrlUpMoveToStart_ClearInput_UsesPageUpUpAndDeleteLoop()
+    public void CtrlUpMoveToStart_ClearInput_UsesSelectAllAndDeleteLoop()
     {
         // UI安定化待機
         PauseForUiStabilization();
@@ -74,7 +74,7 @@ public class CompositeMoveToStartManualTests
             new ConsoleAppLogger());
 
         MessageBox.Show(
-            "削除処理でPageUpとUpの逐次入力後にDelete連打が実行され、旧文字列が消えていることを確認してください。",
+            "削除処理で全選択ショートカット送信後にDelete2回が繰り返し実行され、旧文字列が消えていることを確認してください。",
             "VoicepeakProxyCore Manual Test",
             MessageBoxButtons.OK,
             MessageBoxIcon.Information);
@@ -133,10 +133,8 @@ public class CompositeMoveToStartManualTests
     {
         // 手動確認向け設定
         AppConfig config = new AppConfig();
-        config.Ui.MoveToStartShortcut = "Ctrl+Up";
-        config.Startup.ClickAtValidationEnabled = true;
-        config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled = true;
-        config.Ui.ClickOnInputFailureRetryEnabled = true;
+        config.Ui.MoveToStartModifier = "ctrl";
+        config.Ui.MoveToStartKey = "cursor up";
         config.Audio.StartConfirmTimeoutMs = 2000;
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 300;

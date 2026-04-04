@@ -25,6 +25,118 @@ public class ModifierKeyHookControllerTests
         Assert.AreEqual(1, platform.ConnectCalls);
     }
 
+    [TestMethod]
+    public void SetModifierOverride_WhenConnected_SendsOverrideCommand()
+    {
+        string lastCommand = null;
+        FakeModifierHookConnection connection = new FakeModifierHookConnection
+        {
+            SendHandler = (string command, int timeoutMs, out string response) =>
+            {
+                lastCommand = command;
+                response = command == "PING" ? "PONG" : "OK";
+                return true;
+            }
+        };
+        FakeModifierHookPlatform platform = new FakeModifierHookPlatform
+        {
+            ConnectResults = new Queue<bool>(new[] { true }),
+            ConnectionToReturn = connection
+        };
+        ModifierKeyHookController controller = new ModifierKeyHookController(100, 100, 500, platform);
+        AppLogger log = new AppLogger(new TestLogger());
+
+        Assert.IsTrue(controller.EnsureInjected(123, log));
+        bool ok = controller.SetModifierOverride(ModifierOverrideMode.Ctrl, log);
+
+        Assert.IsTrue(ok);
+        Assert.AreEqual("OVERRIDE|CTRL", lastCommand);
+    }
+
+    [TestMethod]
+    public void SetModifierOverride_WhenAlt_SendsAltCommand()
+    {
+        string lastCommand = null;
+        FakeModifierHookConnection connection = new FakeModifierHookConnection
+        {
+            SendHandler = (string command, int timeoutMs, out string response) =>
+            {
+                lastCommand = command;
+                response = command == "PING" ? "PONG" : "OK";
+                return true;
+            }
+        };
+        FakeModifierHookPlatform platform = new FakeModifierHookPlatform
+        {
+            ConnectResults = new Queue<bool>(new[] { true }),
+            ConnectionToReturn = connection
+        };
+        ModifierKeyHookController controller = new ModifierKeyHookController(100, 100, 500, platform);
+        AppLogger log = new AppLogger(new TestLogger());
+
+        Assert.IsTrue(controller.EnsureInjected(123, log));
+        bool ok = controller.SetModifierOverride(ModifierOverrideMode.Alt, log);
+
+        Assert.IsTrue(ok);
+        Assert.AreEqual("OVERRIDE|ALT", lastCommand);
+    }
+
+    [TestMethod]
+    public void SetModifierOverride_WhenShift_SendsShiftCommand()
+    {
+        string lastCommand = null;
+        FakeModifierHookConnection connection = new FakeModifierHookConnection
+        {
+            SendHandler = (string command, int timeoutMs, out string response) =>
+            {
+                lastCommand = command;
+                response = command == "PING" ? "PONG" : "OK";
+                return true;
+            }
+        };
+        FakeModifierHookPlatform platform = new FakeModifierHookPlatform
+        {
+            ConnectResults = new Queue<bool>(new[] { true }),
+            ConnectionToReturn = connection
+        };
+        ModifierKeyHookController controller = new ModifierKeyHookController(100, 100, 500, platform);
+        AppLogger log = new AppLogger(new TestLogger());
+
+        Assert.IsTrue(controller.EnsureInjected(123, log));
+        bool ok = controller.SetModifierOverride(ModifierOverrideMode.Shift, log);
+
+        Assert.IsTrue(ok);
+        Assert.AreEqual("OVERRIDE|SHIFT", lastCommand);
+    }
+
+    [TestMethod]
+    public void SetModifierOverride_WhenFailed_ThenRetryReconnects()
+    {
+        int sendAttempt = 0;
+        FakeModifierHookPlatform platform = new FakeModifierHookPlatform
+        {
+            ConnectResults = new Queue<bool>(new[] { true, true }),
+            CreateConnection = () => new FakeModifierHookConnection
+            {
+                SendHandler = (string command, int timeoutMs, out string response) =>
+                {
+                    sendAttempt++;
+                    response = sendAttempt == 1 ? string.Empty : "OK";
+                    return sendAttempt > 1;
+                }
+            }
+        };
+        ModifierKeyHookController controller = new ModifierKeyHookController(100, 100, 500, platform);
+        AppLogger log = new AppLogger(new TestLogger());
+
+        Assert.IsTrue(controller.EnsureInjected(123, log));
+        bool ok = controller.SetModifierOverride(ModifierOverrideMode.Ctrl, log);
+
+        Assert.IsTrue(ok);
+        Assert.AreEqual(2, sendAttempt);
+        Assert.AreEqual(2, platform.ConnectCalls);
+    }
+
     [DataTestMethod]
     [DataRow(true)]
     [DataRow(false)]

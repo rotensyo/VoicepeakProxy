@@ -1,12 +1,12 @@
 # Dequeueから再生までのリトライ戦略
 
-この文書は、常駐ランタイムでジョブがdequeueされてから再生が確定するまでの挙動を、先頭移動キーが単体系と複合系の場合に分けて整理したものです。
+この文書は、常駐ランタイムでジョブがdequeueされてから再生が確定するまでの挙動を、先頭移動設定に依存する分岐を含めて整理したものです。
 
 ## 対象範囲
 
 - 対象は`VoicepeakEngine.WorkerLoop`→`ExecuteJob`の区間です。
 - 単発API`VoicepeakOneShot`ではなく、キュー処理時の戦略を扱います。
-- 参照設定は`AppConfig.Ui.MoveToStartShortcut`と`AppConfig.Audio.StartConfirmMaxRetries`です。
+- 参照設定は`AppConfig.Ui.MoveToStartModifier`と`AppConfig.Ui.MoveToStartKey`と`AppConfig.Audio.StartConfirmMaxRetries`です。
 
 ## 共通フロー
 
@@ -51,21 +51,8 @@
 ### 単体系(F1-F12)
 
 - `MoveToStart`は通常ショートカット送信(`SendShortcut`)を使います。
-- `PrepareForTextInput`と`PrepareForPlayback`は、追加のprime処理を行いません。
+- `PrepareForTextInput`と`PrepareForPlayback`は、追加前処理を行いません。
 - start-confirmの再試行時は、毎回通常ショートカットで先頭移動をやり直します。
-
-### 複合系(Ctrl+Up)
-
-- `MoveToStart`は複合専用経路(`SendCompositeMoveToStart`)を使います。
-- クリック注入は明示設定された契機でのみ行います。
-  - `ClickAtValidationEnabled`
-  - `ClickBeforeTextFocusWhenUninitializedEnabled`
-  - `ClickOnInputFailureRetryEnabled`
-- `PrepareForTextInput`では、未primeかつ設定有効時だけ文字入力欄フォーカス直前でprimeを試みます。
-- `PrepareForPlayback`では通常primeせず、キーボードフォーカス再付与とCtrl+Up送信だけを行います。
-- prime状態はプロセスIDとメインHWNDの組で保持します。
-- start-confirmの再試行時も`PrepareForPlayback`は毎回呼ばれます。
-- フォーカス再付与とCtrl+Up送信は毎回実施されます。
 
 ## 実装上の要点
 

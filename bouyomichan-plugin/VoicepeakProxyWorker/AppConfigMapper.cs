@@ -16,12 +16,11 @@ internal static class AppConfigMapper
         AppConfig config = new AppConfig();
         // core既定値を欠損補完に利用
         HookConfig defaults = new AppConfig().Hook;
+        UiConfig uiDefaults = new AppConfig().Ui;
 
         config.Startup.BootValidationText = data.Startup.BootValidationText ?? string.Empty;
         config.Startup.BootValidationMaxRetries = data.Startup.BootValidationMaxRetries;
         config.Startup.BootValidationRetryIntervalMs = data.Startup.BootValidationRetryIntervalMs;
-        config.Startup.ClickAtValidationEnabled = data.Startup.ClickAtValidationEnabled;
-        config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled = data.Startup.ClickBeforeTextFocusWhenUninitializedEnabled;
 
         config.Hook.HookCommandTimeoutMs = data.Hook.HookCommandTimeoutMs > 0
             ? data.Hook.HookCommandTimeoutMs
@@ -33,15 +32,17 @@ internal static class AppConfigMapper
             ? data.Hook.HookConnectTotalWaitMs
             : defaults.HookConnectTotalWaitMs;
 
-        config.Ui.MoveToStartShortcut = data.Ui.MoveToStartShortcut ?? string.Empty;
-        config.Ui.PlayShortcut = data.Ui.PlayShortcut ?? string.Empty;
+        config.Ui.MoveToStartModifier = data.Ui.MoveToStartModifier ?? uiDefaults.MoveToStartModifier;
+        config.Ui.MoveToStartKey = data.Ui.MoveToStartKey ?? uiDefaults.MoveToStartKey;
+        config.Ui.ClearInputSelectAllModifier = data.Ui.ClearInputSelectAllModifier ?? uiDefaults.ClearInputSelectAllModifier;
+        config.Ui.ClearInputSelectAllKey = data.Ui.ClearInputSelectAllKey ?? uiDefaults.ClearInputSelectAllKey;
+        config.Ui.PlayShortcutModifier = data.Ui.PlayShortcutModifier ?? uiDefaults.PlayShortcutModifier;
+        config.Ui.PlayShortcutKey = data.Ui.PlayShortcutKey ?? uiDefaults.PlayShortcutKey;
         config.Ui.DelayBeforePlayShortcutMs = data.Ui.DelayBeforePlayShortcutMs;
-        config.Ui.ClickOnInputFailureRetryEnabled = data.Ui.ClickOnInputFailureRetryEnabled;
 
         config.InputTiming.CharDelayBaseMs = data.InputTiming.CharDelayBaseMs;
         config.InputTiming.DeleteKeyDelayBaseMs = data.InputTiming.DeleteKeyDelayBaseMs;
         config.InputTiming.ActionDelayMs = data.InputTiming.ActionDelayMs;
-        config.InputTiming.SequentialMoveToStartKeyDelayBaseMs = data.InputTiming.SequentialMoveToStartKeyDelayBaseMs;
         config.InputTiming.PostTypeWaitPerCharMs = data.InputTiming.PostTypeWaitPerCharMs;
         config.InputTiming.PostTypeWaitMinMs = data.InputTiming.PostTypeWaitMinMs;
         config.InputTiming.ClearInputMaxPasses = data.InputTiming.ClearInputMaxPasses;
@@ -90,22 +91,22 @@ internal static class AppConfigMapper
         data.Startup.BootValidationText = config.Startup.BootValidationText ?? string.Empty;
         data.Startup.BootValidationMaxRetries = config.Startup.BootValidationMaxRetries;
         data.Startup.BootValidationRetryIntervalMs = config.Startup.BootValidationRetryIntervalMs;
-        data.Startup.ClickAtValidationEnabled = config.Startup.ClickAtValidationEnabled;
-        data.Startup.ClickBeforeTextFocusWhenUninitializedEnabled = config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled;
 
         data.Hook.HookCommandTimeoutMs = config.Hook.HookCommandTimeoutMs;
         data.Hook.HookConnectTimeoutMs = config.Hook.HookConnectTimeoutMs;
         data.Hook.HookConnectTotalWaitMs = config.Hook.HookConnectTotalWaitMs;
 
-        data.Ui.MoveToStartShortcut = config.Ui.MoveToStartShortcut ?? string.Empty;
-        data.Ui.PlayShortcut = config.Ui.PlayShortcut ?? string.Empty;
+        data.Ui.MoveToStartModifier = config.Ui.MoveToStartModifier ?? string.Empty;
+        data.Ui.MoveToStartKey = config.Ui.MoveToStartKey ?? string.Empty;
+        data.Ui.ClearInputSelectAllModifier = config.Ui.ClearInputSelectAllModifier ?? string.Empty;
+        data.Ui.ClearInputSelectAllKey = config.Ui.ClearInputSelectAllKey ?? string.Empty;
+        data.Ui.PlayShortcutModifier = config.Ui.PlayShortcutModifier ?? string.Empty;
+        data.Ui.PlayShortcutKey = config.Ui.PlayShortcutKey ?? string.Empty;
         data.Ui.DelayBeforePlayShortcutMs = config.Ui.DelayBeforePlayShortcutMs;
-        data.Ui.ClickOnInputFailureRetryEnabled = config.Ui.ClickOnInputFailureRetryEnabled;
 
         data.InputTiming.CharDelayBaseMs = config.InputTiming.CharDelayBaseMs;
         data.InputTiming.DeleteKeyDelayBaseMs = config.InputTiming.DeleteKeyDelayBaseMs;
         data.InputTiming.ActionDelayMs = config.InputTiming.ActionDelayMs;
-        data.InputTiming.SequentialMoveToStartKeyDelayBaseMs = config.InputTiming.SequentialMoveToStartKeyDelayBaseMs;
         data.InputTiming.PostTypeWaitPerCharMs = config.InputTiming.PostTypeWaitPerCharMs;
         data.InputTiming.PostTypeWaitMinMs = config.InputTiming.PostTypeWaitMinMs;
         data.InputTiming.ClearInputMaxPasses = config.InputTiming.ClearInputMaxPasses;

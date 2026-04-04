@@ -29,6 +29,14 @@ public enum ModifierHookApi
     GetKeyboardState
 }
 
+internal enum ModifierOverrideMode
+{
+    Neutralize,
+    Ctrl,
+    Alt,
+    Shift
+}
+
 // 修飾キー中立化フックの制御
 internal sealed class ModifierKeyHookController
 {
@@ -143,6 +151,75 @@ internal sealed class ModifierKeyHookController
 
         log.Info($"modifier_hook_state enabled={enabled}");
         return true;
+    }
+
+    // OVERRIDEコマンドを1回送信
+    private bool TrySetModifierOverrideOnce(ModifierOverrideMode mode, AppLogger log)
+    {
+        string token;
+        switch (mode)
+        {
+            case ModifierOverrideMode.Ctrl:
+                token = "CTRL";
+                break;
+            case ModifierOverrideMode.Alt:
+                token = "ALT";
+                break;
+            case ModifierOverrideMode.Shift:
+                token = "SHIFT";
+                break;
+            default:
+                token = "NONE";
+                break;
+        }
+
+        if (!SendCommand($"OVERRIDE|{token}", out string response))
+        {
+            log.Warn($"modifier_hook_override_failed mode={mode} reason=pipe_send_failed");
+            return false;
+        }
+
+        if (!string.Equals(response, "OK", StringComparison.Ordinal))
+        {
+            log.Warn($"modifier_hook_override_failed mode={mode} reason={Sanitize(response)}");
+            return false;
+        }
+
+        log.Info($"modifier_hook_override mode={mode}");
+        return true;
+    }
+
+    // 修飾キー上書きモードを設定
+    public bool SetModifierOverride(ModifierOverrideMode mode, AppLogger log)
+    {
+        lock (_gate)
+        {
+            int targetPid = _pid;
+            if (TrySetModifierOverrideOnce(mode, log))
+            {
+                return true;
+            }
+
+            if (targetPid <= 0)
+            {
+                return false;
+            }
+
+            DisposeConnection(resetPid: false);
+            if (!TryConnectExisting(targetPid, log, _hookConnectTimeoutMs))
+            {
+                log.Warn($"modifier_hook_override_retry_failed mode={mode} reason=reconnect_failed");
+                return false;
+            }
+
+            if (!TrySetModifierOverrideOnce(mode, log))
+            {
+                log.Warn($"modifier_hook_override_retry_failed mode={mode} reason=retry_send_failed");
+                return false;
+            }
+
+            return true;
+        }
     }
 
     // 統計プローブを開始
@@ -484,7 +561,9 @@ internal sealed class NamedPipeModifierHookConnection : IModifierHookConnection
 internal sealed class ModifierHookRuntimeState
 {
     private volatile bool _enabled;
+    private volatile bool _beepSuppressed;
     private volatile bool _statsEnabled;
+    private volatile ModifierOverrideMode _overrideMode = ModifierOverrideMode.Neutralize;
     private readonly object _statsGate = new object();
     private long _getKeyStateCalls;
     private long _getAsyncKeyStateCalls;
@@ -503,6 +582,29 @@ internal sealed class ModifierHookRuntimeState
     public void SetEnabled(bool enabled)
     {
         _enabled = enabled;
+        _beepSuppressed = enabled;
+        if (!enabled)
+        {
+            _overrideMode = ModifierOverrideMode.Neutralize;
+        }
+    }
+
+    // 修飾キー上書きモードを設定
+    public void SetModifierOverrideMode(ModifierOverrideMode mode)
+    {
+        _overrideMode = mode;
+    }
+
+    // 修飾キー上書きモードを取得
+    public ModifierOverrideMode GetModifierOverrideMode()
+    {
+        return _overrideMode;
+    }
+
+    // 警告音抑止状態を取得
+    public bool IsBeepSuppressed()
+    {
+        return _beepSuppressed;
     }
 
     // 統計収集状態を設定
@@ -698,6 +800,37 @@ internal sealed class ModifierHookPipeServer
             case "ENABLE":
                 _state.SetEnabled(parts.Length >= 2 && parts[1] == "1");
                 return "OK";
+            case "OVERRIDE":
+                if (parts.Length < 2)
+                {
+                    return "ERR|override_missing_mode";
+                }
+
+                if (string.Equals(parts[1], "CTRL", StringComparison.OrdinalIgnoreCase))
+                {
+                    _state.SetModifierOverrideMode(ModifierOverrideMode.Ctrl);
+                    return "OK";
+                }
+
+                if (string.Equals(parts[1], "ALT", StringComparison.OrdinalIgnoreCase))
+                {
+                    _state.SetModifierOverrideMode(ModifierOverrideMode.Alt);
+                    return "OK";
+                }
+
+                if (string.Equals(parts[1], "SHIFT", StringComparison.OrdinalIgnoreCase))
+                {
+                    _state.SetModifierOverrideMode(ModifierOverrideMode.Shift);
+                    return "OK";
+                }
+
+                if (string.Equals(parts[1], "NONE", StringComparison.OrdinalIgnoreCase))
+                {
+                    _state.SetModifierOverrideMode(ModifierOverrideMode.Neutralize);
+                    return "OK";
+                }
+
+                return "ERR|override_invalid_mode";
             case "STATS_ENABLE":
                 _state.SetStatsEnabled(parts.Length >= 2 && parts[1] == "1");
                 return "OK";
@@ -744,6 +877,12 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
     [UnmanagedFunctionPointer(CallingConvention.StdCall, SetLastError = true)]
     private delegate bool GetKeyboardStateDelegate(IntPtr lpKeyState);
 
+    [UnmanagedFunctionPointer(CallingConvention.StdCall, SetLastError = true)]
+    private delegate bool MessageBeepDelegate(uint uType);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall, SetLastError = true)]
+    private delegate bool BeepDelegate(uint dwFreq, uint dwDuration);
+
     [DllImport("kernel32.dll")]
     private static extern int GetCurrentThreadId();
 
@@ -752,9 +891,13 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
     private readonly GetKeyStateDelegate _getKeyStateOriginal;
     private readonly GetAsyncKeyStateDelegate _getAsyncKeyStateOriginal;
     private readonly GetKeyboardStateDelegate _getKeyboardStateOriginal;
+    private readonly MessageBeepDelegate _messageBeepOriginal;
+    private readonly BeepDelegate _beepOriginal;
     private readonly LocalHook _getKeyStateHook;
     private readonly LocalHook _getAsyncKeyStateHook;
     private readonly LocalHook _getKeyboardStateHook;
+    private readonly LocalHook _messageBeepHook;
+    private readonly LocalHook _beepHook;
 
     // 注入先でフックを初期化
     public ModifierKeyHookEntryPoint(RemoteHooking.IContext context, string pipeName)
@@ -764,20 +907,28 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
         IntPtr getKeyStateAddress = LocalHook.GetProcAddress("user32.dll", "GetKeyState");
         IntPtr getAsyncKeyStateAddress = LocalHook.GetProcAddress("user32.dll", "GetAsyncKeyState");
         IntPtr getKeyboardStateAddress = LocalHook.GetProcAddress("user32.dll", "GetKeyboardState");
+        IntPtr messageBeepAddress = LocalHook.GetProcAddress("user32.dll", "MessageBeep");
+        IntPtr beepAddress = LocalHook.GetProcAddress("kernel32.dll", "Beep");
 
         _getKeyStateOriginal = Marshal.GetDelegateForFunctionPointer<GetKeyStateDelegate>(getKeyStateAddress);
         _getAsyncKeyStateOriginal = Marshal.GetDelegateForFunctionPointer<GetAsyncKeyStateDelegate>(getAsyncKeyStateAddress);
         _getKeyboardStateOriginal = Marshal.GetDelegateForFunctionPointer<GetKeyboardStateDelegate>(getKeyboardStateAddress);
+        _messageBeepOriginal = Marshal.GetDelegateForFunctionPointer<MessageBeepDelegate>(messageBeepAddress);
+        _beepOriginal = Marshal.GetDelegateForFunctionPointer<BeepDelegate>(beepAddress);
 
         _getKeyStateHook = LocalHook.Create(getKeyStateAddress, new GetKeyStateDelegate(GetKeyStateHooked), this);
         _getAsyncKeyStateHook = LocalHook.Create(getAsyncKeyStateAddress, new GetAsyncKeyStateDelegate(GetAsyncKeyStateHooked), this);
         _getKeyboardStateHook = LocalHook.Create(getKeyboardStateAddress, new GetKeyboardStateDelegate(GetKeyboardStateHooked), this);
+        _messageBeepHook = LocalHook.Create(messageBeepAddress, new MessageBeepDelegate(MessageBeepHooked), this);
+        _beepHook = LocalHook.Create(beepAddress, new BeepDelegate(BeepHooked), this);
 
         // 全スレッドへ適用
         // 注入初期化スレッドのみ除外
         _getKeyStateHook.ThreadACL.SetExclusiveACL(new[] { 0 });
         _getAsyncKeyStateHook.ThreadACL.SetExclusiveACL(new[] { 0 });
         _getKeyboardStateHook.ThreadACL.SetExclusiveACL(new[] { 0 });
+        _messageBeepHook.ThreadACL.SetExclusiveACL(new[] { 0 });
+        _beepHook.ThreadACL.SetExclusiveACL(new[] { 0 });
     }
 
     // 注入先で制御ループを開始
@@ -802,8 +953,16 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
     {
         try
         {
-            bool neutralized = ShouldNeutralize(vKey);
+            bool forcedCtrl = ShouldForceCtrl(vKey);
+            bool forcedAlt = ShouldForceAlt(vKey);
+            bool forcedShift = ShouldForceShift(vKey);
+            bool neutralized = !forcedCtrl && !forcedAlt && !forcedShift && ShouldNeutralize(vKey);
             _state.RecordCall(ModifierHookApi.GetKeyState, vKey, GetCurrentThreadId(), neutralized);
+            if (forcedCtrl || forcedAlt || forcedShift)
+            {
+                return unchecked((short)0x8000);
+            }
+
             if (neutralized)
             {
                 return 0;
@@ -822,8 +981,16 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
     {
         try
         {
-            bool neutralized = ShouldNeutralize(vKey);
+            bool forcedCtrl = ShouldForceCtrl(vKey);
+            bool forcedAlt = ShouldForceAlt(vKey);
+            bool forcedShift = ShouldForceShift(vKey);
+            bool neutralized = !forcedCtrl && !forcedAlt && !forcedShift && ShouldNeutralize(vKey);
             _state.RecordCall(ModifierHookApi.GetAsyncKeyState, vKey, GetCurrentThreadId(), neutralized);
+            if (forcedCtrl || forcedAlt || forcedShift)
+            {
+                return unchecked((short)0x8000);
+            }
+
             if (neutralized)
             {
                 return 0;
@@ -846,7 +1013,7 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
             bool neutralized = false;
             if (ok && _state.IsEnabled() && lpKeyState != IntPtr.Zero)
             {
-                NeutralizeKeyboardState(lpKeyState);
+                ApplyKeyboardStateOverride(lpKeyState);
                 neutralized = true;
             }
 
@@ -856,6 +1023,42 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
         catch
         {
             return _getKeyboardStateOriginal(lpKeyState);
+        }
+    }
+
+    // MessageBeep呼び出しをフック
+    private bool MessageBeepHooked(uint uType)
+    {
+        try
+        {
+            if (_state.IsEnabled() && _state.IsBeepSuppressed())
+            {
+                return true;
+            }
+
+            return _messageBeepOriginal(uType);
+        }
+        catch
+        {
+            return _messageBeepOriginal(uType);
+        }
+    }
+
+    // Beep呼び出しをフック
+    private bool BeepHooked(uint dwFreq, uint dwDuration)
+    {
+        try
+        {
+            if (_state.IsEnabled() && _state.IsBeepSuppressed())
+            {
+                return true;
+            }
+
+            return _beepOriginal(dwFreq, dwDuration);
+        }
+        catch
+        {
+            return _beepOriginal(dwFreq, dwDuration);
         }
     }
 
@@ -878,16 +1081,108 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
                || vKey == VkRMenu;
     }
 
-    // キーボード状態配列の修飾キーを無効化
-    private static void NeutralizeKeyboardState(IntPtr lpKeyState)
+    // Ctrl上書き対象か判定
+    private bool ShouldForceCtrl(int vKey)
+    {
+        if (!_state.IsEnabled())
+        {
+            return false;
+        }
+
+        if (_state.GetModifierOverrideMode() != ModifierOverrideMode.Ctrl)
+        {
+            return false;
+        }
+
+        return vKey == VkControl || vKey == VkLControl || vKey == VkRControl;
+    }
+
+    // Alt上書き対象か判定
+    private bool ShouldForceAlt(int vKey)
+    {
+        if (!_state.IsEnabled())
+        {
+            return false;
+        }
+
+        if (_state.GetModifierOverrideMode() != ModifierOverrideMode.Alt)
+        {
+            return false;
+        }
+
+        return vKey == VkMenu || vKey == VkLMenu || vKey == VkRMenu;
+    }
+
+    // Shift上書き対象か判定
+    private bool ShouldForceShift(int vKey)
+    {
+        if (!_state.IsEnabled())
+        {
+            return false;
+        }
+
+        if (_state.GetModifierOverrideMode() != ModifierOverrideMode.Shift)
+        {
+            return false;
+        }
+
+        return vKey == VkShift || vKey == VkLShift || vKey == VkRShift;
+    }
+
+    // キーボード状態配列へ上書きを適用
+    private void ApplyKeyboardStateOverride(IntPtr lpKeyState)
     {
         WriteKeyboardState(lpKeyState, VkShift, 0);
-        WriteKeyboardState(lpKeyState, VkControl, 0);
-        WriteKeyboardState(lpKeyState, VkMenu, 0);
         WriteKeyboardState(lpKeyState, VkLShift, 0);
         WriteKeyboardState(lpKeyState, VkRShift, 0);
+
+        ModifierOverrideMode mode = _state.GetModifierOverrideMode();
+        if (mode == ModifierOverrideMode.Ctrl)
+        {
+            WriteKeyboardState(lpKeyState, VkControl, 0x80);
+            WriteKeyboardState(lpKeyState, VkLControl, 0x80);
+            WriteKeyboardState(lpKeyState, VkRControl, 0x80);
+            WriteKeyboardState(lpKeyState, VkShift, 0);
+            WriteKeyboardState(lpKeyState, VkLShift, 0);
+            WriteKeyboardState(lpKeyState, VkRShift, 0);
+            WriteKeyboardState(lpKeyState, VkMenu, 0);
+            WriteKeyboardState(lpKeyState, VkLMenu, 0);
+            WriteKeyboardState(lpKeyState, VkRMenu, 0);
+            return;
+        }
+
+        if (mode == ModifierOverrideMode.Alt)
+        {
+            WriteKeyboardState(lpKeyState, VkControl, 0);
+            WriteKeyboardState(lpKeyState, VkLControl, 0);
+            WriteKeyboardState(lpKeyState, VkRControl, 0);
+            WriteKeyboardState(lpKeyState, VkShift, 0);
+            WriteKeyboardState(lpKeyState, VkLShift, 0);
+            WriteKeyboardState(lpKeyState, VkRShift, 0);
+            WriteKeyboardState(lpKeyState, VkMenu, 0x80);
+            WriteKeyboardState(lpKeyState, VkLMenu, 0x80);
+            WriteKeyboardState(lpKeyState, VkRMenu, 0x80);
+            return;
+        }
+
+        if (mode == ModifierOverrideMode.Shift)
+        {
+            WriteKeyboardState(lpKeyState, VkControl, 0);
+            WriteKeyboardState(lpKeyState, VkLControl, 0);
+            WriteKeyboardState(lpKeyState, VkRControl, 0);
+            WriteKeyboardState(lpKeyState, VkShift, 0x80);
+            WriteKeyboardState(lpKeyState, VkLShift, 0x80);
+            WriteKeyboardState(lpKeyState, VkRShift, 0x80);
+            WriteKeyboardState(lpKeyState, VkMenu, 0);
+            WriteKeyboardState(lpKeyState, VkLMenu, 0);
+            WriteKeyboardState(lpKeyState, VkRMenu, 0);
+            return;
+        }
+
+        WriteKeyboardState(lpKeyState, VkControl, 0);
         WriteKeyboardState(lpKeyState, VkLControl, 0);
         WriteKeyboardState(lpKeyState, VkRControl, 0);
+        WriteKeyboardState(lpKeyState, VkMenu, 0);
         WriteKeyboardState(lpKeyState, VkLMenu, 0);
         WriteKeyboardState(lpKeyState, VkRMenu, 0);
     }

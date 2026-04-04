@@ -105,7 +105,7 @@ public static class VoicepeakOneShot
         return ValidateInputOnceCore(
             config,
             log,
-            new VoicepeakUiController(config.Ui, config.InputTiming, config.Startup, config.Hook, config.Text, config.Debug, log),
+            new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log),
             new AudioSessionReader(log));
     }
 
@@ -140,11 +140,6 @@ public static class VoicepeakOneShot
         bool sessionEnded;
         try
         {
-            if (ui.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.Validation))
-            {
-                ui.TryPrimeInputContext(process, hwnd, InputContextPrimeReason.Validation);
-            }
-
             BootValidationRunResult run = JobExecutionCore.RunBootValidationFlow(
                 config,
                 ui,
@@ -253,7 +248,7 @@ public static class VoicepeakOneShot
         return ClearInputOnceCore(
             config,
             log,
-            new VoicepeakUiController(config.Ui, config.InputTiming, config.Startup, config.Hook, config.Text, config.Debug, log));
+            new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log));
     }
 
     // 依存を差し替えて単発入力削除
@@ -291,8 +286,8 @@ public static class VoicepeakOneShot
             }
             else
             {
-            if (!ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, false))
-            {
+                if (!ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs))
+                {
                     result = new ClearInputOnceResult { Status = ClearInputOnceStatus.ClearInputFailed };
                 }
                 else
@@ -336,7 +331,7 @@ public static class VoicepeakOneShot
             config,
             request,
             log,
-            new VoicepeakUiController(config.Ui, config.InputTiming, config.Startup, config.Hook, config.Text, config.Debug, log),
+            new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log),
             new AudioSessionReader(log));
     }
 
@@ -377,7 +372,7 @@ public static class VoicepeakOneShot
             config,
             request,
             log,
-            new VoicepeakUiController(config.Ui, config.InputTiming, config.Startup, config.Hook, config.Text, config.Debug, log),
+            new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log),
             new AudioSessionReader(log));
     }
 
@@ -515,7 +510,7 @@ public static class VoicepeakOneShot
                 if (!ui.PrepareForPlayback(process, hwnd, config.InputTiming.ActionDelayMs))
                 {
                     log.Warn($"job_dropped jobId={job.JobId} reason=move_to_start_failed");
-                    ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, false);
+                    ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs);
                     result = new SpeakOnceResult { Status = SpeakOnceStatus.MoveToStartFailed, SegmentsExecuted = executed };
                     break;
                 }
@@ -523,7 +518,7 @@ public static class VoicepeakOneShot
                 if (!ui.PressPlay(hwnd))
                 {
                     log.Warn($"job_dropped jobId={job.JobId} reason=play_failed");
-                    ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, false);
+                    ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs);
                     result = new SpeakOnceResult { Status = SpeakOnceStatus.PlayFailed, SegmentsExecuted = executed };
                     break;
                 }
@@ -541,7 +536,7 @@ public static class VoicepeakOneShot
                 {
                     log.Error("monitor_timeout reason=start_confirm");
                     log.Warn($"job_dropped jobId={job.JobId} reason=start_confirm_failed");
-                    ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, false);
+                    ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs);
                     result = new SpeakOnceResult { Status = SpeakOnceStatus.StartConfirmTimeout, SegmentsExecuted = executed };
                     break;
                 }
@@ -625,12 +620,12 @@ public static class VoicepeakOneShot
         int segmentIndex)
     {
         long segmentStartAt = MonoClock.NowMs();
-        bool prepared = JobExecutionCore.PrepareSegment(config, ui, process, hwnd, segment.Text, log, false);
+        bool prepared = JobExecutionCore.PrepareSegment(config, ui, process, hwnd, segment.Text, log);
         long readyAt = MonoClock.NowMs();
         if (!prepared)
         {
             log.Warn($"job_dropped jobId={jobId} reason=prepare_failed");
-            ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, false);
+            ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs);
             return false;
         }
 
@@ -655,14 +650,14 @@ public static class VoicepeakOneShot
         if (loopResult.Kind == StartConfirmLoopKind.MoveToStartFailed)
         {
             log.Warn($"job_dropped jobId={jobId} reason=move_to_start_failed");
-            JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, false, killFocusAfterClear: false);
+            JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, killFocusAfterClear: false);
             return new SpeakOnceResult { Status = SpeakOnceStatus.MoveToStartFailed, SegmentsExecuted = executed };
         }
 
         if (loopResult.Kind == StartConfirmLoopKind.PlayFailed)
         {
             log.Warn($"job_dropped jobId={jobId} reason=play_failed");
-            JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, false, killFocusAfterClear: false);
+            JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, killFocusAfterClear: false);
             return new SpeakOnceResult { Status = SpeakOnceStatus.PlayFailed, SegmentsExecuted = executed };
         }
 
@@ -670,7 +665,7 @@ public static class VoicepeakOneShot
         {
             log.Error("monitor_timeout reason=start_confirm");
             log.Warn($"job_dropped jobId={jobId} reason=start_confirm_failed");
-            JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, false, killFocusAfterClear: false);
+            JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, killFocusAfterClear: false);
             return new SpeakOnceResult { Status = SpeakOnceStatus.StartConfirmTimeout, SegmentsExecuted = executed };
         }
 
@@ -678,7 +673,7 @@ public static class VoicepeakOneShot
         {
             log.Error("monitor_timeout reason=max_duration");
             log.Warn($"job_dropped jobId={jobId} reason=max_speaking_duration");
-            JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, false, killFocusAfterClear: false);
+            JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, killFocusAfterClear: false);
             return new SpeakOnceResult { Status = SpeakOnceStatus.MaxSpeakingDurationExceeded, SegmentsExecuted = executed };
         }
 

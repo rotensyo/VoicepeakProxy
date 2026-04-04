@@ -23,8 +23,6 @@ public sealed class StartupConfig
     public string BootValidationText { get; set; } = "初期化完了";
     public int BootValidationMaxRetries { get; set; } = 2;
     public int BootValidationRetryIntervalMs { get; set; } = 1000;
-    public bool ClickAtValidationEnabled { get; set; } = true;
-    public bool ClickBeforeTextFocusWhenUninitializedEnabled { get; set; } = false;
 }
 
 // 修飾キーフック関連設定
@@ -38,10 +36,13 @@ public sealed class HookConfig
 // UI操作関連設定
 public sealed class UiConfig
 {
-    public string MoveToStartShortcut { get; set; } = "Ctrl+Up";
-    public string PlayShortcut { get; set; } = "Space";
+    public string MoveToStartModifier { get; set; } = "ctrl";
+    public string MoveToStartKey { get; set; } = "cursor up";
+    public string ClearInputSelectAllModifier { get; set; } = "ctrl";
+    public string ClearInputSelectAllKey { get; set; } = "a";
+    public string PlayShortcutModifier { get; set; } = string.Empty;
+    public string PlayShortcutKey { get; set; } = "spacebar";
     public int DelayBeforePlayShortcutMs { get; set; } = 60;
-    public bool ClickOnInputFailureRetryEnabled { get; set; } = false;
 }
 
 // 入力タイミング関連設定
@@ -50,7 +51,6 @@ public sealed class InputTimingConfig
     public int CharDelayBaseMs { get; set; } = 0;
     public int DeleteKeyDelayBaseMs { get; set; } = 0;
     public int ActionDelayMs { get; set; } = 5;
-    public int SequentialMoveToStartKeyDelayBaseMs { get; set; } = 5;
     public int PostTypeWaitPerCharMs { get; set; } = 5;
     public int PostTypeWaitMinMs { get; set; } = 300;
     public int ClearInputMaxPasses { get; set; } = 10;
@@ -128,20 +128,39 @@ internal static class AppConfigValidator
 
         EnsureNonNegative(config.Ui.DelayBeforePlayShortcutMs, "ui.delayBeforePlayShortcutMs は 0 以上で指定してください");
 
-        if (!VoicepeakUiController.IsValidMoveToStartShortcut(config.Ui.MoveToStartShortcut))
+        if (!VoicepeakUiController.IsValidMoveToStartModifier(config.Ui.MoveToStartModifier))
         {
-            throw new InvalidOperationException("ui.moveToStartShortcut は null/空文字/空白にできません");
+            throw new InvalidOperationException("ui.moveToStartModifier は空文字/ctrl/alt のいずれかを指定してください");
         }
 
-        if (!VoicepeakUiController.IsValidPlayShortcut(config.Ui.PlayShortcut))
+        if (!VoicepeakUiController.IsValidMoveToStartKey(config.Ui.MoveToStartKey))
         {
-            throw new InvalidOperationException("ui.playShortcut は修飾なしキーのみ指定できます（例: F3, Space, Home）");
+            throw new InvalidOperationException("ui.moveToStartKey は有効なキーを指定してください（例: cursor up, F3, home）");
+        }
+
+        if (!VoicepeakUiController.IsValidClearInputSelectAllModifier(config.Ui.ClearInputSelectAllModifier))
+        {
+            throw new InvalidOperationException("ui.clearInputSelectAllModifier は空文字/ctrl/alt のいずれかを指定してください");
+        }
+
+        if (!VoicepeakUiController.IsValidClearInputSelectAllKey(config.Ui.ClearInputSelectAllKey))
+        {
+            throw new InvalidOperationException("ui.clearInputSelectAllKey は有効なキーを指定してください（例: a, @, home）");
+        }
+
+        if (!VoicepeakUiController.IsValidPlayShortcutModifier(config.Ui.PlayShortcutModifier))
+        {
+            throw new InvalidOperationException("ui.playShortcutModifier は空文字/ctrl/alt/shift のいずれかを指定してください");
+        }
+
+        if (!VoicepeakUiController.IsValidPlayShortcutKey(config.Ui.PlayShortcutKey))
+        {
+            throw new InvalidOperationException("ui.playShortcutKey は有効なキーを指定してください（例: spacebar, F3, home）");
         }
 
         EnsureNonNegative(config.InputTiming.ActionDelayMs, "inputTiming.actionDelayMs は 0 以上で指定してください");
         EnsureNonNegative(config.InputTiming.PostTypeWaitPerCharMs, "inputTiming.postTypeWaitPerCharMs は 0 以上で指定してください");
         EnsureNonNegative(config.InputTiming.PostTypeWaitMinMs, "inputTiming.postTypeWaitMinMs は 0 以上で指定してください");
-        EnsureNonNegative(config.InputTiming.SequentialMoveToStartKeyDelayBaseMs, "inputTiming.sequentialMoveToStartKeyDelayBaseMs は 0 以上で指定してください");
         EnsureNonNegative(config.InputTiming.DeleteKeyDelayBaseMs, "inputTiming.deleteKeyDelayBaseMs は 0 以上で指定してください");
         EnsurePositive(config.InputTiming.ClearInputMaxPasses, "inputTiming.clearInputMaxPasses は 1 以上で指定してください");
 

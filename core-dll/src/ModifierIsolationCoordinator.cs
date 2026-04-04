@@ -109,6 +109,12 @@ internal sealed class ModifierIsolationCoordinator
         }
     }
 
+    // 修飾キー上書きを設定
+    public bool SetModifierOverride(IntPtr targetHwnd, string operationName, ModifierOverrideMode mode)
+    {
+        return TrySetModifierOverride(targetHwnd, operationName, mode);
+    }
+
     // 修飾キー中立化セッションを開始
     public bool BeginModifierIsolationSession(int voicepeakProcessId, string operationName)
     {
@@ -299,6 +305,42 @@ internal sealed class ModifierIsolationCoordinator
         {
             return false;
         }
+    }
+
+    // 修飾キー上書きモードを設定
+    private bool TrySetModifierOverride(IntPtr targetHwnd, string operationName, ModifierOverrideMode mode)
+    {
+        if (targetHwnd == IntPtr.Zero)
+        {
+            _log.Warn($"modifier_hook_override_failed reason=target_hwnd_zero op={SanitizeForLog(operationName)}");
+            return false;
+        }
+
+        GetWindowThreadProcessId(targetHwnd, out uint processId);
+        if (processId == 0)
+        {
+            _log.Warn($"modifier_hook_override_failed reason=target_pid_zero op={SanitizeForLog(operationName)}");
+            return false;
+        }
+
+        if (!IsVoicepeakProcessId(processId))
+        {
+            return true;
+        }
+
+        if (!_modifierKeyHookController.EnsureInjected((int)processId, _log))
+        {
+            _log.Warn($"modifier_hook_override_failed reason=ensure_injected_failed op={SanitizeForLog(operationName)} mode={mode}");
+            return false;
+        }
+
+        if (!_modifierKeyHookController.SetModifierOverride(mode, _log))
+        {
+            _log.Warn($"modifier_hook_override_failed reason=set_override_failed op={SanitizeForLog(operationName)} mode={mode}");
+            return false;
+        }
+
+        return true;
     }
 
     // ログ用に文字列を正規化

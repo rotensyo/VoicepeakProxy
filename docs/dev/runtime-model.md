@@ -66,12 +66,10 @@ stateDiagram-v2
 - この再試行は常駐実行、`SpeakOnceWait`、起動時バリデーションに適用されます
 - `SpeakOnce`は開始確認専用のため再試行を行いません
 
-## 非F系フォーカス順序
+## 先頭移動の補足
 
-- 対象: `Ui.MoveToStartShortcut`が`F1-F12`以外の経路
-- `FocusInputForKeyboardIfNeeded(...)`では`WM_SETFOCUS`の前に`WM_KILLFOCUS`を送信します
-- 送信順序は`WM_ACTIVATE`→`WM_KILLFOCUS`→`WM_SETFOCUS`です
-- 背景: 既に存在しない入力ブロックへ`SETFOCUS`済みの状態で、`KILLFOCUS`なしに再度`SETFOCUS`すると不具合が発生するためです
+- 通常の先頭移動は`MoveToStartModifier`+`MoveToStartKey`の送信で実行します
+- 逐次`PageUp`→`Up`経路は削除済みです
 
 ## 関連ドキュメント
 

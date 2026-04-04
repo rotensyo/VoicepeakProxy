@@ -106,7 +106,7 @@ public class ExecutionLogicTests
         };
         TestLogger logger = new TestLogger();
 
-        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(logger), true);
+        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(logger));
 
         Assert.IsFalse(actual);
         Assert.IsTrue(logger.WarnMessages.Exists(m => m.Contains("process_not_alive")));
@@ -122,7 +122,7 @@ public class ExecutionLogicTests
         };
         TestLogger logger = new TestLogger();
 
-        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(logger), true);
+        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(logger));
 
         Assert.IsFalse(actual);
         Assert.IsTrue(logger.WarnMessages.Exists(m => m.Contains("clear_input_failed")));
@@ -138,7 +138,7 @@ public class ExecutionLogicTests
             VisibleInputBlockCountHandler = _ => 1
         };
 
-        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()), true);
+        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()));
 
         Assert.IsTrue(actual);
         CollectionAssert.AreEqual(new[] { "prepare_text", "clear_input", "type_text" }, ui.CallLog);
@@ -154,48 +154,27 @@ public class ExecutionLogicTests
         };
         TestLogger logger = new TestLogger();
 
-        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(logger), true);
+        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(logger));
 
         Assert.IsFalse(actual);
         Assert.IsTrue(logger.WarnMessages.Exists(m => m.Contains("type_text_failed")));
     }
 
     [TestMethod]
-    public void PrepareSegment_InputEmptyAfterType_PrimesAndRetypesOnce()
+    public void PrepareSegment_InputEmptyAfterType_ReturnsFalse()
     {
-        // 入力反映なし時は1回だけ修正クリックして再入力
+        // 入力反映なし時は失敗を返す
         Queue<ReadInputResult> reads = new Queue<ReadInputResult>();
         reads.Enqueue(ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA));
-        reads.Enqueue(ReadInputResult.Ok("hello", 5, ReadInputSource.PrimaryUiA));
         FakeVoicepeakUiController ui = new FakeVoicepeakUiController
         {
             ReadInputHandler = _ => reads.Count > 0 ? reads.Dequeue() : ReadInputResult.Ok("hello", 5, ReadInputSource.PrimaryUiA),
-            VisibleInputBlockCountHandler = _ => 1,
-            ShouldAttemptPrimeInputContextHandler = (_, _, reason) => reason == InputContextPrimeReason.InputFailureRetry
+            VisibleInputBlockCountHandler = _ => 1
         };
 
-        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()), true);
-
-        Assert.IsTrue(actual);
-        Assert.AreEqual(1, ui.TryPrimeInputContextCalls);
-        Assert.AreEqual(2, ui.TypedTexts.Count);
-    }
-
-    [TestMethod]
-    public void PrepareSegment_InputEmptyAfterType_NoRetryFlag_ReturnsFalse()
-    {
-        // 入力反映なしで救済無効なら失敗
-        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
-        {
-            ReadInputHandler = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA),
-            VisibleInputBlockCountHandler = _ => 1,
-            ShouldAttemptPrimeInputContextHandler = (_, _, _) => false
-        };
-
-        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()), true);
+        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()));
 
         Assert.IsFalse(actual);
-        Assert.AreEqual(0, ui.TryPrimeInputContextCalls);
     }
 
     [TestMethod]
@@ -208,42 +187,26 @@ public class ExecutionLogicTests
             VisibleInputBlockCountHandler = _ => 1
         };
 
-        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "  a\r\n b  ", new AppLogger(new TestLogger()), true);
+        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "  a\r\n b  ", new AppLogger(new TestLogger()));
 
         Assert.IsTrue(actual);
         CollectionAssert.AreEqual(new[] { "a b" }, ui.TypedTexts);
     }
 
     [TestMethod]
-    public void PrepareSegment_LoopContext_AllowsCompositePrimeBeforeTextFocus()
+    public void PrepareSegment_CallsPrepareForTextInputOnce()
     {
-        // ループ実行では入力前prime許可を渡す
+        // 入力準備は1回だけ実行
         FakeVoicepeakUiController ui = new FakeVoicepeakUiController
         {
             ReadInputHandler = _ => ReadInputResult.Ok("hello", 5, ReadInputSource.PrimaryUiA),
             VisibleInputBlockCountHandler = _ => 1
         };
 
-        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()), true);
+        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()));
 
         Assert.IsTrue(actual);
-        CollectionAssert.AreEqual(new[] { true }, ui.PrepareForTextInputCompositePrimeFlags);
-    }
-
-    [TestMethod]
-    public void PrepareSegment_OneShotContext_DisablesCompositePrimeBeforeTextFocus()
-    {
-        // 単発実行では入力前primeを無効化
-        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
-        {
-            ReadInputHandler = _ => ReadInputResult.Ok("hello", 5, ReadInputSource.PrimaryUiA),
-            VisibleInputBlockCountHandler = _ => 1
-        };
-
-        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()), false);
-
-        Assert.IsTrue(actual);
-        CollectionAssert.AreEqual(new[] { false }, ui.PrepareForTextInputCompositePrimeFlags);
+        Assert.AreEqual(1, ui.PrepareForTextInputCalls);
     }
 
     [TestMethod]
@@ -316,14 +279,15 @@ public class ExecutionLogicTests
     }
 
     [TestMethod]
-    public void MonitorSpeaking_InterruptRequested_WithCompositeShortcut_PressesPlayThenMovesToStart()
+    public void MonitorSpeaking_InterruptRequested_WithModifierShortcut_MovesToStartWithoutPrePlay()
     {
-        // 複合経路では停止してから先頭移動
+        // 修飾子ショートカットは先頭移動のみを実行
         FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
         FakeAudioSessionReader audio = new FakeAudioSessionReader();
         bool callbackCalled = false;
         AppConfig config = CreateMonitorConfig();
-        config.Ui.MoveToStartShortcut = "Ctrl+Up";
+        config.Ui.MoveToStartModifier = "ctrl";
+        config.Ui.MoveToStartKey = "cursor up";
 
         SpeakMonitorResult result = JobExecutionCore.MonitorSpeaking(
             config,
@@ -338,9 +302,8 @@ public class ExecutionLogicTests
 
         Assert.AreEqual(SpeakMonitorKind.Interrupted, result.Kind);
         Assert.IsTrue(callbackCalled);
-        Assert.AreEqual(1, ui.PressPlayCalls);
+        Assert.AreEqual(0, ui.PressPlayCalls);
         Assert.AreEqual(1, ui.MoveToStartCalls);
-        Assert.IsTrue(ui.CallLog.IndexOf("press_play") < ui.CallLog.IndexOf("move_to_start"));
     }
 
     [TestMethod]
@@ -441,11 +404,12 @@ public class ExecutionLogicTests
     }
 
     [TestMethod]
-    public void MonitorSpeaking_MaxDuration_WithCompositeShortcut_PressesPlayThenMovesToStart()
+    public void MonitorSpeaking_MaxDuration_WithModifierShortcut_MovesToStartWithoutPrePlay()
     {
-        // 複合経路では停止してから先頭移動
+        // 修飾子ショートカットは先頭移動のみを実行
         AppConfig config = CreateMonitorConfig();
-        config.Ui.MoveToStartShortcut = "Ctrl+Up";
+        config.Ui.MoveToStartModifier = "ctrl";
+        config.Ui.MoveToStartKey = "cursor up";
         config.Audio.MaxSpeakingDurationSec = 1;
         FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
         FakeAudioSessionReader audio = new FakeAudioSessionReader();
@@ -463,9 +427,8 @@ public class ExecutionLogicTests
             null);
 
         Assert.AreEqual(SpeakMonitorKind.MaxDuration, result.Kind);
-        Assert.AreEqual(1, ui.PressPlayCalls);
+        Assert.AreEqual(0, ui.PressPlayCalls);
         Assert.AreEqual(1, ui.MoveToStartCalls);
-        Assert.IsTrue(ui.CallLog.IndexOf("press_play") < ui.CallLog.IndexOf("move_to_start"));
     }
 
     [TestMethod]

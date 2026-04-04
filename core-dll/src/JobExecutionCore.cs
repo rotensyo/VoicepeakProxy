@@ -141,7 +141,7 @@ internal static class JobExecutionCore
     // 再生中の先頭移動を文脈別に実行
     public static bool MoveToStartDuringPlayback(AppConfig config, IVoicepeakUiController ui, IntPtr hwnd, int actionDelayMs)
     {
-        if (!VoicepeakUiController.IsFunctionKeyMoveToStartShortcut(config.Ui.MoveToStartShortcut))
+        if (VoicepeakUiController.ShouldPressPlayBeforeMoveToStartDuringPlayback(config.Ui))
         {
             if (!ui.PressPlay(hwnd))
             {
@@ -153,7 +153,7 @@ internal static class JobExecutionCore
     }
 
     // セグメント入力準備を実行
-    public static bool PrepareSegment(AppConfig config, IVoicepeakUiController ui, Process process, IntPtr hwnd, string text, AppLogger log, bool allowCompositePrimeBeforeTextFocusWhenUnprimed)
+    public static bool PrepareSegment(AppConfig config, IVoicepeakUiController ui, Process process, IntPtr hwnd, string text, AppLogger log)
     {
         if (!ui.IsAlive(process))
         {
@@ -161,13 +161,13 @@ internal static class JobExecutionCore
             return false;
         }
 
-        if (!ui.PrepareForTextInput(process, hwnd, config.InputTiming.ActionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed))
+        if (!ui.PrepareForTextInput(process, hwnd, config.InputTiming.ActionDelayMs))
         {
             log.Warn("prepare_failed_detail reason=prepare_text_input_failed cause=shortcut_not_applied_or_context_mismatch");
             return false;
         }
 
-        if (!ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed))
+        if (!ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs))
         {
             log.Warn("prepare_failed_detail reason=clear_input_failed cause=move_to_start_or_delete_not_applied");
             return false;
@@ -190,34 +190,7 @@ internal static class JobExecutionCore
         if (expected.Length > 0 && IsInputEmptyState(ui, hwnd))
         {
             log.Warn("prepare_failed_detail reason=typed_text_not_reflected cause=input_context_not_focused");
-            if (!ui.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.InputFailureRetry))
-            {
-                return false;
-            }
-
-            ui.TryPrimeInputContext(process, hwnd, InputContextPrimeReason.InputFailureRetry);
-            if (!ui.PrepareForTextInput(process, hwnd, config.InputTiming.ActionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed))
-            {
-                log.Warn("prepare_failed_detail reason=prepare_text_input_failed_after_retry cause=shortcut_not_applied_or_context_mismatch");
-                return false;
-            }
-
-            if (!ui.TypeText(hwnd, expected, charDelay))
-            {
-                log.Warn("prepare_failed_detail reason=type_text_failed_after_retry cause=wm_char_input_failed");
-                return false;
-            }
-
-            if (postTypeWaitMs > 0)
-            {
-                Thread.Sleep(postTypeWaitMs);
-            }
-
-            if (IsInputEmptyState(ui, hwnd))
-            {
-                log.Warn("prepare_failed_detail reason=typed_text_not_reflected_after_retry cause=input_context_not_focused");
-                return false;
-            }
+            return false;
         }
 
         return true;
@@ -467,7 +440,7 @@ internal static class JobExecutionCore
             null);
         if (loopResult.Kind == StartConfirmLoopKind.Completed)
         {
-            ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, true);
+            ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs);
             log.Info("boot_validation_ok");
             return BootValidationRunResult.Completed(bootValidate);
         }
@@ -514,12 +487,12 @@ internal static class JobExecutionCore
             return InputValidateResult.Fail("process_not_alive", "voicepeak_process_exited_or_unavailable", string.Empty);
         }
 
-        if (!ui.PrepareForTextInput(process, hwnd, config.InputTiming.ActionDelayMs, true))
+        if (!ui.PrepareForTextInput(process, hwnd, config.InputTiming.ActionDelayMs))
         {
             return InputValidateResult.Fail("move_to_start_failed", "shortcut_not_applied_or_context_mismatch", string.Empty);
         }
 
-        if (!ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, true))
+        if (!ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs))
         {
             return InputValidateResult.Fail("clear_input_failed", "move_to_start_or_delete_not_applied", string.Empty);
         }
@@ -539,7 +512,7 @@ internal static class JobExecutionCore
 
         if (useProbeGuardChars)
         {
-            if (!ui.PrepareForTextInput(process, hwnd, config.InputTiming.ActionDelayMs, true))
+            if (!ui.PrepareForTextInput(process, hwnd, config.InputTiming.ActionDelayMs))
             {
                 return InputValidateResult.Fail("move_to_start_failed", "shortcut_not_applied_or_context_mismatch", string.Empty);
             }
@@ -602,7 +575,6 @@ internal static class JobExecutionCore
         IVoicepeakUiController ui,
         Process process,
         IntPtr hwnd,
-        bool allowCompositePrimeBeforeTextFocusWhenUnprimed,
         bool killFocusAfterClear)
     {
         if (ui == null || process == null || hwnd == IntPtr.Zero)
@@ -610,7 +582,7 @@ internal static class JobExecutionCore
             return;
         }
 
-        ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed);
+        ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs);
         if (killFocusAfterClear)
         {
             ui.KillFocus(hwnd);

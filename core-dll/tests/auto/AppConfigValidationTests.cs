@@ -23,16 +23,17 @@ public class AppConfigValidationTests
         Assert.AreEqual(0, config.InputTiming.CharDelayBaseMs);
         Assert.AreEqual(5, config.InputTiming.PostTypeWaitPerCharMs);
         Assert.AreEqual(300, config.InputTiming.PostTypeWaitMinMs);
-        Assert.AreEqual(5, config.InputTiming.SequentialMoveToStartKeyDelayBaseMs);
         Assert.AreEqual(0, config.InputTiming.DeleteKeyDelayBaseMs);
         Assert.AreEqual(10, config.InputTiming.ClearInputMaxPasses);
         Assert.AreEqual(500, config.Hook.HookCommandTimeoutMs);
         Assert.AreEqual(300, config.Hook.HookConnectTimeoutMs);
         Assert.AreEqual(8000, config.Hook.HookConnectTotalWaitMs);
-        Assert.AreEqual("Ctrl+Up", config.Ui.MoveToStartShortcut);
-        Assert.IsTrue(config.Startup.ClickAtValidationEnabled);
-        Assert.IsFalse(config.Startup.ClickBeforeTextFocusWhenUninitializedEnabled);
-        Assert.IsFalse(config.Ui.ClickOnInputFailureRetryEnabled);
+        Assert.AreEqual("ctrl", config.Ui.MoveToStartModifier);
+        Assert.AreEqual("cursor up", config.Ui.MoveToStartKey);
+        Assert.AreEqual("ctrl", config.Ui.ClearInputSelectAllModifier);
+        Assert.AreEqual("a", config.Ui.ClearInputSelectAllKey);
+        Assert.AreEqual(string.Empty, config.Ui.PlayShortcutModifier);
+        Assert.AreEqual("spacebar", config.Ui.PlayShortcutKey);
         CollectionAssert.AreEqual(new[] { "。", "！", "？", "!", "?" }, config.Text.SentenceBreakTriggers);
         Assert.AreEqual(BootValidationMode.Required, config.Validation.BootValidation);
     }
@@ -84,7 +85,6 @@ public class AppConfigValidationTests
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Startup.BootValidationRetryIntervalMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.PostTypeWaitPerCharMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.PostTypeWaitMinMs = -1));
-        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.SequentialMoveToStartKeyDelayBaseMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.DeleteKeyDelayBaseMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.ClearInputMaxPasses = 0));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Hook.HookCommandTimeoutMs = 0));
@@ -94,40 +94,85 @@ public class AppConfigValidationTests
     }
 
     [TestMethod]
-    public void Validate_BlankMoveToStartShortcut_Throws()
+    public void Validate_BlankMoveToStartKey_Throws()
     {
-        // 先頭移動設定の空白を拒否
+        // 先頭移動キー設定の空白を拒否
         InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
-            ValidateWith(config => config.Ui.MoveToStartShortcut = "   "));
+            ValidateWith(config => config.Ui.MoveToStartKey = "   "));
 
-        StringAssert.Contains(ex.Message, "ui.moveToStartShortcut");
+        StringAssert.Contains(ex.Message, "ui.moveToStartKey");
     }
 
     [TestMethod]
-    public void Validate_CtrlUpMoveToStartShortcut_IsAllowed()
+    public void Validate_MoveToStartModifierAndKey_IsAllowed()
     {
-        // Ctrl+Upを許可
-        ValidateWith(config => config.Ui.MoveToStartShortcut = "Ctrl+Up");
+        // ctrlとcursor upを許可
+        ValidateWith(config =>
+        {
+            config.Ui.MoveToStartModifier = "ctrl";
+            config.Ui.MoveToStartKey = "cursor up";
+        });
     }
 
     [TestMethod]
-    public void Validate_InvalidPlayShortcut_Throws()
+    public void Validate_InvalidMoveToStartModifier_Throws()
     {
-        // 再生ショートカット不正を拒否
+        // 修飾子は空文字とctrlとalt以外を拒否
         InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
-            ValidateWith(config => config.Ui.PlayShortcut = "Delete"));
+            ValidateWith(config => config.Ui.MoveToStartModifier = "shift"));
 
-        StringAssert.Contains(ex.Message, "ui.playShortcut");
+        StringAssert.Contains(ex.Message, "ui.moveToStartModifier");
     }
 
     [TestMethod]
-    public void Validate_ModifierPlayShortcut_Throws()
+    public void Validate_InvalidClearInputSelectAllModifier_Throws()
     {
-        // 修飾付き再生ショートカットを拒否
+        // 全選択修飾子は空文字とctrlとalt以外を拒否
         InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
-            ValidateWith(config => config.Ui.PlayShortcut = "Ctrl+F4"));
+            ValidateWith(config => config.Ui.ClearInputSelectAllModifier = "shift"));
 
-        StringAssert.Contains(ex.Message, "ui.playShortcut");
+        StringAssert.Contains(ex.Message, "ui.clearInputSelectAllModifier");
+    }
+
+    [TestMethod]
+    public void Validate_InvalidClearInputSelectAllKey_Throws()
+    {
+        // 全選択キー不正を拒否
+        InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
+            ValidateWith(config => config.Ui.ClearInputSelectAllKey = ""));
+
+        StringAssert.Contains(ex.Message, "ui.clearInputSelectAllKey");
+    }
+
+    [TestMethod]
+    public void Validate_InvalidPlayShortcutKey_Throws()
+    {
+        // 再生キー不正を拒否
+        InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
+            ValidateWith(config => config.Ui.PlayShortcutKey = "Delete"));
+
+        StringAssert.Contains(ex.Message, "ui.playShortcutKey");
+    }
+
+    [TestMethod]
+    public void Validate_InvalidPlayShortcutModifier_Throws()
+    {
+        // 再生修飾子不正を拒否
+        InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
+            ValidateWith(config => config.Ui.PlayShortcutModifier = "meta"));
+
+        StringAssert.Contains(ex.Message, "ui.playShortcutModifier");
+    }
+
+    [TestMethod]
+    public void Validate_PlayShortcutModifierAndKey_IsAllowed()
+    {
+        // 再生修飾子と再生キーの有効値を許可
+        ValidateWith(config =>
+        {
+            config.Ui.PlayShortcutModifier = "shift";
+            config.Ui.PlayShortcutKey = "spacebar";
+        });
     }
 
     [TestMethod]
@@ -203,7 +248,6 @@ public class AppConfigValidationTests
             config.Startup.BootValidationRetryIntervalMs = 0;
             config.InputTiming.PostTypeWaitPerCharMs = 0;
             config.InputTiming.PostTypeWaitMinMs = 0;
-            config.InputTiming.SequentialMoveToStartKeyDelayBaseMs = 0;
             config.InputTiming.DeleteKeyDelayBaseMs = 0;
             config.InputTiming.ClearInputMaxPasses = 1;
             config.Hook.HookCommandTimeoutMs = 1;

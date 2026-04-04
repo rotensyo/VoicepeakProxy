@@ -18,15 +18,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private const uint WmGetText = 0x000D;
     private const uint WmGetTextLength = 0x000E;
     private const uint WmKillFocus = 0x0008;
-    private const uint WmSetFocus = 0x0007;
-    private const uint WmActivate = 0x0006;
-    private const uint WmMouseMove = 0x0200;
-    private const uint WmLButtonDown = 0x0201;
-    private const uint WmLButtonUp = 0x0202;
-    private const int MkLButton = 0x0001;
     private readonly UiConfig _ui;
     private readonly InputTimingConfig _inputTiming;
-    private readonly StartupConfig _startup;
     private readonly HookConfig _hook;
     private readonly TextConfig _text;
     private readonly DebugConfig _debug;
@@ -34,37 +27,32 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private readonly AppLogger _log;
     private readonly VoicepeakTargetResolver _targetResolver;
     private readonly ModifierIsolationCoordinator _modifierIsolationCoordinator;
-    private readonly object _inputPrimeGate = new object();
     // 単一操作経路前提のためロックは設けない
     private int _cachedVoicepeakPid;  // テスト互換のため保持する解決キャッシュ
-    private int _primedProcessId;  // 事前クリックを最後に行ったプロセスID
-    private IntPtr _primedMainHwnd;  // prime済みメインウィンドウハンドル
-    private int _lastInjectedEnterCount;  // 入力ブロック区切りに押下したEnter回数
     private bool _modifierIsolationSessionActive;  // テスト互換のため保持するセッション状態
     private uint _modifierIsolationSessionProcessId;  // テスト互換のため保持する対象pid
 
     // UI設定とロガーを保持
     public VoicepeakUiController(UiConfig ui, DebugConfig debug, AppLogger log)
-        : this(ui, new InputTimingConfig(), new StartupConfig(), new HookConfig(), new TextConfig(), debug, log, new DefaultVoicepeakProcessApi())
+        : this(ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), debug, log, new DefaultVoicepeakProcessApi())
     {
     }
 
-    public VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, StartupConfig startup, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log)
-        : this(ui, inputTiming, startup, hook, text, debug, log, new DefaultVoicepeakProcessApi())
+    public VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log)
+        : this(ui, inputTiming, hook, text, debug, log, new DefaultVoicepeakProcessApi())
     {
     }
 
     internal VoicepeakUiController(UiConfig ui, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
-        : this(ui, new InputTimingConfig(), new StartupConfig(), new HookConfig(), new TextConfig(), debug, log, processApi)
+        : this(ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), debug, log, processApi)
     {
     }
 
-    internal VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, StartupConfig startup, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
+    internal VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
     {
         IVoicepeakProcessApi resolvedProcessApi = processApi ?? new DefaultVoicepeakProcessApi();
         _ui = ui ?? new UiConfig();
         _inputTiming = inputTiming ?? new InputTimingConfig();
-        _startup = startup ?? new StartupConfig();
         _hook = hook ?? new HookConfig();
         _text = text ?? new TextConfig();
         _debug = debug ?? new DebugConfig();
@@ -76,7 +64,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             _hook.HookConnectTotalWaitMs);
         _modifierIsolationCoordinator = new ModifierIsolationCoordinator(modifierKeyHookController, _log);
         _sentenceBreakTriggerIndex = BuildSentenceBreakTriggerIndex(_text);
-        WarnIfMoveToStartShortcutWillUseSequentialFallback(_ui.MoveToStartShortcut);
     }
 
     // 対象プロセスとメインウィンドウを解決
@@ -116,38 +103,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return process != null && !process.HasExited;
     }
 
-    public bool TryPrimeInputContext(Process process, IntPtr mainHwnd, InputContextPrimeReason reason)
+    public bool PrepareForTextInput(Process process, IntPtr mainHwnd, int actionDelayMs)
     {
-        if (process == null || mainHwnd == IntPtr.Zero)
-        {
-            return false;
-        }
-
-        lock (_inputPrimeGate)
-        {
-            if (reason != InputContextPrimeReason.InputFailureRetry && IsInputContextPrimed(process, mainHwnd))
-            {
-                return true;
-            }
-
-            if (!TryPrimeInputContextWithForeground(process, mainHwnd))
-            {
-                return false;
-            }
-
-            MarkInputContextPrimed(process, mainHwnd);
-            return true;
-        }
-    }
-
-    public bool PrepareForTextInput(Process process, IntPtr mainHwnd, int actionDelayMs, bool allowCompositePrimeBeforeTextFocusWhenUnprimed)
-    {
-        if (allowCompositePrimeBeforeTextFocusWhenUnprimed
-            && ShouldAttemptPrimeInputContext(process, mainHwnd, InputContextPrimeReason.BeforeTextFocusWhenUnprimed))
-        {
-            TryPrimeInputContext(process, mainHwnd, InputContextPrimeReason.BeforeTextFocusWhenUnprimed);
-        }
-
         return MoveToStart(mainHwnd, actionDelayMs);
     }
 
@@ -157,12 +114,27 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     }
 
     // 入力欄をクリア
-    public bool ClearInput(Process process, IntPtr mainHwnd, int actionDelayMs, bool allowCompositePrimeBeforeTextFocusWhenUnprimed)
+    public bool ClearInput(Process process, IntPtr mainHwnd, int actionDelayMs)
     {
-        int clearInputMaxPasses = Math.Max(1, _inputTiming.ClearInputMaxPasses);
-        bool compositeMoveToStart = UsesSequentialMoveToStartFallback(_ui.MoveToStartShortcut);
-        if (compositeMoveToStart)
+        return ExecuteWithModifierIsolation(mainHwnd, "clear_input", action: () =>
         {
+            if (!TryParseClearInputSelectAllKey(_ui.ClearInputSelectAllKey, out VirtualKey selectAllKey))
+            {
+                return false;
+            }
+
+            if (!TryParseClearInputSelectAllModifier(_ui.ClearInputSelectAllModifier, out ModifierOverrideMode selectAllMode, out bool useSelectAllModifier))
+            {
+                return false;
+            }
+
+            SleepActionDelay(actionDelayMs);
+            if (!SendMoveToStartShortcut(mainHwnd))
+            {
+                return false;
+            }
+
+            int clearInputMaxPasses = Math.Max(1, _inputTiming.ClearInputMaxPasses);
             for (int pass = 0; pass < clearInputMaxPasses; pass++)
             {
                 ClearInputState before = ReadClearInputState(mainHwnd);
@@ -171,133 +143,40 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                     return true;
                 }
 
-                int pairCount = Math.Max(1, before.VisibleBlockCount + 1);
-                int deleteSteps = ComputeCompositeDeleteSteps(before.Read, before.VisibleBlockCount);
-                if (!ExecuteWithModifierIsolation(mainHwnd, "composite_clear_cycle", action: () =>
-                {
-                    return RunCompositeClearCycleCore(mainHwnd, pairCount, deleteSteps, actionDelayMs);
-                }))
+                int visibleBlockCount = Math.Max(1, before.VisibleBlockCount);
+                if (!RunSelectAllDeleteCycle(mainHwnd, selectAllKey, selectAllMode, useSelectAllModifier, visibleBlockCount))
                 {
                     return false;
-                }
-
-                ClearInputState after = ReadClearInputState(mainHwnd);
-                if (IsClearCompleted(after.Read, after.VisibleBlockCount))
-                {
-                    return true;
-                }
-            }
-
-            if (ShouldAttemptPrimeInputContext(process, mainHwnd, InputContextPrimeReason.InputFailureRetry))
-            {
-                TryPrimeInputContext(process, mainHwnd, InputContextPrimeReason.InputFailureRetry);
-                if (!PrepareForTextInput(process, mainHwnd, actionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed))
-                {
-                    return false;
-                }
-
-                ClearInputState beforeRetry = ReadClearInputState(mainHwnd);
-                if (IsClearCompleted(beforeRetry.Read, beforeRetry.VisibleBlockCount))
-                {
-                    return true;
-                }
-
-                int retryPairCount = Math.Max(1, beforeRetry.VisibleBlockCount + 1);
-                int retryDeleteSteps = ComputeCompositeDeleteSteps(beforeRetry.Read, beforeRetry.VisibleBlockCount);
-                if (!ExecuteWithModifierIsolation(mainHwnd, "composite_clear_cycle", action: () =>
-                {
-                    return RunCompositeClearCycleCore(mainHwnd, retryPairCount, retryDeleteSteps, actionDelayMs);
-                }))
-                {
-                    return false;
-                }
-
-                ClearInputState afterRetry = ReadClearInputState(mainHwnd);
-                if (IsClearCompleted(afterRetry.Read, afterRetry.VisibleBlockCount))
-                {
-                    return true;
                 }
             }
 
             return LogIncompleteClearInputAndReturnResult(ReadClearInputState(mainHwnd));
-        }
+        });
+    }
 
-        for (int pass = 0; pass < clearInputMaxPasses; pass++)
+    // 全選択後にDeleteを二回送信するサイクル
+    private bool RunSelectAllDeleteCycle(IntPtr mainHwnd, VirtualKey selectAllKey, ModifierOverrideMode selectAllMode, bool useSelectAllModifier, int visibleBlockCount)
+    {
+        int cycleCount = Math.Max(1, visibleBlockCount);
+        for (int i = 0; i < cycleCount; i++)
         {
-            ClearInputState before = ReadClearInputState(mainHwnd);
-            if (IsClearCompleted(before.Read, before.VisibleBlockCount))
-            {
-                return true;
-            }
-
-            int clearSteps = ComputeNonCompositeDeleteSteps(before.Read, before.VisibleBlockCount);
-            if (!ExecuteWithModifierIsolation(mainHwnd, "clear_input_delete_loop", action: () =>
-            {
-                for (int i = 0; i < clearSteps; i++)
-                {
-                    if (!PressDeleteCore(mainHwnd))
-                    {
-                        return false;
-                    }
-                }
-
-                return true;
-            }))
+            if (!SendShortcutWithOptionalModifier(mainHwnd, "clear_input_select_all", selectAllKey, selectAllMode, useSelectAllModifier, "clear_input_select_all_override_reset_failed"))
             {
                 return false;
             }
 
-            ClearInputState after = ReadClearInputState(mainHwnd);
-            if (IsClearCompleted(after.Read, after.VisibleBlockCount))
+            if (!PressDeleteCore(mainHwnd))
             {
-                return true;
+                return false;
             }
 
-            if (!PrepareForTextInput(process, mainHwnd, actionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed))
+            if (!PressDeleteCore(mainHwnd))
             {
                 return false;
             }
         }
 
-        if (ShouldAttemptPrimeInputContext(process, mainHwnd, InputContextPrimeReason.InputFailureRetry))
-        {
-            TryPrimeInputContext(process, mainHwnd, InputContextPrimeReason.InputFailureRetry);
-            if (!PrepareForTextInput(process, mainHwnd, actionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed))
-            {
-                return false;
-            }
-
-            ClearInputState beforeRetry = ReadClearInputState(mainHwnd);
-            if (IsClearCompleted(beforeRetry.Read, beforeRetry.VisibleBlockCount))
-            {
-                return true;
-            }
-
-            int retryClearSteps = ComputeNonCompositeDeleteSteps(beforeRetry.Read, beforeRetry.VisibleBlockCount);
-            if (!ExecuteWithModifierIsolation(mainHwnd, "clear_input_delete_loop", action: () =>
-            {
-                for (int i = 0; i < retryClearSteps; i++)
-                {
-                    if (!PressDeleteCore(mainHwnd))
-                    {
-                        return false;
-                    }
-                }
-
-                return true;
-            }))
-            {
-                return false;
-            }
-
-            ClearInputState afterRetry = ReadClearInputState(mainHwnd);
-            if (IsClearCompleted(afterRetry.Read, afterRetry.VisibleBlockCount))
-            {
-                return true;
-            }
-        }
-
-        return LogIncompleteClearInputAndReturnResult(ReadClearInputState(mainHwnd));
+        return true;
     }
 
     // 可視入力欄数を返す
@@ -312,11 +191,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return read.Success && read.TotalLength == 0 && visibleBlockCount == 1;
     }
 
-    internal static bool IsCompositeClearCompleted(ReadInputResult read, int visibleBlockCount)
-    {
-        return IsClearCompleted(read, visibleBlockCount);
-    }
-
     private bool LogIncompleteClearInputAndReturnResult(ClearInputState state)
     {
         _log.Warn("clear_input_incomplete " +
@@ -329,63 +203,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         ReadInputResult read = ReadInputTextDetailed(mainHwnd);
         int visibleBlockCount = EstimateVisibleBlockCount(mainHwnd);
         return new ClearInputState(read, visibleBlockCount);
-    }
-
-    internal static int ComputeCompositeDeleteSteps(ReadInputResult read, int visibleBlockCount)
-    {
-        int baseLength = read.Success ? Math.Max(0, read.TotalLength) : 0;
-        int inputBoxCount = Math.Max(0, visibleBlockCount);
-        return baseLength + inputBoxCount + 10;
-    }
-
-    internal static int ComputeNonCompositeDeleteSteps(ReadInputResult read, int visibleBlockCount)
-    {
-        int baseLength = read.Success ? Math.Max(0, read.TotalLength) : 0;
-        int inputBoxCount = Math.Max(0, visibleBlockCount);
-        return Math.Max(10, baseLength + 10 + inputBoxCount);
-    }
-
-    private bool RunCompositeClearCycleCore(IntPtr mainHwnd, int pairCount, int deleteSteps, int actionDelayMs)
-    {
-        if (!FocusInputForKeyboardIfNeeded(mainHwnd, actionDelayMs))
-        {
-            return false;
-        }
-
-        int actualPairs = Math.Max(1, pairCount);
-        for (int i = 0; i < actualPairs; i++)
-        {
-            if (!SendKey(mainHwnd, VirtualKey.PageUp))
-            {
-                return false;
-            }
-
-            if (_inputTiming.SequentialMoveToStartKeyDelayBaseMs > 0)
-            {
-                Thread.Sleep(_inputTiming.SequentialMoveToStartKeyDelayBaseMs);
-            }
-
-            if (!SendKey(mainHwnd, VirtualKey.Up))
-            {
-                return false;
-            }
-
-            if (_inputTiming.SequentialMoveToStartKeyDelayBaseMs > 0)
-            {
-                Thread.Sleep(_inputTiming.SequentialMoveToStartKeyDelayBaseMs);
-            }
-        }
-
-        int actualDeletes = Math.Max(0, deleteSteps);
-        for (int i = 0; i < actualDeletes; i++)
-        {
-            if (!PressDeleteCore(mainHwnd))
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     // 可視状態の入力ブロック数を取得
@@ -437,14 +254,13 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 statsProbeStarted = true;
             }
 
-            if (!TryTypeTextByWindowMessages(mainHwnd, send, enterPositions, charDelayMs, out int messageEnterCount))
+            if (!TryTypeTextByWindowMessages(mainHwnd, send, enterPositions, charDelayMs))
             {
                 _log.Warn($"type_text_target_send_failed reason=wm_char_failed hwnd=0x{mainHwnd.ToInt64():X}");
                 return false;
             }
 
-            _lastInjectedEnterCount = messageEnterCount;
-            _log.Info($"type_text_route_selected route=wm_char_only enterCount={messageEnterCount}");
+            _log.Info("type_text_route_selected route=wm_char_only");
             return true;
         }
         finally
@@ -536,9 +352,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     }
 
     // WM_CHARとEnter送信で入力
-    private bool TryTypeTextByWindowMessages(IntPtr targetHwnd, string send, HashSet<int> enterPositions, int charDelayMs, out int injectedEnterCount)
+    private bool TryTypeTextByWindowMessages(IntPtr targetHwnd, string send, HashSet<int> enterPositions, int charDelayMs)
     {
-        injectedEnterCount = 0;
         for (int i = 0; i < send.Length; i++)
         {
             bool isLastCharInSegment = i == send.Length - 1;
@@ -559,7 +374,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                     return false;
                 }
 
-                injectedEnterCount++;
                 if (charDelayMs > 0)
                 {
                     Thread.Sleep(charDelayMs);
@@ -574,6 +388,16 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     {
         return ExecuteWithModifierIsolation(mainHwnd, "press_play", action: () =>
         {
+            if (!TryParsePlayShortcutKey(_ui.PlayShortcutKey, out VirtualKey key))
+            {
+                return false;
+            }
+
+            if (!TryParsePlayShortcutModifier(_ui.PlayShortcutModifier, out ModifierOverrideMode mode, out bool useModifier))
+            {
+                return false;
+            }
+
             if (!KillFocusCore(mainHwnd))
             {
                 return false;
@@ -584,7 +408,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 Thread.Sleep(_ui.DelayBeforePlayShortcutMs);
             }
 
-            return SendShortcut(mainHwnd, _ui.PlayShortcut);
+            return SendShortcutWithOptionalModifier(mainHwnd, "press_play", key, mode, useModifier, "press_play_override_reset_failed");
         });
     }
 
@@ -593,13 +417,55 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return ExecuteWithModifierIsolation(mainHwnd, "move_to_start", action: () =>
         {
             SleepActionDelay(actionDelayMs);
-            if (IsFunctionKeyMoveToStartShortcut(_ui.MoveToStartShortcut))
-            {
-                return SendShortcut(mainHwnd, _ui.MoveToStartShortcut);
-            }
-
-            return SendCompositeMoveToStart(mainHwnd, actionDelayMs);
+            return SendMoveToStartShortcut(mainHwnd);
         });
+    }
+
+    // 先頭移動ショートカットを送信
+    private bool SendMoveToStartShortcut(IntPtr mainHwnd)
+    {
+        if (!TryParseMoveToStartKey(_ui.MoveToStartKey, out VirtualKey key))
+        {
+            return false;
+        }
+
+        if (!TryParseMoveToStartModifier(_ui.MoveToStartModifier, out ModifierOverrideMode mode, out bool useModifier))
+        {
+            return false;
+        }
+
+        return SendShortcutWithOptionalModifier(mainHwnd, "move_to_start", key, mode, useModifier, "move_to_start_override_reset_failed");
+    }
+
+    // 修飾子付きショートカット送信を共通化
+    private bool SendShortcutWithOptionalModifier(IntPtr mainHwnd, string operationName, VirtualKey key, ModifierOverrideMode mode, bool useModifier, string resetFailedLog)
+    {
+        if (!useModifier)
+        {
+            return SendKey(mainHwnd, key);
+        }
+
+        if (!_modifierIsolationCoordinator.SetModifierOverride(mainHwnd, operationName, mode))
+        {
+            return false;
+        }
+
+        bool sent = false;
+        bool resetOk = true;
+        try
+        {
+            sent = SendKey(mainHwnd, key);
+        }
+        finally
+        {
+            resetOk = _modifierIsolationCoordinator.SetModifierOverride(mainHwnd, operationName, ModifierOverrideMode.Neutralize);
+            if (!resetOk)
+            {
+                _log.Warn(resetFailedLog);
+            }
+        }
+
+        return sent && resetOk;
     }
 
     public bool PressDelete(IntPtr mainHwnd)
@@ -637,35 +503,224 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return SendWindowMessage(mainHwnd, WmKillFocus, IntPtr.Zero, IntPtr.Zero);
     }
 
-    internal static bool IsValidShortcut(string raw)
+    // 再生ショートカット修飾子の妥当性を判定
+    internal static bool IsValidPlayShortcutModifier(string raw)
     {
-        return ShortcutSpec.TryParse(raw, out _);
+        return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAltShift, out _, out _);
     }
 
-    // 再生ショートカットは修飾なしキーのみ許可
-    internal static bool IsValidPlayShortcut(string raw)
+    // 再生ショートカットキーの妥当性を判定
+    internal static bool IsValidPlayShortcutKey(string raw)
     {
-        if (!ShortcutSpec.TryParse(raw, out ShortcutSpec spec))
+        return TryParseShortcutKey(raw, out _);
+    }
+
+    internal static bool IsValidMoveToStartModifier(string raw)
+    {
+        return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAlt, out _, out _);
+    }
+
+    internal static bool IsValidMoveToStartKey(string raw)
+    {
+        return TryParseShortcutKey(raw, out _);
+    }
+
+    internal static bool IsValidClearInputSelectAllModifier(string raw)
+    {
+        return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAlt, out _, out _);
+    }
+
+    internal static bool IsValidClearInputSelectAllKey(string raw)
+    {
+        return TryParseShortcutKey(raw, out _);
+    }
+
+    internal static bool ShouldPressPlayBeforeMoveToStartDuringPlayback(UiConfig ui)
+    {
+        UiConfig source = ui ?? new UiConfig();
+        return string.IsNullOrWhiteSpace(source.MoveToStartModifier)
+            && !IsFunctionKeyMoveToStartKey(source.MoveToStartKey);
+    }
+
+    // 再生ショートカット修飾子を解析
+    private static bool TryParsePlayShortcutModifier(string raw, out ModifierOverrideMode mode, out bool useModifier)
+    {
+        return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAltShift, out mode, out useModifier);
+    }
+
+    // 再生ショートカットキーを解析
+    private static bool TryParsePlayShortcutKey(string raw, out VirtualKey key)
+    {
+        return TryParseShortcutKey(raw, out key);
+    }
+
+    // 先頭移動の修飾子設定を解析
+    private static bool TryParseMoveToStartModifier(string raw, out ModifierOverrideMode mode, out bool useModifier)
+    {
+        return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAlt, out mode, out useModifier);
+    }
+
+    // 先頭移動キー設定を解析
+    private static bool TryParseMoveToStartKey(string raw, out VirtualKey key)
+    {
+        return TryParseShortcutKey(raw, out key);
+    }
+
+    // 全選択の修飾子設定を解析
+    private static bool TryParseClearInputSelectAllModifier(string raw, out ModifierOverrideMode mode, out bool useModifier)
+    {
+        return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAlt, out mode, out useModifier);
+    }
+
+    // 全選択キー設定を解析
+    private static bool TryParseClearInputSelectAllKey(string raw, out VirtualKey key)
+    {
+        return TryParseShortcutKey(raw, out key);
+    }
+
+    // 共通ショートカット修飾子を解析
+    private static bool TryParseShortcutModifier(string raw, ModifierAllowance allowance, out ModifierOverrideMode mode, out bool useModifier)
+    {
+        mode = ModifierOverrideMode.Neutralize;
+        useModifier = false;
+        if (raw == null)
         {
             return false;
         }
 
-        return !spec.Control && !spec.Shift && !spec.Alt;
+        string normalized = raw.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(normalized))
+        {
+            return true;
+        }
+
+        if (normalized == "ctrl" && (allowance & ModifierAllowance.Ctrl) != 0)
+        {
+            mode = ModifierOverrideMode.Ctrl;
+            useModifier = true;
+            return true;
+        }
+
+        if (normalized == "alt" && (allowance & ModifierAllowance.Alt) != 0)
+        {
+            mode = ModifierOverrideMode.Alt;
+            useModifier = true;
+            return true;
+        }
+
+        if (normalized == "shift" && (allowance & ModifierAllowance.Shift) != 0)
+        {
+            mode = ModifierOverrideMode.Shift;
+            useModifier = true;
+            return true;
+        }
+
+        return false;
     }
 
-    internal static bool IsValidMoveToStartShortcut(string raw)
+    // 共通ショートカットキーを解析
+    private static bool TryParseShortcutKey(string raw, out VirtualKey key)
     {
-        return !string.IsNullOrWhiteSpace(raw);
+        key = 0;
+        string normalized = NormalizeShortcutKey(raw);
+        if (string.IsNullOrEmpty(normalized))
+        {
+            return false;
+        }
+
+        switch (normalized)
+        {
+            case "spacebar":
+                key = VirtualKey.Space;
+                return true;
+            case "home":
+                key = VirtualKey.Home;
+                return true;
+            case "end":
+                key = VirtualKey.End;
+                return true;
+            case "cursor up":
+                key = VirtualKey.Up;
+                return true;
+            case "cursor down":
+                key = VirtualKey.Down;
+                return true;
+            case "cursor left":
+                key = VirtualKey.Left;
+                return true;
+            case "cursor right":
+                key = VirtualKey.Right;
+                return true;
+        }
+
+        if (normalized.Length <= 3 && normalized.StartsWith("f", StringComparison.Ordinal))
+        {
+            if (int.TryParse(normalized.Substring(1), out int fn) && fn >= 1 && fn <= 12)
+            {
+                key = (VirtualKey)((int)VirtualKey.F1 + (fn - 1));
+                return true;
+            }
+        }
+
+        if (normalized.Length == 1)
+        {
+            char c = normalized[0];
+            if (c >= 'a' && c <= 'z')
+            {
+                key = (VirtualKey)((int)'A' + (c - 'a'));
+                return true;
+            }
+
+            if (c >= '0' && c <= '9')
+            {
+                key = (VirtualKey)c;
+                return true;
+            }
+
+            short vkScan = VkKeyScan(c);
+            if (vkScan != -1)
+            {
+                key = (VirtualKey)(vkScan & 0xFF);
+                return true;
+            }
+        }
+
+        return false;
     }
 
-    internal static bool IsFunctionKeyMoveToStartShortcut(string raw)
+    // ショートカットキー文字列を正規化
+    private static string NormalizeShortcutKey(string raw)
     {
-        return ShortcutSpec.TryParse(raw, out ShortcutSpec spec) && spec.IsFunctionKeyOnly;
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return string.Empty;
+        }
+
+        string[] parts = raw.Trim().ToLowerInvariant().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(" ", parts);
     }
 
-    private static bool UsesSequentialMoveToStartFallback(string raw)
+    [Flags]
+    private enum ModifierAllowance
     {
-        return !IsFunctionKeyMoveToStartShortcut(raw);
+        Ctrl = 1,
+        Alt = 2,
+        Shift = 4,
+        CtrlAlt = Ctrl | Alt,
+        CtrlAltShift = Ctrl | Alt | Shift
+    }
+
+    // 先頭移動が単独Fキーか判定
+    private static bool IsFunctionKeyMoveToStartKey(string raw)
+    {
+        return TryParseMoveToStartKey(raw, out VirtualKey key)
+            && key >= VirtualKey.F1
+            && key <= VirtualKey.F12;
     }
 
     public ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd)
@@ -701,21 +756,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
     }
 
-    private bool SendShortcut(IntPtr hwnd, string shortcut)
-    {
-        if (!ShortcutSpec.TryParse(shortcut, out ShortcutSpec spec))
-        {
-            return false;
-        }
-
-        if (spec.Control || spec.Shift || spec.Alt)
-        {
-            return false;
-        }
-
-        return SendKeyDown(hwnd, spec.Key) && SendKeyUp(hwnd, spec.Key);
-    }
-
     private bool SendKey(IntPtr hwnd, VirtualKey key)
     {
         return SendKeyDown(hwnd, key) && SendKeyUp(hwnd, key);
@@ -743,284 +783,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return ok != IntPtr.Zero;
     }
 
-    private bool FocusInputForKeyboardIfNeeded(IntPtr mainHwnd, int actionDelayMs)
-    {
-        if (!UsesSequentialMoveToStartFallback(_ui.MoveToStartShortcut))
-        {
-            return true;
-        }
-
-        IntPtr voicePeakHwnd = FindWindow(null, "VOICEPEAK");
-        if (voicePeakHwnd == IntPtr.Zero)
-        {
-            voicePeakHwnd = mainHwnd;
-        }
-
-        if (voicePeakHwnd == IntPtr.Zero)
-        {
-            return false;
-        }
-
-        bool sent = false;
-        IntPtr juceHwnd = FindWindow("JUCEWindow", null);
-        if (juceHwnd != IntPtr.Zero)
-        {
-            sent |= SendWindowMessage(juceHwnd, WmActivate, new IntPtr(2), IntPtr.Zero);
-        }
-        else
-        {
-            sent |= SendWindowMessage(voicePeakHwnd, WmActivate, new IntPtr(2), IntPtr.Zero);
-        }
-
-        sent |= SendWindowMessage(voicePeakHwnd, WmKillFocus, IntPtr.Zero, IntPtr.Zero);
-        SleepFocusTransitionDelay(actionDelayMs);
-        sent |= SendWindowMessage(voicePeakHwnd, WmSetFocus, IntPtr.Zero, IntPtr.Zero);
-        SleepFocusTransitionDelay(actionDelayMs);
-        return sent;
-    }
-
-    private bool PrimeKeyboardInputForComposite(IntPtr mainHwnd, int actionDelayMs)
-    {
-        return FocusInputForKeyboardIfNeeded(mainHwnd, actionDelayMs);
-    }
-
-    private bool TryPrimeInputContextWithForeground(Process process, IntPtr mainHwnd)
-    {
-        if (!TryGetBestInputBox(mainHwnd, out AutomationElement inputBox))
-        {
-            _log.Warn("input_context_prime_failed reason=no_input_box");
-            return false;
-        }
-
-        IntPtr previousForeground = GetForegroundWindow();
-        bool foregroundChanged = false;
-        try
-        {
-            if (previousForeground != mainHwnd)
-            {
-                foregroundChanged = TrySetForegroundWindow(mainHwnd);
-                if (!foregroundChanged)
-                {
-                    _log.Warn("input_context_prime_failed reason=set_foreground_failed");
-                    return false;
-                }
-            }
-
-            if (!TryClickElementByWindowMessages(mainHwnd, inputBox))
-            {
-                _log.Warn("input_context_prime_failed reason=click_input_box_failed");
-                return false;
-            }
-
-            Thread.Sleep(30);
-            _log.Info($"input_context_primed pid={process.Id}");
-            return true;
-        }
-        finally
-        {
-            if (foregroundChanged && previousForeground != IntPtr.Zero && previousForeground != mainHwnd)
-            {
-                TrySetForegroundWindow(previousForeground);
-            }
-        }
-    }
-
-    public bool ShouldAttemptPrimeInputContext(Process process, IntPtr mainHwnd, InputContextPrimeReason reason)
-    {
-        if (!UsesSequentialMoveToStartFallback(_ui.MoveToStartShortcut))
-        {
-            return false;
-        }
-
-        switch (reason)
-        {
-            case InputContextPrimeReason.Validation:
-                return _startup.ClickAtValidationEnabled && !IsInputContextPrimed(process, mainHwnd);
-            case InputContextPrimeReason.BeforeTextFocusWhenUnprimed:
-                return _startup.ClickBeforeTextFocusWhenUninitializedEnabled && !IsInputContextPrimed(process, mainHwnd);
-            case InputContextPrimeReason.InputFailureRetry:
-                return _ui.ClickOnInputFailureRetryEnabled;
-            default:
-                return false;
-        }
-    }
-
-    private bool IsInputContextPrimed(Process process, IntPtr mainHwnd)
-    {
-        return process != null && mainHwnd != IntPtr.Zero && _primedProcessId == process.Id && _primedMainHwnd == mainHwnd;
-    }
-
-    private void MarkInputContextPrimed(Process process, IntPtr mainHwnd)
-    {
-        _primedProcessId = process.Id;
-        _primedMainHwnd = mainHwnd;
-    }
-
-    private static bool TryGetBestInputBox(IntPtr mainHwnd, out AutomationElement inputBox)
-    {
-        inputBox = null;
-        if (mainHwnd == IntPtr.Zero)
-        {
-            return false;
-        }
-
-        try
-        {
-            AutomationElement root = AutomationElement.FromHandle(mainHwnd);
-            List<TextCandidateInfo> candidates = CollectTextCandidates(root, maxCount: 200);
-            inputBox = FindBestInputBox(candidates);
-            return inputBox != null;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private static bool TrySetForegroundWindow(IntPtr hWnd)
-    {
-        if (hWnd == IntPtr.Zero)
-        {
-            return false;
-        }
-
-        IntPtr currentForeground = GetForegroundWindow();
-        uint currentThread = GetCurrentThreadId();
-        uint targetThread = GetWindowThreadProcessId(hWnd, out _);
-        uint foregroundThread = currentForeground != IntPtr.Zero ? GetWindowThreadProcessId(currentForeground, out _) : 0;
-
-        if (foregroundThread != 0 && foregroundThread != currentThread)
-        {
-            AttachThreadInput(foregroundThread, currentThread, true);
-        }
-
-        if (targetThread != 0 && targetThread != currentThread)
-        {
-            AttachThreadInput(targetThread, currentThread, true);
-        }
-
-        bool ok = SetForegroundWindow(hWnd);
-        if (!ok)
-        {
-            SendAltTap();
-            Thread.Sleep(20);
-            ok = SetForegroundWindow(hWnd);
-        }
-
-        if (targetThread != 0 && targetThread != currentThread)
-        {
-            AttachThreadInput(targetThread, currentThread, false);
-        }
-
-        if (foregroundThread != 0 && foregroundThread != currentThread)
-        {
-            AttachThreadInput(foregroundThread, currentThread, false);
-        }
-
-        return ok || GetForegroundWindow() == hWnd;
-    }
-
-    private static void SendAltTap()
-    {
-        keybd_event((byte)VirtualKey.Menu, 0, 0, UIntPtr.Zero);
-        keybd_event((byte)VirtualKey.Menu, 0, 0x0002, UIntPtr.Zero);
-    }
-
-    private static bool TryClickElementByWindowMessages(IntPtr mainHwnd, AutomationElement element)
-    {
-        if (mainHwnd == IntPtr.Zero || element == null)
-        {
-            return false;
-        }
-
-        var rect = element.Current.BoundingRectangle;
-        if (rect.IsEmpty)
-        {
-            return false;
-        }
-
-        // クリック位置、入力欄のヘッダを避けるため中央下寄りをクリックする
-        int screenX = (int)(rect.Left + (rect.Width / 2.0));
-        int screenY = (int)(rect.Top + (rect.Height / 3.0 * 2.0));
-        POINT point = new POINT { X = screenX, Y = screenY };
-        if (!ScreenToClient(mainHwnd, ref point))
-        {
-            return false;
-        }
-
-        IntPtr lParam = MakeLParam(point.X, point.Y);
-        bool sent = true;
-        sent &= SendWindowMessage(mainHwnd, WmMouseMove, IntPtr.Zero, lParam);
-        sent &= SendWindowMessage(mainHwnd, WmLButtonDown, new IntPtr(MkLButton), lParam);
-        sent &= SendWindowMessage(mainHwnd, WmLButtonUp, IntPtr.Zero, lParam);
-        return sent;
-    }
-
-    private bool SendCompositeMoveToStart(IntPtr hwnd, int actionDelayMs)
-    {
-        if (hwnd == IntPtr.Zero)
-        {
-            return false;
-        }
-
-        if (!PrimeKeyboardInputForComposite(hwnd, actionDelayMs))
-        {
-            return false;
-        }
-
-        int pairCount = Math.Max(1, _lastInjectedEnterCount + 1);
-        return SendCompositePageUpUpPairs(hwnd, pairCount);
-    }
-
-    private void WarnIfMoveToStartShortcutWillUseSequentialFallback(string shortcut)
-    {
-        if (IsFunctionKeyMoveToStartShortcut(shortcut))
-        {
-            return;
-        }
-
-        if (ShortcutSpec.TryParse(shortcut, out _) || ShortcutSpec.TryParseCompositeMoveToStart(shortcut, out _))
-        {
-            return;
-        }
-
-        _log.Warn($"move_to_start_shortcut_unrecognized_fallback_to_pageup value={SanitizeForLog(shortcut)}");
-    }
-
-    private bool SendCompositePageUpUpPairs(IntPtr mainHwnd, int pairCount)
-    {
-        int actualPairs = Math.Max(1, pairCount);
-        for (int i = 0; i < actualPairs; i++)
-        {
-            if (!SendKey(mainHwnd, VirtualKey.PageUp))
-            {
-                return false;
-            }
-
-            if (_inputTiming.SequentialMoveToStartKeyDelayBaseMs > 0)
-            {
-                Thread.Sleep(_inputTiming.SequentialMoveToStartKeyDelayBaseMs);
-            }
-
-            if (!SendKey(mainHwnd, VirtualKey.Up))
-            {
-                return false;
-            }
-
-            if (_inputTiming.SequentialMoveToStartKeyDelayBaseMs > 0)
-            {
-                Thread.Sleep(_inputTiming.SequentialMoveToStartKeyDelayBaseMs);
-            }
-        }
-
-        return true;
-    }
-
-    private static IntPtr MakeLParam(int low, int high)
-    {
-        int combined = (high << 16) | (low & 0xFFFF);
-        return new IntPtr(combined);
-    }
 
     private static AutomationElement FindBestInputBox(List<TextCandidateInfo> candidates)
     {
@@ -1305,14 +1067,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
     }
 
-    private static void SleepFocusTransitionDelay(int actionDelayMs)
-    {
-        if (actionDelayMs > 0)
-        {
-            Thread.Sleep(actionDelayMs);
-        }
-    }
-
     private static Dictionary<char, List<SentenceBreakTrigger>> BuildSentenceBreakTriggerIndex(TextConfig text)
     {
         var index = new Dictionary<char, List<SentenceBreakTrigger>>();
@@ -1384,38 +1138,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         out IntPtr lpdwResult);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool ScreenToClient(IntPtr hWnd, ref POINT lpPoint);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern IntPtr GetForegroundWindow();
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
-
-    [DllImport("kernel32.dll")]
-    private static extern uint GetCurrentThreadId();
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct POINT
-    {
-        public int X;
-        public int Y;
-    }
+    private static extern short VkKeyScan(char ch);
 
     private enum VirtualKey
     {
@@ -1423,7 +1146,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         Return = 0x0D,
         Delete = 0x2E,
         Space = 0x20,
-        PageUp = 0x21,
         F1 = 0x70,
         F2 = 0x71,
         F3 = 0x72,
@@ -1439,6 +1161,9 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         Home = 0x24,
         End = 0x23,
         Up = 0x26,
+        Down = 0x28,
+        Left = 0x25,
+        Right = 0x27,
         Control = 0x11,
         Shift = 0x10,
         Menu = 0x12
@@ -1528,150 +1253,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
         public string Text { get; }
         public int Order { get; }
-    }
-
-    private sealed class ShortcutSpec
-    {
-        public bool Control { get; set; }
-        public bool Shift { get; set; }
-        public bool Alt { get; set; }
-        public VirtualKey Key { get; set; }
-        public bool IsCtrlUpOnly => Control && !Shift && !Alt && Key == VirtualKey.Up;
-        public bool IsFunctionKeyOnly => !Control && !Shift && !Alt && Key >= VirtualKey.F1 && Key <= VirtualKey.F12;
-
-        public static bool TryParse(string raw, out ShortcutSpec spec)
-        {
-            spec = null;
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                return false;
-            }
-
-            string[] parts = raw.Split('+');
-            ShortcutSpec temp = new ShortcutSpec();
-            for (int i = 0; i < parts.Length; i++)
-            {
-                string p = parts[i].Trim();
-                if (p.Equals("Ctrl", StringComparison.OrdinalIgnoreCase) || p.Equals("Control", StringComparison.OrdinalIgnoreCase))
-                {
-                    temp.Control = true;
-                    continue;
-                }
-
-                if (p.Equals("Shift", StringComparison.OrdinalIgnoreCase))
-                {
-                    temp.Shift = true;
-                    continue;
-                }
-
-                if (p.Equals("Alt", StringComparison.OrdinalIgnoreCase))
-                {
-                    temp.Alt = true;
-                    continue;
-                }
-
-                if (!TryParseKey(p, out VirtualKey key))
-                {
-                    return false;
-                }
-
-                temp.Key = key;
-            }
-
-            if (temp.Key == 0)
-            {
-                return false;
-            }
-
-            spec = temp;
-            return true;
-        }
-
-        public static bool TryParseCompositeMoveToStart(string raw, out ShortcutSpec spec)
-        {
-            spec = null;
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                return false;
-            }
-
-            string[] parts = raw.Split('+');
-            ShortcutSpec temp = new ShortcutSpec();
-            for (int i = 0; i < parts.Length; i++)
-            {
-                string p = parts[i].Trim();
-                if (p.Equals("Ctrl", StringComparison.OrdinalIgnoreCase) || p.Equals("Control", StringComparison.OrdinalIgnoreCase))
-                {
-                    temp.Control = true;
-                    continue;
-                }
-
-                if (p.Equals("Shift", StringComparison.OrdinalIgnoreCase))
-                {
-                    temp.Shift = true;
-                    continue;
-                }
-
-                if (p.Equals("Alt", StringComparison.OrdinalIgnoreCase))
-                {
-                    temp.Alt = true;
-                    continue;
-                }
-
-                if (!p.Equals("Up", StringComparison.OrdinalIgnoreCase))
-                {
-                    return false;
-                }
-
-                temp.Key = VirtualKey.Up;
-            }
-
-            if (!temp.IsCtrlUpOnly)
-            {
-                return false;
-            }
-
-            spec = temp;
-            return true;
-        }
-
-        private static bool TryParseKey(string text, out VirtualKey key)
-        {
-            key = 0;
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                return false;
-            }
-
-            if (text.Equals("Space", StringComparison.OrdinalIgnoreCase))
-            {
-                key = VirtualKey.Space;
-                return true;
-            }
-
-            if (text.Equals("Home", StringComparison.OrdinalIgnoreCase))
-            {
-                key = VirtualKey.Home;
-                return true;
-            }
-
-            if (text.Equals("End", StringComparison.OrdinalIgnoreCase))
-            {
-                key = VirtualKey.End;
-                return true;
-            }
-
-            if (text.Length <= 3 && text.StartsWith("F", StringComparison.OrdinalIgnoreCase))
-            {
-                if (int.TryParse(text.Substring(1), out int fn) && fn >= 1 && fn <= 12)
-                {
-                    key = (VirtualKey)((int)VirtualKey.F1 + (fn - 1));
-                    return true;
-                }
-            }
-
-            return false;
-        }
     }
 
     private readonly struct TextCandidateInfo

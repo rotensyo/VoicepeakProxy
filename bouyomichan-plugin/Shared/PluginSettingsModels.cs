@@ -136,8 +136,6 @@ public sealed class StartupConfigData
     public string BootValidationText { get; set; }
     public int BootValidationMaxRetries { get; set; }
     public int BootValidationRetryIntervalMs { get; set; }
-    public bool ClickAtValidationEnabled { get; set; }
-    public bool ClickBeforeTextFocusWhenUninitializedEnabled { get; set; }
 }
 
     // フック関連設定
@@ -151,10 +149,13 @@ public sealed class StartupConfigData
     // UI関連設定
 public sealed class UiConfigData
 {
-    public string MoveToStartShortcut { get; set; }
-    public string PlayShortcut { get; set; }
+    public string MoveToStartModifier { get; set; }
+    public string MoveToStartKey { get; set; }
+    public string ClearInputSelectAllModifier { get; set; }
+    public string ClearInputSelectAllKey { get; set; }
+    public string PlayShortcutModifier { get; set; }
+    public string PlayShortcutKey { get; set; }
     public int DelayBeforePlayShortcutMs { get; set; }
-    public bool ClickOnInputFailureRetryEnabled { get; set; }
 }
 
     // 入力タイミング関連設定
@@ -163,7 +164,6 @@ public sealed class UiConfigData
         public int CharDelayBaseMs { get; set; }
         public int DeleteKeyDelayBaseMs { get; set; }
         public int ActionDelayMs { get; set; }
-        public int SequentialMoveToStartKeyDelayBaseMs { get; set; }
         public int PostTypeWaitPerCharMs { get; set; }
         public int PostTypeWaitMinMs { get; set; }
         public int ClearInputMaxPasses { get; set; }

@@ -47,7 +47,6 @@
 - `Audio.PeakThreshold`を見直してください
 - `Audio.StartConfirmTimeoutMs`を見直してください
 - 必要に応じて`Audio.StartConfirmMaxRetries`を増やしてください
-- `MoveToStartShortcut`が`F1-F12`以外の時は`Ui.ClickOnInputFailureRetryEnabled`も検討してください
 
 ## `monitor_timeout reason=max_duration`
 
@@ -57,8 +56,9 @@
 
 ## ショートカット形式エラー
 
-- `MoveToStartShortcut`はnull/空文字/空白を設定できません
-- `MoveToStartShortcut`が`F1-F12`以外の場合は逐次`PageUp`→`Up`経路を使用します
-- クリック注入は`Ui.Composite...`設定で明示制御します
-- それ以外のショートカットは`Space`, `Home`, `End`と`Ctrl`/`Shift`/`Alt`の組み合わせを使用してください
+- `MoveToStartModifier`は空文字/`ctrl`/`alt`のみ指定できます
+- `MoveToStartKey`は`cursor up/cursor down/cursor left/cursor right`, `F1-F12`, `spacebar`, `home`, `end`を指定できます
+- `ClearInputSelectAllModifier`は空文字/`ctrl`/`alt`のみ指定できます
+- `ClearInputSelectAllKey`は`a-z`, `0-9`, 記号キーを指定できます
+- それ以外のショートカットは`Spacebar`, `Home`, `End`と`Ctrl`/`Shift`/`Alt`の組み合わせを使用してください
 - `Delete`や`Enter`は設定値としてサポートしていません

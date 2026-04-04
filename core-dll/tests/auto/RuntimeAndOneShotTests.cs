@@ -19,7 +19,7 @@ public class RuntimeAndOneShotTests
     public void Start_InvalidConfig_Throws()
     {
         AppConfig config = new AppConfig();
-        config.Ui.MoveToStartShortcut = "   ";
+        config.Ui.MoveToStartKey = "   ";
 
         Assert.ThrowsException<InvalidOperationException>(() => VoicepeakRuntime.Start(config, new TestLogger()));
     }
