@@ -44,6 +44,13 @@
   - 先頭移動キーです
   - VOICEPEAKの設定値と同じものを指定してください
   - 主な指定値は`cursor up`, `cursor down`, `cursor left`, `cursor right`, `F1-F12`, `spacebar`, `home`, `end`, `a-z`, `0-9`, 記号キー(`@`, `-`, `[`, `]`など)です
+- `ClearInputSelectAllModifier` (`default: "ctrl"`)
+  - 入力欄全選択の修飾子キーです
+  - 空文字または`ctrl`または`alt`を指定してください(`shift`は指定できません)
+- `ClearInputSelectAllKey` (`default: "a"`)
+  - 入力欄全選択キーです
+  - VOICEPEAKの設定値と同じものを指定してください
+  - 主な指定値は`a-z`, `0-9`, 記号キーです
 - `PlayShortcutModifier` (`default: ""`)
   - 再生ショートカットの修飾子キーです
   - 空文字または`ctrl`または`alt`または`shift`を指定してください
@@ -76,7 +83,8 @@
   - 文字入力後待機時間の最小値です
   - 短文で再生失敗する場合は値を増やして待機を伸ばしてください
 - `ClearInputMaxPasses` (`default: 10`)
-  - 入力クリア処理の最大試行回数です
+  - 入力クリア処理の最大パス回数です
+  - 1パスでは可視入力ブロック数分だけ`全選択`->`Delete`->`Delete`を実行します
 
 ## AudioConfig
 
@@ -154,6 +162,8 @@
 - 数値設定が許容範囲にあること
 - `MoveToStartModifier`が空文字/`ctrl`/`alt`のいずれかであること
 - `MoveToStartKey`が有効なキー形式であること
+- `ClearInputSelectAllModifier`が空文字/`ctrl`/`alt`のいずれかであること
+- `ClearInputSelectAllKey`が有効なキー形式であること
 - `PlayShortcutModifier`が空文字/`ctrl`/`alt`/`shift`のいずれかであること
 - `PlayShortcutKey`が有効なキー形式であること
 - `SentenceBreakTriggers`が`null`でなく、各要素が空文字でないこと

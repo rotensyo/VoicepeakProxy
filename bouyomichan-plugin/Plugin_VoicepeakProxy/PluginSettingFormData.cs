@@ -374,7 +374,25 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("Ui")]
-        [DisplayName("03)playShortcutModifier")]
+        [DisplayName("03)clearInputSelectAllModifier")]
+        [Description("入力欄全選択の修飾子キーです。VOICEPEAKの設定値に応じて、空文字/ctrl/altのいずれかを指定してください。")]
+        public string ClearInputSelectAllModifier
+        {
+            get { return State.Settings.AppConfig.Ui.ClearInputSelectAllModifier; }
+            set { State.Settings.AppConfig.Ui.ClearInputSelectAllModifier = value ?? string.Empty; }
+        }
+
+        [Category("Ui")]
+        [DisplayName("04)clearInputSelectAllKey")]
+        [Description("入力欄全選択のキーです。VOICEPEAKの設定値と同じものを指定してください。例: a")]
+        public string ClearInputSelectAllKey
+        {
+            get { return State.Settings.AppConfig.Ui.ClearInputSelectAllKey; }
+            set { State.Settings.AppConfig.Ui.ClearInputSelectAllKey = value ?? string.Empty; }
+        }
+
+        [Category("Ui")]
+        [DisplayName("05)playShortcutModifier")]
         [Description("再生ショートカットの修飾子キーです。VOICEPEAKの設定値に応じて、空文字/ctrl/alt/shiftのいずれかを指定してください。")]
         public string PlayShortcutModifier
         {
@@ -383,7 +401,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("Ui")]
-        [DisplayName("04)playShortcutKey")]
+        [DisplayName("06)playShortcutKey")]
         [Description("再生ショートカットのキーです。VOICEPEAKの設定値と同じものを指定してください。例: spacebar, F3, home")]
         public string PlayShortcutKey
         {
@@ -392,7 +410,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("Ui")]
-        [DisplayName("05)delayBeforePlayShortcutMs")]
+        [DisplayName("07)delayBeforePlayShortcutMs")]
         [Description("再生ボタンを押す前の待機時間です。")]
         public int DelayBeforePlayShortcutMs
         {

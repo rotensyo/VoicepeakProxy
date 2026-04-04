@@ -168,83 +168,67 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     // 入力欄をクリア
     public bool ClearInput(Process process, IntPtr mainHwnd, int actionDelayMs, bool allowCompositePrimeBeforeTextFocusWhenUnprimed)
     {
-        int clearInputMaxPasses = Math.Max(1, _inputTiming.ClearInputMaxPasses);
-        for (int pass = 0; pass < clearInputMaxPasses; pass++)
+        return ExecuteWithModifierIsolation(mainHwnd, "clear_input", action: () =>
         {
-            ClearInputState before = ReadClearInputState(mainHwnd);
-            if (IsClearCompleted(before.Read, before.VisibleBlockCount))
-            {
-                return true;
-            }
-
-            int clearSteps = ComputeNonCompositeDeleteSteps(before.Read, before.VisibleBlockCount);
-            if (!ExecuteWithModifierIsolation(mainHwnd, "clear_input_delete_loop", action: () =>
-            {
-                for (int i = 0; i < clearSteps; i++)
-                {
-                    if (!PressDeleteCore(mainHwnd))
-                    {
-                        return false;
-                    }
-                }
-
-                return true;
-            }))
+            if (!TryParseClearInputSelectAllKey(_ui.ClearInputSelectAllKey, out VirtualKey selectAllKey))
             {
                 return false;
             }
 
-            ClearInputState after = ReadClearInputState(mainHwnd);
-            if (IsClearCompleted(after.Read, after.VisibleBlockCount))
+            if (!TryParseClearInputSelectAllModifier(_ui.ClearInputSelectAllModifier, out ModifierOverrideMode selectAllMode, out bool useSelectAllModifier))
             {
-                return true;
+                return false;
             }
 
-            if (!PrepareForTextInput(process, mainHwnd, actionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed))
+            SleepActionDelay(actionDelayMs);
+            if (!SendMoveToStartShortcut(mainHwnd))
+            {
+                return false;
+            }
+
+            int clearInputMaxPasses = Math.Max(1, _inputTiming.ClearInputMaxPasses);
+            for (int pass = 0; pass < clearInputMaxPasses; pass++)
+            {
+                ClearInputState before = ReadClearInputState(mainHwnd);
+                if (IsClearCompleted(before.Read, before.VisibleBlockCount))
+                {
+                    return true;
+                }
+
+                int visibleBlockCount = Math.Max(1, before.VisibleBlockCount);
+                if (!RunSelectAllDeleteCycle(mainHwnd, selectAllKey, selectAllMode, useSelectAllModifier, visibleBlockCount))
+                {
+                    return false;
+                }
+            }
+
+            return LogIncompleteClearInputAndReturnResult(ReadClearInputState(mainHwnd));
+        });
+    }
+
+    // 全選択後にDeleteを二回送信するサイクル
+    private bool RunSelectAllDeleteCycle(IntPtr mainHwnd, VirtualKey selectAllKey, ModifierOverrideMode selectAllMode, bool useSelectAllModifier, int visibleBlockCount)
+    {
+        int cycleCount = Math.Max(1, visibleBlockCount);
+        for (int i = 0; i < cycleCount; i++)
+        {
+            if (!SendShortcutWithOptionalModifier(mainHwnd, "clear_input_select_all", selectAllKey, selectAllMode, useSelectAllModifier, "clear_input_select_all_override_reset_failed"))
+            {
+                return false;
+            }
+
+            if (!PressDeleteCore(mainHwnd))
+            {
+                return false;
+            }
+
+            if (!PressDeleteCore(mainHwnd))
             {
                 return false;
             }
         }
 
-        if (ShouldAttemptPrimeInputContext(process, mainHwnd, InputContextPrimeReason.InputFailureRetry))
-        {
-            TryPrimeInputContext(process, mainHwnd, InputContextPrimeReason.InputFailureRetry);
-            if (!PrepareForTextInput(process, mainHwnd, actionDelayMs, allowCompositePrimeBeforeTextFocusWhenUnprimed))
-            {
-                return false;
-            }
-
-            ClearInputState beforeRetry = ReadClearInputState(mainHwnd);
-            if (IsClearCompleted(beforeRetry.Read, beforeRetry.VisibleBlockCount))
-            {
-                return true;
-            }
-
-            int retryClearSteps = ComputeNonCompositeDeleteSteps(beforeRetry.Read, beforeRetry.VisibleBlockCount);
-            if (!ExecuteWithModifierIsolation(mainHwnd, "clear_input_delete_loop", action: () =>
-            {
-                for (int i = 0; i < retryClearSteps; i++)
-                {
-                    if (!PressDeleteCore(mainHwnd))
-                    {
-                        return false;
-                    }
-                }
-
-                return true;
-            }))
-            {
-                return false;
-            }
-
-            ClearInputState afterRetry = ReadClearInputState(mainHwnd);
-            if (IsClearCompleted(afterRetry.Read, afterRetry.VisibleBlockCount))
-            {
-                return true;
-            }
-        }
-
-        return LogIncompleteClearInputAndReturnResult(ReadClearInputState(mainHwnd));
+        return true;
     }
 
     // 可視入力欄数を返す
@@ -541,32 +525,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 Thread.Sleep(_ui.DelayBeforePlayShortcutMs);
             }
 
-            if (!useModifier)
-            {
-                return SendKey(mainHwnd, key);
-            }
-
-            if (!_modifierIsolationCoordinator.SetModifierOverride(mainHwnd, "press_play", mode))
-            {
-                return false;
-            }
-
-            bool sent = false;
-            bool resetOk = true;
-            try
-            {
-                sent = SendKey(mainHwnd, key);
-            }
-            finally
-            {
-                resetOk = _modifierIsolationCoordinator.SetModifierOverride(mainHwnd, "press_play", ModifierOverrideMode.Neutralize);
-                if (!resetOk)
-                {
-                    _log.Warn("press_play_override_reset_failed");
-                }
-            }
-
-            return sent && resetOk;
+            return SendShortcutWithOptionalModifier(mainHwnd, "press_play", key, mode, useModifier, "press_play_override_reset_failed");
         });
     }
 
@@ -592,12 +551,18 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             return false;
         }
 
+        return SendShortcutWithOptionalModifier(mainHwnd, "move_to_start", key, mode, useModifier, "move_to_start_override_reset_failed");
+    }
+
+    // 修飾子付きショートカット送信を共通化
+    private bool SendShortcutWithOptionalModifier(IntPtr mainHwnd, string operationName, VirtualKey key, ModifierOverrideMode mode, bool useModifier, string resetFailedLog)
+    {
         if (!useModifier)
         {
             return SendKey(mainHwnd, key);
         }
 
-        if (!_modifierIsolationCoordinator.SetModifierOverride(mainHwnd, "move_to_start", mode))
+        if (!_modifierIsolationCoordinator.SetModifierOverride(mainHwnd, operationName, mode))
         {
             return false;
         }
@@ -610,10 +575,10 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
         finally
         {
-            resetOk = _modifierIsolationCoordinator.SetModifierOverride(mainHwnd, "move_to_start", ModifierOverrideMode.Neutralize);
+            resetOk = _modifierIsolationCoordinator.SetModifierOverride(mainHwnd, operationName, ModifierOverrideMode.Neutralize);
             if (!resetOk)
             {
-                _log.Warn("move_to_start_override_reset_failed");
+                _log.Warn(resetFailedLog);
             }
         }
 
@@ -682,6 +647,16 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return TryParseShortcutKey(raw, out _);
     }
 
+    internal static bool IsValidClearInputSelectAllModifier(string raw)
+    {
+        return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAlt, out _, out _);
+    }
+
+    internal static bool IsValidClearInputSelectAllKey(string raw)
+    {
+        return TryParseShortcutKey(raw, out _);
+    }
+
     internal static bool ShouldPressPlayBeforeMoveToStartDuringPlayback(UiConfig ui)
     {
         UiConfig source = ui ?? new UiConfig();
@@ -709,6 +684,18 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
     // 先頭移動キー設定を解析
     private static bool TryParseMoveToStartKey(string raw, out VirtualKey key)
+    {
+        return TryParseShortcutKey(raw, out key);
+    }
+
+    // 全選択の修飾子設定を解析
+    private static bool TryParseClearInputSelectAllModifier(string raw, out ModifierOverrideMode mode, out bool useModifier)
+    {
+        return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAlt, out mode, out useModifier);
+    }
+
+    // 全選択キー設定を解析
+    private static bool TryParseClearInputSelectAllKey(string raw, out VirtualKey key)
     {
         return TryParseShortcutKey(raw, out key);
     }

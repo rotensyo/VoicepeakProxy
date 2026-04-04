@@ -31,6 +31,8 @@ public class AppConfigValidationTests
         Assert.AreEqual(8000, config.Hook.HookConnectTotalWaitMs);
         Assert.AreEqual("ctrl", config.Ui.MoveToStartModifier);
         Assert.AreEqual("cursor up", config.Ui.MoveToStartKey);
+        Assert.AreEqual("ctrl", config.Ui.ClearInputSelectAllModifier);
+        Assert.AreEqual("a", config.Ui.ClearInputSelectAllKey);
         Assert.AreEqual(string.Empty, config.Ui.PlayShortcutModifier);
         Assert.AreEqual("spacebar", config.Ui.PlayShortcutKey);
         Assert.IsFalse(config.Deprecated.EnableLegacyPrimeInputClick);
@@ -126,6 +128,26 @@ public class AppConfigValidationTests
             ValidateWith(config => config.Ui.MoveToStartModifier = "shift"));
 
         StringAssert.Contains(ex.Message, "ui.moveToStartModifier");
+    }
+
+    [TestMethod]
+    public void Validate_InvalidClearInputSelectAllModifier_Throws()
+    {
+        // 全選択修飾子は空文字とctrlとalt以外を拒否
+        InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
+            ValidateWith(config => config.Ui.ClearInputSelectAllModifier = "shift"));
+
+        StringAssert.Contains(ex.Message, "ui.clearInputSelectAllModifier");
+    }
+
+    [TestMethod]
+    public void Validate_InvalidClearInputSelectAllKey_Throws()
+    {
+        // 全選択キー不正を拒否
+        InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
+            ValidateWith(config => config.Ui.ClearInputSelectAllKey = ""));
+
+        StringAssert.Contains(ex.Message, "ui.clearInputSelectAllKey");
     }
 
     [TestMethod]

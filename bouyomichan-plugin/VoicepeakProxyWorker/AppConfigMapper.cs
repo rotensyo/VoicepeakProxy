@@ -16,6 +16,7 @@ internal static class AppConfigMapper
         AppConfig config = new AppConfig();
         // core既定値を欠損補完に利用
         HookConfig defaults = new AppConfig().Hook;
+        UiConfig uiDefaults = new AppConfig().Ui;
 
         config.Startup.BootValidationText = data.Startup.BootValidationText ?? string.Empty;
         config.Startup.BootValidationMaxRetries = data.Startup.BootValidationMaxRetries;
@@ -31,10 +32,12 @@ internal static class AppConfigMapper
             ? data.Hook.HookConnectTotalWaitMs
             : defaults.HookConnectTotalWaitMs;
 
-        config.Ui.MoveToStartModifier = data.Ui.MoveToStartModifier ?? string.Empty;
-        config.Ui.MoveToStartKey = data.Ui.MoveToStartKey ?? string.Empty;
-        config.Ui.PlayShortcutModifier = data.Ui.PlayShortcutModifier ?? string.Empty;
-        config.Ui.PlayShortcutKey = data.Ui.PlayShortcutKey ?? string.Empty;
+        config.Ui.MoveToStartModifier = data.Ui.MoveToStartModifier ?? uiDefaults.MoveToStartModifier;
+        config.Ui.MoveToStartKey = data.Ui.MoveToStartKey ?? uiDefaults.MoveToStartKey;
+        config.Ui.ClearInputSelectAllModifier = data.Ui.ClearInputSelectAllModifier ?? uiDefaults.ClearInputSelectAllModifier;
+        config.Ui.ClearInputSelectAllKey = data.Ui.ClearInputSelectAllKey ?? uiDefaults.ClearInputSelectAllKey;
+        config.Ui.PlayShortcutModifier = data.Ui.PlayShortcutModifier ?? uiDefaults.PlayShortcutModifier;
+        config.Ui.PlayShortcutKey = data.Ui.PlayShortcutKey ?? uiDefaults.PlayShortcutKey;
         config.Ui.DelayBeforePlayShortcutMs = data.Ui.DelayBeforePlayShortcutMs;
 
         config.Deprecated.EnableLegacyPrimeInputClick = data.Deprecated.EnableLegacyPrimeInputClick;
@@ -101,6 +104,8 @@ internal static class AppConfigMapper
 
         data.Ui.MoveToStartModifier = config.Ui.MoveToStartModifier ?? string.Empty;
         data.Ui.MoveToStartKey = config.Ui.MoveToStartKey ?? string.Empty;
+        data.Ui.ClearInputSelectAllModifier = config.Ui.ClearInputSelectAllModifier ?? string.Empty;
+        data.Ui.ClearInputSelectAllKey = config.Ui.ClearInputSelectAllKey ?? string.Empty;
         data.Ui.PlayShortcutModifier = config.Ui.PlayShortcutModifier ?? string.Empty;
         data.Ui.PlayShortcutKey = config.Ui.PlayShortcutKey ?? string.Empty;
         data.Ui.DelayBeforePlayShortcutMs = config.Ui.DelayBeforePlayShortcutMs;

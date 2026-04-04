@@ -101,6 +101,26 @@ public class UiControllerTests
     }
 
     [TestMethod]
+    public void IsValidClearInputSelectAllModifier_ReturnsExpectedValues()
+    {
+        // 全選択修飾子は空文字とctrlとaltを許可
+        Assert.IsTrue(VoicepeakUiController.IsValidClearInputSelectAllModifier(string.Empty));
+        Assert.IsTrue(VoicepeakUiController.IsValidClearInputSelectAllModifier("CTRL"));
+        Assert.IsTrue(VoicepeakUiController.IsValidClearInputSelectAllModifier("alt"));
+        Assert.IsFalse(VoicepeakUiController.IsValidClearInputSelectAllModifier("shift"));
+        Assert.IsFalse(VoicepeakUiController.IsValidClearInputSelectAllModifier(null));
+    }
+
+    [TestMethod]
+    public void IsValidClearInputSelectAllKey_ReturnsExpectedValues()
+    {
+        // 全選択キーは共通キー集合を許可
+        Assert.IsTrue(VoicepeakUiController.IsValidClearInputSelectAllKey("A"));
+        Assert.IsTrue(VoicepeakUiController.IsValidClearInputSelectAllKey("@"));
+        Assert.IsFalse(VoicepeakUiController.IsValidClearInputSelectAllKey(""));
+    }
+
+    [TestMethod]
     public void ShouldAttemptPrimeInputContext_FunctionShortcut_ReturnsFalse()
     {
         // Fキー独自ルートではprimeしない
@@ -238,15 +258,17 @@ public class UiControllerTests
     }
 
     [TestMethod]
-    public void ClearInput_UsesPrepareClearInputMaxPasses_ForNonCompositePath()
+    public void ClearInput_UsesClearInputMaxPasses_ForSelectAllDeleteCycle()
     {
-        // 非複合経路は設定した最大試行回数でループ
+        // クリア処理は設定した最大パス回数で全選択削除を繰り返す
         var messages = ReflectionTestHelper.RunInSta(() =>
         {
             UiConfig ui = new UiConfig
             {
                 MoveToStartModifier = string.Empty,
-                MoveToStartKey = "F3"
+                MoveToStartKey = "F3",
+                ClearInputSelectAllModifier = "ctrl",
+                ClearInputSelectAllKey = "a"
             };
             InputTimingConfig inputTiming = new InputTimingConfig
             {
@@ -269,8 +291,12 @@ public class UiControllerTests
             return window.Messages.ToArray();
         });
 
-        Assert.AreEqual(2, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkF3));
-        Assert.AreEqual(2, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkF3));
+        Assert.AreEqual(1, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkF3));
+        Assert.AreEqual(1, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkF3));
+        Assert.AreEqual(2, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == 0x41));
+        Assert.AreEqual(2, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == 0x41));
+        Assert.AreEqual(4, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkDelete));
+        Assert.AreEqual(4, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkDelete));
     }
 
     [TestMethod]

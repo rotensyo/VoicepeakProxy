@@ -39,6 +39,8 @@ public sealed class UiConfig
 {
     public string MoveToStartModifier { get; set; } = "ctrl";
     public string MoveToStartKey { get; set; } = "cursor up";
+    public string ClearInputSelectAllModifier { get; set; } = "ctrl";
+    public string ClearInputSelectAllKey { get; set; } = "a";
     public string PlayShortcutModifier { get; set; } = string.Empty;
     public string PlayShortcutKey { get; set; } = "spacebar";
     public int DelayBeforePlayShortcutMs { get; set; } = 60;
@@ -146,6 +148,16 @@ internal static class AppConfigValidator
         if (!VoicepeakUiController.IsValidMoveToStartKey(config.Ui.MoveToStartKey))
         {
             throw new InvalidOperationException("ui.moveToStartKey は有効なキーを指定してください（例: cursor up, F3, home）");
+        }
+
+        if (!VoicepeakUiController.IsValidClearInputSelectAllModifier(config.Ui.ClearInputSelectAllModifier))
+        {
+            throw new InvalidOperationException("ui.clearInputSelectAllModifier は空文字/ctrl/alt のいずれかを指定してください");
+        }
+
+        if (!VoicepeakUiController.IsValidClearInputSelectAllKey(config.Ui.ClearInputSelectAllKey))
+        {
+            throw new InvalidOperationException("ui.clearInputSelectAllKey は有効なキーを指定してください（例: a, @, home）");
         }
 
         if (!VoicepeakUiController.IsValidPlayShortcutModifier(config.Ui.PlayShortcutModifier))
