@@ -47,7 +47,6 @@
 - `Audio.PeakThreshold`を見直してください
 - `Audio.StartConfirmTimeoutMs`を見直してください
 - 必要に応じて`Audio.StartConfirmMaxRetries`を増やしてください
-- 旧クリックprime経路は既定で無効です(`Deprecated.EnableLegacyPrimeInputClick=false`)
 
 ## `monitor_timeout reason=max_duration`
 
@@ -61,6 +60,5 @@
 - `MoveToStartKey`は`cursor up/cursor down/cursor left/cursor right`, `F1-F12`, `spacebar`, `home`, `end`を指定できます
 - `ClearInputSelectAllModifier`は空文字/`ctrl`/`alt`のみ指定できます
 - `ClearInputSelectAllKey`は`a-z`, `0-9`, 記号キーを指定できます
-- クリック注入は`Ui.Composite...`設定で明示制御します
 - それ以外のショートカットは`Spacebar`, `Home`, `End`と`Ctrl`/`Shift`/`Alt`の組み合わせを使用してください
 - `Delete`や`Enter`は設定値としてサポートしていません

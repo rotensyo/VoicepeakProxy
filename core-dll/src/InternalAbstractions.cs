@@ -3,14 +3,6 @@ using System.Diagnostics;
 
 namespace VoicepeakProxyCore;
 
-// クリック注入の契機を表す
-internal enum InputContextPrimeReason
-{
-    Validation,
-    BeforeTextFocusWhenUnprimed,
-    InputFailureRetry
-}
-
 // 対象解決失敗理由
 internal enum ResolveTargetFailureReason
 {
@@ -75,11 +67,9 @@ internal interface IVoicepeakUiController
     bool TryResolveTargetByPid(int pid, out Process process, out IntPtr mainHwnd);
     int GetVoicepeakProcessCount();
     bool IsAlive(Process process);
-    bool ShouldAttemptPrimeInputContext(Process process, IntPtr mainHwnd, InputContextPrimeReason reason);
-    bool TryPrimeInputContext(Process process, IntPtr mainHwnd, InputContextPrimeReason reason);
-    bool PrepareForTextInput(Process process, IntPtr mainHwnd, int actionDelayMs, bool allowCompositePrimeBeforeTextFocusWhenUnprimed);
+    bool PrepareForTextInput(Process process, IntPtr mainHwnd, int actionDelayMs);
     bool PrepareForPlayback(Process process, IntPtr mainHwnd, int actionDelayMs);
-    bool ClearInput(Process process, IntPtr mainHwnd, int actionDelayMs, bool allowCompositePrimeBeforeTextFocusWhenUnprimed);
+    bool ClearInput(Process process, IntPtr mainHwnd, int actionDelayMs);
     bool TypeText(IntPtr mainHwnd, string text, int charDelayMs);
     int GetVisibleInputBlockCount(IntPtr mainHwnd);
     bool PressPlay(IntPtr mainHwnd);

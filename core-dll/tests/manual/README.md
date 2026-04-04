@@ -16,6 +16,5 @@ dotnet test core-dll/tests/manual/VoicepeakProxyCore.ManualTests.csproj
 
 主な確認内容です。
 
-- `Ctrl+Up`設定時に入力欄クリックのprimeが効くこと
 - 入力欄フォーカス後に`Ctrl+Up`で先頭移動できること
 - 起動時バリデーションと単発読み上げが成功すること

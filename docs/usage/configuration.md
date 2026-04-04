@@ -23,8 +23,6 @@
   - 起動時の入力検証失敗時の再試行回数です
 - `BootValidationRetryIntervalMs` (`default: 1000`)
   - 起動時入力検証の再試行待機時間です
-- クリックprime関連設定は`DeprecatedConfig`へ退避されています
-- 既定では`Deprecated.EnableLegacyPrimeInputClick=false`のため実行されません
 
 ## HookConfig
 
@@ -60,8 +58,6 @@
   - 主な指定値は`cursor up`, `cursor down`, `cursor left`, `cursor right`, `F1-F12`, `spacebar`, `home`, `end`, `a-z`, `0-9`, 記号キー(`@`, `-`, `[`, `]`など)です
 - `DelayBeforePlayShortcutMs` (`default: 60`)
   - 再生ボタンを押す前の待機時間です
-- 入力失敗時クリック設定は`Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled`へ退避されています
-- 既定では`Deprecated.EnableLegacyPrimeInputClick=false`のため実行されません
 
 ## InputTimingConfig
 
@@ -138,18 +134,6 @@
 - `LogModifierHookStats` (`default: false`)
   - 修飾キー中立化フックの統計ログを出力します
   - `modifier_hook_stats_probe_*`と`modifier_hook_stats`を有効化します
-
-## DeprecatedConfig
-
-- `EnableLegacyPrimeInputClick` (`default: false`)
-  - 旧クリックprime経路を有効化します
-  - 既定は無効です
-- `LegacyPrimeClickAtValidationEnabled` (`default: true`)
-  - 旧経路有効時のみ、起動時バリデーションでクリックprimeを許可します
-- `LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled` (`default: false`)
-  - 旧経路有効時のみ、入力前未初期化時クリックprimeを許可します
-- `LegacyPrimeClickOnInputFailureRetryEnabled` (`default: false`)
-  - 旧経路有効時のみ、入力失敗時リトライクリックprimeを許可します
 
 ## configバリデーション
 

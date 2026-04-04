@@ -51,14 +51,8 @@
 ### 単体系(F1-F12)
 
 - `MoveToStart`は通常ショートカット送信(`SendShortcut`)を使います。
-- `PrepareForTextInput`と`PrepareForPlayback`は、追加のprime処理を行いません。
+- `PrepareForTextInput`と`PrepareForPlayback`は、追加前処理を行いません。
 - start-confirmの再試行時は、毎回通常ショートカットで先頭移動をやり直します。
-
-### 旧クリックprime経路
-
-- クリックprimeの受け口は残っています。
-- ただし既定は`Deprecated.EnableLegacyPrimeInputClick=false`で無効です。
-- 有効化時の契機は`Deprecated.LegacyPrimeClick*`設定で制御します。
 
 ## 実装上の要点
 

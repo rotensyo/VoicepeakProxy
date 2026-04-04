@@ -121,57 +121,6 @@ public class UiControllerTests
     }
 
     [TestMethod]
-    public void ShouldAttemptPrimeInputContext_FunctionShortcut_ReturnsFalse()
-    {
-        // Fキー独自ルートではprimeしない
-        VoicepeakUiController controller = CreateController(
-            new UiConfig { MoveToStartModifier = string.Empty, MoveToStartKey = "F3" },
-            new FakeVoicepeakProcessApi());
-        Process process = Process.GetCurrentProcess();
-        IntPtr hwnd = new IntPtr(123);
-
-        Assert.IsFalse(controller.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.Validation));
-        Assert.IsFalse(controller.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.BeforeTextFocusWhenUnprimed));
-        Assert.IsFalse(controller.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.InputFailureRetry));
-    }
-
-    [TestMethod]
-    public void ShouldAttemptPrimeInputContext_BeforeTextFocus_UsesFlagAndPrimeState()
-    {
-        // 旧prime経路無効時は常にfalse
-        UiConfig ui = new UiConfig
-        {
-            MoveToStartModifier = string.Empty,
-            MoveToStartKey = "cursor up"
-        };
-        VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
-        Process process = Process.GetCurrentProcess();
-        IntPtr hwnd = new IntPtr(123);
-
-        Assert.IsFalse(controller.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.BeforeTextFocusWhenUnprimed));
-
-        ReflectionTestHelper.SetField(controller, "_primedProcessId", process.Id);
-        ReflectionTestHelper.SetField(controller, "_primedMainHwnd", hwnd);
-
-        Assert.IsFalse(controller.ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.BeforeTextFocusWhenUnprimed));
-    }
-
-    [TestMethod]
-    public void ShouldAttemptPrimeInputContext_InputFailureRetry_UsesDedicatedFlag()
-    {
-        // 旧prime経路無効時は入力失敗時もfalse
-        UiConfig disabled = new UiConfig { MoveToStartModifier = string.Empty, MoveToStartKey = "cursor up" };
-        UiConfig enabled = new UiConfig { MoveToStartModifier = string.Empty, MoveToStartKey = "cursor up" };
-        Process process = Process.GetCurrentProcess();
-        IntPtr hwnd = new IntPtr(123);
-
-        Assert.IsFalse(CreateController(disabled, new FakeVoicepeakProcessApi())
-            .ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.InputFailureRetry));
-        Assert.IsFalse(CreateController(enabled, new FakeVoicepeakProcessApi())
-            .ShouldAttemptPrimeInputContext(process, hwnd, InputContextPrimeReason.InputFailureRetry));
-    }
-
-    [TestMethod]
     public void IsCollectTextCandidateTarget_UsesAllowedControlTypeAndStrictEmptyName()
     {
         // 候補条件は型と空文字名のみを許可
@@ -260,7 +209,7 @@ public class UiControllerTests
                 new FakeVoicepeakProcessApi());
 
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
-            bool ok = controller.ClearInput(null, window.Handle, 0, false);
+            bool ok = controller.ClearInput(null, window.Handle, 0);
             Assert.IsFalse(ok);
             return window.Messages.ToArray();
         });
@@ -300,7 +249,7 @@ public class UiControllerTests
                 new FakeVoicepeakProcessApi());
 
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
-            bool ok = controller.ClearInput(null, window.Handle, 0, false);
+            bool ok = controller.ClearInput(null, window.Handle, 0);
             Assert.IsFalse(ok);
             return window.Messages.ToArray();
         });

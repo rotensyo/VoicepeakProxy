@@ -9,7 +9,6 @@ public sealed class AppConfig
     public StartupConfig Startup { get; set; } = new StartupConfig();
     public HookConfig Hook { get; set; } = new HookConfig();
     public UiConfig Ui { get; set; } = new UiConfig();
-    public DeprecatedConfig Deprecated { get; set; } = new DeprecatedConfig();
     public InputTimingConfig InputTiming { get; set; } = new InputTimingConfig();
     public AudioConfig Audio { get; set; } = new AudioConfig();
     public TextConfig Text { get; set; } = new TextConfig();
@@ -44,15 +43,6 @@ public sealed class UiConfig
     public string PlayShortcutModifier { get; set; } = string.Empty;
     public string PlayShortcutKey { get; set; } = "spacebar";
     public int DelayBeforePlayShortcutMs { get; set; } = 60;
-}
-
-// 廃止予定設定
-public sealed class DeprecatedConfig
-{
-    public bool EnableLegacyPrimeInputClick { get; set; } = false;
-    public bool LegacyPrimeClickAtValidationEnabled { get; set; } = true;
-    public bool LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled { get; set; } = false;
-    public bool LegacyPrimeClickOnInputFailureRetryEnabled { get; set; } = false;
 }
 
 // 入力タイミング関連設定
@@ -121,7 +111,6 @@ internal static class AppConfigValidator
         EnsureNotNull(config.Startup, "startup は null にできません");
         EnsureNotNull(config.Hook, "hook は null にできません");
         EnsureNotNull(config.Ui, "ui は null にできません");
-        EnsureNotNull(config.Deprecated, "deprecated は null にできません");
         EnsureNotNull(config.InputTiming, "inputTiming は null にできません");
         EnsureNotNull(config.Audio, "audio は null にできません");
         EnsureNotNull(config.Text, "text は null にできません");

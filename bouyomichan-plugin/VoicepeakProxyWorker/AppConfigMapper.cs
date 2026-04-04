@@ -40,11 +40,6 @@ internal static class AppConfigMapper
         config.Ui.PlayShortcutKey = data.Ui.PlayShortcutKey ?? uiDefaults.PlayShortcutKey;
         config.Ui.DelayBeforePlayShortcutMs = data.Ui.DelayBeforePlayShortcutMs;
 
-        config.Deprecated.EnableLegacyPrimeInputClick = data.Deprecated.EnableLegacyPrimeInputClick;
-        config.Deprecated.LegacyPrimeClickAtValidationEnabled = data.Deprecated.LegacyPrimeClickAtValidationEnabled;
-        config.Deprecated.LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled = data.Deprecated.LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled;
-        config.Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled = data.Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled;
-
         config.InputTiming.CharDelayBaseMs = data.InputTiming.CharDelayBaseMs;
         config.InputTiming.DeleteKeyDelayBaseMs = data.InputTiming.DeleteKeyDelayBaseMs;
         config.InputTiming.ActionDelayMs = data.InputTiming.ActionDelayMs;
@@ -108,11 +103,6 @@ internal static class AppConfigMapper
         data.Ui.PlayShortcutModifier = config.Ui.PlayShortcutModifier ?? string.Empty;
         data.Ui.PlayShortcutKey = config.Ui.PlayShortcutKey ?? string.Empty;
         data.Ui.DelayBeforePlayShortcutMs = config.Ui.DelayBeforePlayShortcutMs;
-
-        data.Deprecated.EnableLegacyPrimeInputClick = config.Deprecated.EnableLegacyPrimeInputClick;
-        data.Deprecated.LegacyPrimeClickAtValidationEnabled = config.Deprecated.LegacyPrimeClickAtValidationEnabled;
-        data.Deprecated.LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled = config.Deprecated.LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled;
-        data.Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled = config.Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled;
 
         data.InputTiming.CharDelayBaseMs = config.InputTiming.CharDelayBaseMs;
         data.InputTiming.DeleteKeyDelayBaseMs = config.InputTiming.DeleteKeyDelayBaseMs;

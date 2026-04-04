@@ -18,13 +18,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private const uint WmGetText = 0x000D;
     private const uint WmGetTextLength = 0x000E;
     private const uint WmKillFocus = 0x0008;
-    private const uint WmMouseMove = 0x0200;
-    private const uint WmLButtonDown = 0x0201;
-    private const uint WmLButtonUp = 0x0202;
-    private const int MkLButton = 0x0001;
     private readonly UiConfig _ui;
     private readonly InputTimingConfig _inputTiming;
-    private readonly DeprecatedConfig _deprecated;
     private readonly HookConfig _hook;
     private readonly TextConfig _text;
     private readonly DebugConfig _debug;
@@ -32,11 +27,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private readonly AppLogger _log;
     private readonly VoicepeakTargetResolver _targetResolver;
     private readonly ModifierIsolationCoordinator _modifierIsolationCoordinator;
-    private readonly object _inputPrimeGate = new object();
     // 単一操作経路前提のためロックは設けない
     private int _cachedVoicepeakPid;  // テスト互換のため保持する解決キャッシュ
-    private int _primedProcessId;  // 事前クリックを最後に行ったプロセスID
-    private IntPtr _primedMainHwnd;  // prime済みメインウィンドウハンドル
     private bool _modifierIsolationSessionActive;  // テスト互換のため保持するセッション状態
     private uint _modifierIsolationSessionProcessId;  // テスト互換のため保持する対象pid
 
@@ -47,12 +39,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     }
 
     public VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, StartupConfig startup, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log)
-        : this(ui, inputTiming, startup, hook, text, debug, new DeprecatedConfig(), log, new DefaultVoicepeakProcessApi())
-    {
-    }
-
-    public VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, StartupConfig startup, HookConfig hook, TextConfig text, DebugConfig debug, DeprecatedConfig deprecated, AppLogger log)
-        : this(ui, inputTiming, startup, hook, text, debug, deprecated, log, new DefaultVoicepeakProcessApi())
+        : this(ui, inputTiming, startup, hook, text, debug, log, new DefaultVoicepeakProcessApi())
     {
     }
 
@@ -62,16 +49,10 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     }
 
     internal VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, StartupConfig startup, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
-        : this(ui, inputTiming, startup, hook, text, debug, new DeprecatedConfig(), log, processApi)
-    {
-    }
-
-    internal VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, StartupConfig startup, HookConfig hook, TextConfig text, DebugConfig debug, DeprecatedConfig deprecated, AppLogger log, IVoicepeakProcessApi processApi)
     {
         IVoicepeakProcessApi resolvedProcessApi = processApi ?? new DefaultVoicepeakProcessApi();
         _ui = ui ?? new UiConfig();
         _inputTiming = inputTiming ?? new InputTimingConfig();
-        _deprecated = deprecated ?? new DeprecatedConfig();
         _hook = hook ?? new HookConfig();
         _text = text ?? new TextConfig();
         _debug = debug ?? new DebugConfig();
@@ -122,38 +103,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return process != null && !process.HasExited;
     }
 
-    public bool TryPrimeInputContext(Process process, IntPtr mainHwnd, InputContextPrimeReason reason)
+    public bool PrepareForTextInput(Process process, IntPtr mainHwnd, int actionDelayMs)
     {
-        if (process == null || mainHwnd == IntPtr.Zero)
-        {
-            return false;
-        }
-
-        lock (_inputPrimeGate)
-        {
-            if (reason != InputContextPrimeReason.InputFailureRetry && IsInputContextPrimed(process, mainHwnd))
-            {
-                return true;
-            }
-
-            if (!TryPrimeInputContextWithForeground(process, mainHwnd))
-            {
-                return false;
-            }
-
-            MarkInputContextPrimed(process, mainHwnd);
-            return true;
-        }
-    }
-
-    public bool PrepareForTextInput(Process process, IntPtr mainHwnd, int actionDelayMs, bool allowCompositePrimeBeforeTextFocusWhenUnprimed)
-    {
-        if (allowCompositePrimeBeforeTextFocusWhenUnprimed
-            && ShouldAttemptPrimeInputContext(process, mainHwnd, InputContextPrimeReason.BeforeTextFocusWhenUnprimed))
-        {
-            TryPrimeInputContext(process, mainHwnd, InputContextPrimeReason.BeforeTextFocusWhenUnprimed);
-        }
-
         return MoveToStart(mainHwnd, actionDelayMs);
     }
 
@@ -163,7 +114,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     }
 
     // 入力欄をクリア
-    public bool ClearInput(Process process, IntPtr mainHwnd, int actionDelayMs, bool allowCompositePrimeBeforeTextFocusWhenUnprimed)
+    public bool ClearInput(Process process, IntPtr mainHwnd, int actionDelayMs)
     {
         return ExecuteWithModifierIsolation(mainHwnd, "clear_input", action: () =>
         {
@@ -676,7 +627,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private static bool TryParseShortcutKey(string raw, out VirtualKey key)
     {
         key = 0;
-        string normalized = NormalizeMoveToStartKey(raw);
+        string normalized = NormalizeShortcutKey(raw);
         if (string.IsNullOrEmpty(normalized))
         {
             return false;
@@ -742,18 +693,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return false;
     }
 
-    [Flags]
-    private enum ModifierAllowance
-    {
-        Ctrl = 1,
-        Alt = 2,
-        Shift = 4,
-        CtrlAlt = Ctrl | Alt,
-        CtrlAltShift = Ctrl | Alt | Shift
-    }
-
-    // 先頭移動キー文字列を正規化
-    private static string NormalizeMoveToStartKey(string raw)
+    // ショートカットキー文字列を正規化
+    private static string NormalizeShortcutKey(string raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
         {
@@ -769,20 +710,22 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return string.Join(" ", parts);
     }
 
+    [Flags]
+    private enum ModifierAllowance
+    {
+        Ctrl = 1,
+        Alt = 2,
+        Shift = 4,
+        CtrlAlt = Ctrl | Alt,
+        CtrlAltShift = Ctrl | Alt | Shift
+    }
+
     // 先頭移動が単独Fキーか判定
     private static bool IsFunctionKeyMoveToStartKey(string raw)
     {
         return TryParseMoveToStartKey(raw, out VirtualKey key)
             && key >= VirtualKey.F1
             && key <= VirtualKey.F12;
-    }
-
-    // 旧来prime経路が必要か判定
-    private bool ShouldUseLegacyPrimeForMoveToStart()
-    {
-        return _deprecated.EnableLegacyPrimeInputClick
-            && string.IsNullOrWhiteSpace(_ui.MoveToStartModifier)
-            && !IsFunctionKeyMoveToStartKey(_ui.MoveToStartKey);
     }
 
     public ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd)
@@ -845,183 +788,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return ok != IntPtr.Zero;
     }
 
-    private bool TryPrimeInputContextWithForeground(Process process, IntPtr mainHwnd)
-    {
-        if (!TryGetBestInputBox(mainHwnd, out AutomationElement inputBox))
-        {
-            _log.Warn("input_context_prime_failed reason=no_input_box");
-            return false;
-        }
-
-        IntPtr previousForeground = GetForegroundWindow();
-        bool foregroundChanged = false;
-        try
-        {
-            if (previousForeground != mainHwnd)
-            {
-                foregroundChanged = TrySetForegroundWindow(mainHwnd);
-                if (!foregroundChanged)
-                {
-                    _log.Warn("input_context_prime_failed reason=set_foreground_failed");
-                    return false;
-                }
-            }
-
-            if (!TryClickElementByWindowMessages(mainHwnd, inputBox))
-            {
-                _log.Warn("input_context_prime_failed reason=click_input_box_failed");
-                return false;
-            }
-
-            Thread.Sleep(30);
-            _log.Info($"input_context_primed pid={process.Id}");
-            return true;
-        }
-        finally
-        {
-            if (foregroundChanged && previousForeground != IntPtr.Zero && previousForeground != mainHwnd)
-            {
-                TrySetForegroundWindow(previousForeground);
-            }
-        }
-    }
-
-    public bool ShouldAttemptPrimeInputContext(Process process, IntPtr mainHwnd, InputContextPrimeReason reason)
-    {
-        if (!ShouldUseLegacyPrimeForMoveToStart())
-        {
-            return false;
-        }
-
-        switch (reason)
-        {
-            case InputContextPrimeReason.Validation:
-                return _deprecated.LegacyPrimeClickAtValidationEnabled && !IsInputContextPrimed(process, mainHwnd);
-            case InputContextPrimeReason.BeforeTextFocusWhenUnprimed:
-                return _deprecated.LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled && !IsInputContextPrimed(process, mainHwnd);
-            case InputContextPrimeReason.InputFailureRetry:
-                return _deprecated.LegacyPrimeClickOnInputFailureRetryEnabled;
-            default:
-                return false;
-        }
-    }
-
-    private bool IsInputContextPrimed(Process process, IntPtr mainHwnd)
-    {
-        return process != null && mainHwnd != IntPtr.Zero && _primedProcessId == process.Id && _primedMainHwnd == mainHwnd;
-    }
-
-    private void MarkInputContextPrimed(Process process, IntPtr mainHwnd)
-    {
-        _primedProcessId = process.Id;
-        _primedMainHwnd = mainHwnd;
-    }
-
-    private static bool TryGetBestInputBox(IntPtr mainHwnd, out AutomationElement inputBox)
-    {
-        inputBox = null;
-        if (mainHwnd == IntPtr.Zero)
-        {
-            return false;
-        }
-
-        try
-        {
-            AutomationElement root = AutomationElement.FromHandle(mainHwnd);
-            List<TextCandidateInfo> candidates = CollectTextCandidates(root, maxCount: 200);
-            inputBox = FindBestInputBox(candidates);
-            return inputBox != null;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private static bool TrySetForegroundWindow(IntPtr hWnd)
-    {
-        if (hWnd == IntPtr.Zero)
-        {
-            return false;
-        }
-
-        IntPtr currentForeground = GetForegroundWindow();
-        uint currentThread = GetCurrentThreadId();
-        uint targetThread = GetWindowThreadProcessId(hWnd, out _);
-        uint foregroundThread = currentForeground != IntPtr.Zero ? GetWindowThreadProcessId(currentForeground, out _) : 0;
-
-        if (foregroundThread != 0 && foregroundThread != currentThread)
-        {
-            AttachThreadInput(foregroundThread, currentThread, true);
-        }
-
-        if (targetThread != 0 && targetThread != currentThread)
-        {
-            AttachThreadInput(targetThread, currentThread, true);
-        }
-
-        bool ok = SetForegroundWindow(hWnd);
-        if (!ok)
-        {
-            SendAltTap();
-            Thread.Sleep(20);
-            ok = SetForegroundWindow(hWnd);
-        }
-
-        if (targetThread != 0 && targetThread != currentThread)
-        {
-            AttachThreadInput(targetThread, currentThread, false);
-        }
-
-        if (foregroundThread != 0 && foregroundThread != currentThread)
-        {
-            AttachThreadInput(foregroundThread, currentThread, false);
-        }
-
-        return ok || GetForegroundWindow() == hWnd;
-    }
-
-    private static void SendAltTap()
-    {
-        keybd_event((byte)VirtualKey.Menu, 0, 0, UIntPtr.Zero);
-        keybd_event((byte)VirtualKey.Menu, 0, 0x0002, UIntPtr.Zero);
-    }
-
-    private static bool TryClickElementByWindowMessages(IntPtr mainHwnd, AutomationElement element)
-    {
-        if (mainHwnd == IntPtr.Zero || element == null)
-        {
-            return false;
-        }
-
-        var rect = element.Current.BoundingRectangle;
-        if (rect.IsEmpty)
-        {
-            return false;
-        }
-
-        // クリック位置、入力欄のヘッダを避けるため中央下寄りをクリックする
-        int screenX = (int)(rect.Left + (rect.Width / 2.0));
-        int screenY = (int)(rect.Top + (rect.Height / 3.0 * 2.0));
-        POINT point = new POINT { X = screenX, Y = screenY };
-        if (!ScreenToClient(mainHwnd, ref point))
-        {
-            return false;
-        }
-
-        IntPtr lParam = MakeLParam(point.X, point.Y);
-        bool sent = true;
-        sent &= SendWindowMessage(mainHwnd, WmMouseMove, IntPtr.Zero, lParam);
-        sent &= SendWindowMessage(mainHwnd, WmLButtonDown, new IntPtr(MkLButton), lParam);
-        sent &= SendWindowMessage(mainHwnd, WmLButtonUp, IntPtr.Zero, lParam);
-        return sent;
-    }
-
-    private static IntPtr MakeLParam(int low, int high)
-    {
-        int combined = (high << 16) | (low & 0xFFFF);
-        return new IntPtr(combined);
-    }
 
     private static AutomationElement FindBestInputBox(List<TextCandidateInfo> candidates)
     {
@@ -1376,36 +1142,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         uint uTimeout,
         out IntPtr lpdwResult);
 
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool ScreenToClient(IntPtr hWnd, ref POINT lpPoint);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern IntPtr GetForegroundWindow();
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
-
-    [DllImport("kernel32.dll")]
-    private static extern uint GetCurrentThreadId();
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern short VkKeyScan(char ch);
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct POINT
-    {
-        public int X;
-        public int Y;
-    }
 
     private enum VirtualKey
     {

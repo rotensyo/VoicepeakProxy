@@ -73,7 +73,7 @@ public class VoicepeakEngineExecuteJobTests
     }
 
     [TestMethod]
-    public void ExecuteJob_StartTimeoutRetry_DoesNotCallTryPrimeInputContext()
+    public void ExecuteJob_StartTimeoutRetry_CompletesSuccessfully()
     {
         TestLogger logger = new TestLogger();
         FakeVoicepeakUiController ui = CreateResolvedUi();
@@ -89,7 +89,6 @@ public class VoicepeakEngineExecuteJobTests
         AppConfig config = CreateConfig();
         config.Ui.MoveToStartModifier = "ctrl";
         config.Ui.MoveToStartKey = "cursor up";
-        config.Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 2;
         config.Audio.StopConfirmMs = 1;
@@ -100,11 +99,10 @@ public class VoicepeakEngineExecuteJobTests
         ReflectionTestHelper.InvokeCoreInstance(engine, "ExecuteJob", CreateJob("hello"));
 
         Assert.AreEqual(3, ui.PressPlayCalls);
-        Assert.AreEqual(0, ui.TryPrimeInputContextCalls);
     }
 
     [TestMethod]
-    public void ExecuteJob_StartTimeoutRetry_FunctionShortcut_DoesNotCallTryPrimeInputContext()
+    public void ExecuteJob_StartTimeoutRetry_FunctionShortcut_CompletesSuccessfully()
     {
         TestLogger logger = new TestLogger();
         FakeVoicepeakUiController ui = CreateResolvedUi();
@@ -118,7 +116,6 @@ public class VoicepeakEngineExecuteJobTests
         AppConfig config = CreateConfig();
         config.Ui.MoveToStartModifier = string.Empty;
         config.Ui.MoveToStartKey = "F3";
-        config.Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 1;
         config.Audio.StopConfirmMs = 1;
@@ -128,7 +125,7 @@ public class VoicepeakEngineExecuteJobTests
 
         ReflectionTestHelper.InvokeCoreInstance(engine, "ExecuteJob", CreateJob("hello"));
 
-        Assert.AreEqual(0, ui.TryPrimeInputContextCalls);
+        Assert.IsTrue(ui.PressPlayCalls >= 1);
     }
 
     [TestMethod]

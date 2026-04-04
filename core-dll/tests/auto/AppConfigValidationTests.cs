@@ -34,10 +34,6 @@ public class AppConfigValidationTests
         Assert.AreEqual("a", config.Ui.ClearInputSelectAllKey);
         Assert.AreEqual(string.Empty, config.Ui.PlayShortcutModifier);
         Assert.AreEqual("spacebar", config.Ui.PlayShortcutKey);
-        Assert.IsFalse(config.Deprecated.EnableLegacyPrimeInputClick);
-        Assert.IsTrue(config.Deprecated.LegacyPrimeClickAtValidationEnabled);
-        Assert.IsFalse(config.Deprecated.LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled);
-        Assert.IsFalse(config.Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled);
         CollectionAssert.AreEqual(new[] { "。", "！", "？", "!", "?" }, config.Text.SentenceBreakTriggers);
         Assert.AreEqual(BootValidationMode.Required, config.Validation.BootValidation);
     }

@@ -173,7 +173,7 @@ public class VoicepeakOneShotCoreTests
     }
 
     [TestMethod]
-    public void SpeakOnceWaitCore_StartTimeoutRetry_DoesNotCallTryPrimeInputContext()
+    public void SpeakOnceWaitCore_StartTimeoutRetry_CompletesSuccessfully()
     {
         FakeVoicepeakUiController ui = CreateResolvedUi();
         FakeAudioSessionReader audio = new FakeAudioSessionReader();
@@ -188,7 +188,6 @@ public class VoicepeakOneShotCoreTests
         AppConfig config = CreateConfig();
         config.Ui.MoveToStartModifier = "ctrl";
         config.Ui.MoveToStartKey = "cursor up";
-        config.Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled = true;
         config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 2;
         config.Audio.StopConfirmMs = 1;
@@ -196,11 +195,10 @@ public class VoicepeakOneShotCoreTests
         SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), ui, audio);
 
         Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
-        Assert.AreEqual(0, ui.TryPrimeInputContextCalls);
     }
 
     [TestMethod]
-    public void SpeakOnceWaitCore_IgnoresCompositePrimeBeforeTextFocusSetting()
+    public void SpeakOnceWaitCore_CallsPrepareForTextInput()
     {
         FakeVoicepeakUiController ui = CreateResolvedUi();
         FakeAudioSessionReader audio = new FakeAudioSessionReader();
@@ -211,13 +209,11 @@ public class VoicepeakOneShotCoreTests
         AppConfig config = CreateConfig();
         config.Ui.MoveToStartModifier = "ctrl";
         config.Ui.MoveToStartKey = "cursor up";
-        config.Deprecated.LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled = true;
 
         SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWaitCore(config, new SpeakOnceRequest { Text = "A" }, new AppLogger(new TestLogger()), ui, audio);
 
         Assert.AreEqual(SpeakOnceStatus.Completed, result.Status);
-        CollectionAssert.AreEqual(new[] { false }, ui.PrepareForTextInputCompositePrimeFlags);
-        Assert.AreEqual(0, ui.TryPrimeInputContextCalls);
+        Assert.AreEqual(1, ui.PrepareForTextInputCalls);
     }
 
     [TestMethod]

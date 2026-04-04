@@ -324,7 +324,7 @@ public class VoicepeakOneShotUtilityTests
             ProcessCountHandler = () => 1,
             ResolveTargetHandler = () => (true, Process.GetCurrentProcess(), new IntPtr(123)),
             IsAliveHandler = _ => true,
-            PrepareForTextInputHandler = (_, _, _, _) => true,
+            PrepareForTextInputHandler = (_, _, _) => true,
             ClearInputHandler = () => true,
             TypeTextHandler = (_, _, _) => true
         };

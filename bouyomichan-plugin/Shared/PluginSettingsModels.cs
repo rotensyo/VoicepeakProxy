@@ -50,7 +50,6 @@ namespace BouyomiVoicepeakBridge.Shared
         public StartupConfigData Startup { get; set; }
         public HookConfigData Hook { get; set; }
         public UiConfigData Ui { get; set; }
-        public DeprecatedConfigData Deprecated { get; set; }
         public InputTimingConfigData InputTiming { get; set; }
         public AudioConfigData Audio { get; set; }
         public TextConfigData Text { get; set; }
@@ -63,7 +62,6 @@ namespace BouyomiVoicepeakBridge.Shared
             Startup = new StartupConfigData();
             Hook = new HookConfigData();
             Ui = new UiConfigData();
-            Deprecated = new DeprecatedConfigData();
             InputTiming = new InputTimingConfigData();
             Audio = new AudioConfigData();
             Text = new TextConfigData();
@@ -88,11 +86,6 @@ namespace BouyomiVoicepeakBridge.Shared
             if (Ui == null)
             {
                 Ui = new UiConfigData();
-            }
-
-            if (Deprecated == null)
-            {
-                Deprecated = new DeprecatedConfigData();
             }
 
             if (InputTiming == null)
@@ -163,15 +156,6 @@ public sealed class UiConfigData
     public string PlayShortcutModifier { get; set; }
     public string PlayShortcutKey { get; set; }
     public int DelayBeforePlayShortcutMs { get; set; }
-}
-
-    // 廃止予定設定
-public sealed class DeprecatedConfigData
-{
-    public bool EnableLegacyPrimeInputClick { get; set; }
-    public bool LegacyPrimeClickAtValidationEnabled { get; set; }
-    public bool LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled { get; set; }
-    public bool LegacyPrimeClickOnInputFailureRetryEnabled { get; set; }
 }
 
     // 入力タイミング関連設定
