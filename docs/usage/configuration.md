@@ -73,9 +73,6 @@
   - より高速化したい場合は`0`で最速削除になります
 - `ActionDelayMs` (`default: 5`)
   - 文字入力欄フォーカスなどのUIアクション時の待機時間です
-- `SequentialMoveToStartKeyDelayBaseMs` (`default: 5`)
-  - 互換で残している逐次`PageUp`→`Up`経路でのキー間待機です
-  - 通常の先頭移動処理では使用されません
 - `PostTypeWaitPerCharMs` (`default: 5`)
   - 文字入力後の待機時間算出に使う倍率です
   - 文字入力完了後に再生失敗する場合は値を増やして待機を伸ばしてください

@@ -218,43 +218,17 @@ public class UiControllerTests
     }
 
     [TestMethod]
-    public void IsCompositeClearCompleted_RequiresSingleInputBox()
+    public void IsClearCompleted_RequiresSingleInputBox()
     {
         // 完全削除判定は入力欄1件を必須
         ReadInputResult cleared = ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA);
         ReadInputResult hasText = ReadInputResult.Ok("a", 1, ReadInputSource.PrimaryUiA);
         ReadInputResult failed = ReadInputResult.Fail(ReadInputSource.Exception, string.Empty, 0);
 
-        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCompositeClearCompleted", cleared, 1));
-        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCompositeClearCompleted", cleared, 2));
-        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCompositeClearCompleted", hasText, 1));
-        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCompositeClearCompleted", failed, 1));
-    }
-
-    [TestMethod]
-    public void ComputeCompositeDeleteSteps_AddsInputBoxCount()
-    {
-        // 削除ステップは文字数と入力欄数を加算
-        ReadInputResult ok = ReadInputResult.Ok("abc", 3, ReadInputSource.PrimaryUiA);
-        ReadInputResult negative = ReadInputResult.Ok(string.Empty, -1, ReadInputSource.PrimaryUiA);
-        ReadInputResult failed = ReadInputResult.Fail(ReadInputSource.Exception, string.Empty, 5);
-
-        Assert.AreEqual(15, (int)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ComputeCompositeDeleteSteps", ok, 2));
-        Assert.AreEqual(12, (int)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ComputeCompositeDeleteSteps", negative, 2));
-        Assert.AreEqual(12, (int)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ComputeCompositeDeleteSteps", failed, 2));
-    }
-
-    [TestMethod]
-    public void ComputeNonCompositeDeleteSteps_AddsInputBoxCountAndKeepsMinimum()
-    {
-        // 非複合削除は入力欄件数を加算し最小値を維持
-        ReadInputResult ok = ReadInputResult.Ok("abc", 3, ReadInputSource.PrimaryUiA);
-        ReadInputResult negative = ReadInputResult.Ok(string.Empty, -1, ReadInputSource.PrimaryUiA);
-        ReadInputResult failed = ReadInputResult.Fail(ReadInputSource.Exception, string.Empty, 5);
-
-        Assert.AreEqual(18, (int)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ComputeNonCompositeDeleteSteps", ok, 5));
-        Assert.AreEqual(11, (int)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ComputeNonCompositeDeleteSteps", negative, 1));
-        Assert.AreEqual(14, (int)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ComputeNonCompositeDeleteSteps", failed, 4));
+        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsClearCompleted", cleared, 1));
+        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsClearCompleted", cleared, 2));
+        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsClearCompleted", hasText, 1));
+        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsClearCompleted", failed, 1));
     }
 
     [TestMethod]
@@ -878,32 +852,6 @@ public class UiControllerTests
         });
 
         Assert.IsTrue(messages.Any(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == 0x2E));
-    }
-
-    [TestMethod]
-    public void RunCompositeClearCycle_SendsPageUpUpAndDelete()
-    {
-        // 複合削除サイクルはPageUpとUpの後にDeleteを送信
-        var messages = ReflectionTestHelper.RunInSta(() =>
-        {
-            object controller = ReflectionTestHelper.CreateVoicepeakUiController(
-                new UiConfig { MoveToStartModifier = string.Empty, MoveToStartKey = "cursor up" },
-                new DebugConfig(),
-                new TestLogger());
-
-            using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
-            bool ok = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "RunCompositeClearCycleCore", window.Handle, 2, 3, 0);
-            Assert.IsTrue(ok);
-            return window.Messages.ToArray();
-        });
-
-        Assert.IsFalse(messages.Any(m => m.Msg == 0x0008));
-        Assert.AreEqual(2, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkPageUp));
-        Assert.AreEqual(2, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkPageUp));
-        Assert.AreEqual(2, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkUp));
-        Assert.AreEqual(2, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkUp));
-        Assert.AreEqual(3, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkDelete));
-        Assert.AreEqual(3, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkDelete));
     }
 
     [TestMethod]

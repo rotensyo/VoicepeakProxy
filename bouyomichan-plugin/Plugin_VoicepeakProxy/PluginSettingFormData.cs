@@ -460,16 +460,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("InputTiming")]
-        [DisplayName("04)sequentialMoveToStartKeyDelayBaseMs")]
-        [Description("カーソル先頭移動時の入力待機時間です。")]
-        public int SequentialMoveToStartKeyDelayBaseMs
-        {
-            get { return State.Settings.AppConfig.InputTiming.SequentialMoveToStartKeyDelayBaseMs; }
-            set { State.Settings.AppConfig.InputTiming.SequentialMoveToStartKeyDelayBaseMs = value; }
-        }
-
-        [Category("InputTiming")]
-        [DisplayName("05)postTypeWaitPerCharMs")]
+        [DisplayName("04)postTypeWaitPerCharMs")]
         [Description("文字入力後の待機時間算出に使用する倍率です。文字入力完了後に再生失敗する場合は、値を増やして再生前の待機時間を伸ばしてみてください。")]
         public int PostTypeWaitPerCharMs
         {
@@ -478,7 +469,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("InputTiming")]
-        [DisplayName("06)postTypeWaitMinMs")]
+        [DisplayName("05)postTypeWaitMinMs")]
         [Description("文字入力後待機時間の最小値です。文字入力完了後に再生失敗する場合は、値を増やして再生前の待機時間を伸ばしてみてください。")]
         public int PostTypeWaitMinMs
         {
@@ -487,7 +478,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("InputTiming")]
-        [DisplayName("07)clearInputMaxPasses")]
+        [DisplayName("06)clearInputMaxPasses")]
         [Description("入力クリア処理の最大繰り返し回数です。入力文字が削除しきれていない場合は増やしてみてください。")]
         public int ClearInputMaxPasses
         {

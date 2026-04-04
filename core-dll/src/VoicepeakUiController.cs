@@ -18,8 +18,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private const uint WmGetText = 0x000D;
     private const uint WmGetTextLength = 0x000E;
     private const uint WmKillFocus = 0x0008;
-    private const uint WmSetFocus = 0x0007;
-    private const uint WmActivate = 0x0006;
     private const uint WmMouseMove = 0x0200;
     private const uint WmLButtonDown = 0x0201;
     private const uint WmLButtonUp = 0x0202;
@@ -39,7 +37,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private int _cachedVoicepeakPid;  // テスト互換のため保持する解決キャッシュ
     private int _primedProcessId;  // 事前クリックを最後に行ったプロセスID
     private IntPtr _primedMainHwnd;  // prime済みメインウィンドウハンドル
-    private int _lastInjectedEnterCount;  // 入力ブロック区切りに押下したEnter回数
     private bool _modifierIsolationSessionActive;  // テスト互換のため保持するセッション状態
     private uint _modifierIsolationSessionProcessId;  // テスト互換のため保持する対象pid
 
@@ -243,11 +240,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return read.Success && read.TotalLength == 0 && visibleBlockCount == 1;
     }
 
-    internal static bool IsCompositeClearCompleted(ReadInputResult read, int visibleBlockCount)
-    {
-        return IsClearCompleted(read, visibleBlockCount);
-    }
-
     private bool LogIncompleteClearInputAndReturnResult(ClearInputState state)
     {
         _log.Warn("clear_input_incomplete " +
@@ -260,63 +252,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         ReadInputResult read = ReadInputTextDetailed(mainHwnd);
         int visibleBlockCount = EstimateVisibleBlockCount(mainHwnd);
         return new ClearInputState(read, visibleBlockCount);
-    }
-
-    internal static int ComputeCompositeDeleteSteps(ReadInputResult read, int visibleBlockCount)
-    {
-        int baseLength = read.Success ? Math.Max(0, read.TotalLength) : 0;
-        int inputBoxCount = Math.Max(0, visibleBlockCount);
-        return baseLength + inputBoxCount + 10;
-    }
-
-    internal static int ComputeNonCompositeDeleteSteps(ReadInputResult read, int visibleBlockCount)
-    {
-        int baseLength = read.Success ? Math.Max(0, read.TotalLength) : 0;
-        int inputBoxCount = Math.Max(0, visibleBlockCount);
-        return Math.Max(10, baseLength + 10 + inputBoxCount);
-    }
-
-    private bool RunCompositeClearCycleCore(IntPtr mainHwnd, int pairCount, int deleteSteps, int actionDelayMs)
-    {
-        if (!FocusInputForKeyboardIfNeeded(mainHwnd, actionDelayMs))
-        {
-            return false;
-        }
-
-        int actualPairs = Math.Max(1, pairCount);
-        for (int i = 0; i < actualPairs; i++)
-        {
-            if (!SendKey(mainHwnd, VirtualKey.PageUp))
-            {
-                return false;
-            }
-
-            if (_inputTiming.SequentialMoveToStartKeyDelayBaseMs > 0)
-            {
-                Thread.Sleep(_inputTiming.SequentialMoveToStartKeyDelayBaseMs);
-            }
-
-            if (!SendKey(mainHwnd, VirtualKey.Up))
-            {
-                return false;
-            }
-
-            if (_inputTiming.SequentialMoveToStartKeyDelayBaseMs > 0)
-            {
-                Thread.Sleep(_inputTiming.SequentialMoveToStartKeyDelayBaseMs);
-            }
-        }
-
-        int actualDeletes = Math.Max(0, deleteSteps);
-        for (int i = 0; i < actualDeletes; i++)
-        {
-            if (!PressDeleteCore(mainHwnd))
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     // 可視状態の入力ブロック数を取得
@@ -368,14 +303,13 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 statsProbeStarted = true;
             }
 
-            if (!TryTypeTextByWindowMessages(mainHwnd, send, enterPositions, charDelayMs, out int messageEnterCount))
+            if (!TryTypeTextByWindowMessages(mainHwnd, send, enterPositions, charDelayMs))
             {
                 _log.Warn($"type_text_target_send_failed reason=wm_char_failed hwnd=0x{mainHwnd.ToInt64():X}");
                 return false;
             }
 
-            _lastInjectedEnterCount = messageEnterCount;
-            _log.Info($"type_text_route_selected route=wm_char_only enterCount={messageEnterCount}");
+            _log.Info("type_text_route_selected route=wm_char_only");
             return true;
         }
         finally
@@ -467,9 +401,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     }
 
     // WM_CHARとEnter送信で入力
-    private bool TryTypeTextByWindowMessages(IntPtr targetHwnd, string send, HashSet<int> enterPositions, int charDelayMs, out int injectedEnterCount)
+    private bool TryTypeTextByWindowMessages(IntPtr targetHwnd, string send, HashSet<int> enterPositions, int charDelayMs)
     {
-        injectedEnterCount = 0;
         for (int i = 0; i < send.Length; i++)
         {
             bool isLastCharInSegment = i == send.Length - 1;
@@ -490,7 +423,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                     return false;
                 }
 
-                injectedEnterCount++;
                 if (charDelayMs > 0)
                 {
                     Thread.Sleep(charDelayMs);
@@ -913,47 +845,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return ok != IntPtr.Zero;
     }
 
-    private bool FocusInputForKeyboardIfNeeded(IntPtr mainHwnd, int actionDelayMs)
-    {
-        if (!ShouldUseLegacyPrimeForMoveToStart())
-        {
-            return true;
-        }
-
-        IntPtr voicePeakHwnd = FindWindow(null, "VOICEPEAK");
-        if (voicePeakHwnd == IntPtr.Zero)
-        {
-            voicePeakHwnd = mainHwnd;
-        }
-
-        if (voicePeakHwnd == IntPtr.Zero)
-        {
-            return false;
-        }
-
-        bool sent = false;
-        IntPtr juceHwnd = FindWindow("JUCEWindow", null);
-        if (juceHwnd != IntPtr.Zero)
-        {
-            sent |= SendWindowMessage(juceHwnd, WmActivate, new IntPtr(2), IntPtr.Zero);
-        }
-        else
-        {
-            sent |= SendWindowMessage(voicePeakHwnd, WmActivate, new IntPtr(2), IntPtr.Zero);
-        }
-
-        sent |= SendWindowMessage(voicePeakHwnd, WmKillFocus, IntPtr.Zero, IntPtr.Zero);
-        SleepFocusTransitionDelay(actionDelayMs);
-        sent |= SendWindowMessage(voicePeakHwnd, WmSetFocus, IntPtr.Zero, IntPtr.Zero);
-        SleepFocusTransitionDelay(actionDelayMs);
-        return sent;
-    }
-
-    private bool PrimeKeyboardInputForComposite(IntPtr mainHwnd, int actionDelayMs)
-    {
-        return FocusInputForKeyboardIfNeeded(mainHwnd, actionDelayMs);
-    }
-
     private bool TryPrimeInputContextWithForeground(Process process, IntPtr mainHwnd)
     {
         if (!TryGetBestInputBox(mainHwnd, out AutomationElement inputBox))
@@ -1124,51 +1015,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         sent &= SendWindowMessage(mainHwnd, WmLButtonDown, new IntPtr(MkLButton), lParam);
         sent &= SendWindowMessage(mainHwnd, WmLButtonUp, IntPtr.Zero, lParam);
         return sent;
-    }
-
-    private bool SendCompositeMoveToStart(IntPtr hwnd, int actionDelayMs)
-    {
-        if (hwnd == IntPtr.Zero)
-        {
-            return false;
-        }
-
-        if (!PrimeKeyboardInputForComposite(hwnd, actionDelayMs))
-        {
-            return false;
-        }
-
-        int pairCount = Math.Max(1, _lastInjectedEnterCount + 1);
-        return SendCompositePageUpUpPairs(hwnd, pairCount);
-    }
-
-    private bool SendCompositePageUpUpPairs(IntPtr mainHwnd, int pairCount)
-    {
-        int actualPairs = Math.Max(1, pairCount);
-        for (int i = 0; i < actualPairs; i++)
-        {
-            if (!SendKey(mainHwnd, VirtualKey.PageUp))
-            {
-                return false;
-            }
-
-            if (_inputTiming.SequentialMoveToStartKeyDelayBaseMs > 0)
-            {
-                Thread.Sleep(_inputTiming.SequentialMoveToStartKeyDelayBaseMs);
-            }
-
-            if (!SendKey(mainHwnd, VirtualKey.Up))
-            {
-                return false;
-            }
-
-            if (_inputTiming.SequentialMoveToStartKeyDelayBaseMs > 0)
-            {
-                Thread.Sleep(_inputTiming.SequentialMoveToStartKeyDelayBaseMs);
-            }
-        }
-
-        return true;
     }
 
     private static IntPtr MakeLParam(int low, int high)
@@ -1460,14 +1306,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
     }
 
-    private static void SleepFocusTransitionDelay(int actionDelayMs)
-    {
-        if (actionDelayMs > 0)
-        {
-            Thread.Sleep(actionDelayMs);
-        }
-    }
-
     private static Dictionary<char, List<SentenceBreakTrigger>> BuildSentenceBreakTriggerIndex(TextConfig text)
     {
         var index = new Dictionary<char, List<SentenceBreakTrigger>>();
@@ -1538,9 +1376,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         uint uTimeout,
         out IntPtr lpdwResult);
 
-    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
-
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool ScreenToClient(IntPtr hWnd, ref POINT lpPoint);
 
@@ -1558,9 +1393,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
     [DllImport("kernel32.dll")]
     private static extern uint GetCurrentThreadId();
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
@@ -1581,7 +1413,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         Return = 0x0D,
         Delete = 0x2E,
         Space = 0x20,
-        PageUp = 0x21,
         F1 = 0x70,
         F2 = 0x71,
         F3 = 0x72,

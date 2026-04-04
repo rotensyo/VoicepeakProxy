@@ -69,7 +69,7 @@ stateDiagram-v2
 ## 先頭移動の補足
 
 - 通常の先頭移動は`MoveToStartModifier`+`MoveToStartKey`の送信で実行します
-- 互換で残した逐次`PageUp`→`Up`経路は通常フローでは使用しません
+- 逐次`PageUp`→`Up`経路は削除済みです
 - クリックprime系は`MoveToStartModifier`が空文字かつ`MoveToStartKey`が`F1-F12`以外の時だけ有効です
 
 ## 関連ドキュメント

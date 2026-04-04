@@ -180,7 +180,6 @@ public sealed class DeprecatedConfigData
         public int CharDelayBaseMs { get; set; }
         public int DeleteKeyDelayBaseMs { get; set; }
         public int ActionDelayMs { get; set; }
-        public int SequentialMoveToStartKeyDelayBaseMs { get; set; }
         public int PostTypeWaitPerCharMs { get; set; }
         public int PostTypeWaitMinMs { get; set; }
         public int ClearInputMaxPasses { get; set; }

@@ -48,7 +48,6 @@ internal static class AppConfigMapper
         config.InputTiming.CharDelayBaseMs = data.InputTiming.CharDelayBaseMs;
         config.InputTiming.DeleteKeyDelayBaseMs = data.InputTiming.DeleteKeyDelayBaseMs;
         config.InputTiming.ActionDelayMs = data.InputTiming.ActionDelayMs;
-        config.InputTiming.SequentialMoveToStartKeyDelayBaseMs = data.InputTiming.SequentialMoveToStartKeyDelayBaseMs;
         config.InputTiming.PostTypeWaitPerCharMs = data.InputTiming.PostTypeWaitPerCharMs;
         config.InputTiming.PostTypeWaitMinMs = data.InputTiming.PostTypeWaitMinMs;
         config.InputTiming.ClearInputMaxPasses = data.InputTiming.ClearInputMaxPasses;
@@ -118,7 +117,6 @@ internal static class AppConfigMapper
         data.InputTiming.CharDelayBaseMs = config.InputTiming.CharDelayBaseMs;
         data.InputTiming.DeleteKeyDelayBaseMs = config.InputTiming.DeleteKeyDelayBaseMs;
         data.InputTiming.ActionDelayMs = config.InputTiming.ActionDelayMs;
-        data.InputTiming.SequentialMoveToStartKeyDelayBaseMs = config.InputTiming.SequentialMoveToStartKeyDelayBaseMs;
         data.InputTiming.PostTypeWaitPerCharMs = config.InputTiming.PostTypeWaitPerCharMs;
         data.InputTiming.PostTypeWaitMinMs = config.InputTiming.PostTypeWaitMinMs;
         data.InputTiming.ClearInputMaxPasses = config.InputTiming.ClearInputMaxPasses;
