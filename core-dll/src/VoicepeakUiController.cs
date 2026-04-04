@@ -34,21 +34,21 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
     // UI設定とロガーを保持
     public VoicepeakUiController(UiConfig ui, DebugConfig debug, AppLogger log)
-        : this(ui, new InputTimingConfig(), new StartupConfig(), new HookConfig(), new TextConfig(), debug, log, new DefaultVoicepeakProcessApi())
+        : this(ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), debug, log, new DefaultVoicepeakProcessApi())
     {
     }
 
-    public VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, StartupConfig startup, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log)
-        : this(ui, inputTiming, startup, hook, text, debug, log, new DefaultVoicepeakProcessApi())
+    public VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log)
+        : this(ui, inputTiming, hook, text, debug, log, new DefaultVoicepeakProcessApi())
     {
     }
 
     internal VoicepeakUiController(UiConfig ui, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
-        : this(ui, new InputTimingConfig(), new StartupConfig(), new HookConfig(), new TextConfig(), debug, log, processApi)
+        : this(ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), debug, log, processApi)
     {
     }
 
-    internal VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, StartupConfig startup, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
+    internal VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
     {
         IVoicepeakProcessApi resolvedProcessApi = processApi ?? new DefaultVoicepeakProcessApi();
         _ui = ui ?? new UiConfig();
@@ -501,11 +501,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private bool KillFocusCore(IntPtr mainHwnd)
     {
         return SendWindowMessage(mainHwnd, WmKillFocus, IntPtr.Zero, IntPtr.Zero);
-    }
-
-    internal static bool IsValidShortcut(string raw)
-    {
-        return ShortcutSpec.TryParse(raw, out _);
     }
 
     // 再生ショートカット修飾子の妥当性を判定
@@ -1258,150 +1253,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
         public string Text { get; }
         public int Order { get; }
-    }
-
-    private sealed class ShortcutSpec
-    {
-        public bool Control { get; set; }
-        public bool Shift { get; set; }
-        public bool Alt { get; set; }
-        public VirtualKey Key { get; set; }
-        public bool IsCtrlUpOnly => Control && !Shift && !Alt && Key == VirtualKey.Up;
-        public bool IsFunctionKeyOnly => !Control && !Shift && !Alt && Key >= VirtualKey.F1 && Key <= VirtualKey.F12;
-
-        public static bool TryParse(string raw, out ShortcutSpec spec)
-        {
-            spec = null;
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                return false;
-            }
-
-            string[] parts = raw.Split('+');
-            ShortcutSpec temp = new ShortcutSpec();
-            for (int i = 0; i < parts.Length; i++)
-            {
-                string p = parts[i].Trim();
-                if (p.Equals("Ctrl", StringComparison.OrdinalIgnoreCase) || p.Equals("Control", StringComparison.OrdinalIgnoreCase))
-                {
-                    temp.Control = true;
-                    continue;
-                }
-
-                if (p.Equals("Shift", StringComparison.OrdinalIgnoreCase))
-                {
-                    temp.Shift = true;
-                    continue;
-                }
-
-                if (p.Equals("Alt", StringComparison.OrdinalIgnoreCase))
-                {
-                    temp.Alt = true;
-                    continue;
-                }
-
-                if (!TryParseKey(p, out VirtualKey key))
-                {
-                    return false;
-                }
-
-                temp.Key = key;
-            }
-
-            if (temp.Key == 0)
-            {
-                return false;
-            }
-
-            spec = temp;
-            return true;
-        }
-
-        public static bool TryParseCompositeMoveToStart(string raw, out ShortcutSpec spec)
-        {
-            spec = null;
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                return false;
-            }
-
-            string[] parts = raw.Split('+');
-            ShortcutSpec temp = new ShortcutSpec();
-            for (int i = 0; i < parts.Length; i++)
-            {
-                string p = parts[i].Trim();
-                if (p.Equals("Ctrl", StringComparison.OrdinalIgnoreCase) || p.Equals("Control", StringComparison.OrdinalIgnoreCase))
-                {
-                    temp.Control = true;
-                    continue;
-                }
-
-                if (p.Equals("Shift", StringComparison.OrdinalIgnoreCase))
-                {
-                    temp.Shift = true;
-                    continue;
-                }
-
-                if (p.Equals("Alt", StringComparison.OrdinalIgnoreCase))
-                {
-                    temp.Alt = true;
-                    continue;
-                }
-
-                if (!p.Equals("Up", StringComparison.OrdinalIgnoreCase))
-                {
-                    return false;
-                }
-
-                temp.Key = VirtualKey.Up;
-            }
-
-            if (!temp.IsCtrlUpOnly)
-            {
-                return false;
-            }
-
-            spec = temp;
-            return true;
-        }
-
-        private static bool TryParseKey(string text, out VirtualKey key)
-        {
-            key = 0;
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                return false;
-            }
-
-            if (text.Equals("Space", StringComparison.OrdinalIgnoreCase))
-            {
-                key = VirtualKey.Space;
-                return true;
-            }
-
-            if (text.Equals("Home", StringComparison.OrdinalIgnoreCase))
-            {
-                key = VirtualKey.Home;
-                return true;
-            }
-
-            if (text.Equals("End", StringComparison.OrdinalIgnoreCase))
-            {
-                key = VirtualKey.End;
-                return true;
-            }
-
-            if (text.Length <= 3 && text.StartsWith("F", StringComparison.OrdinalIgnoreCase))
-            {
-                if (int.TryParse(text.Substring(1), out int fn) && fn >= 1 && fn <= 12)
-                {
-                    key = (VirtualKey)((int)VirtualKey.F1 + (fn - 1));
-                    return true;
-                }
-            }
-
-            return false;
-        }
     }
 
     private readonly struct TextCandidateInfo
