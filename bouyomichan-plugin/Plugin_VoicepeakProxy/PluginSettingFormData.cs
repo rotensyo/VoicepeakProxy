@@ -366,7 +366,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Ui")]
         [DisplayName("02)moveToStartKey")]
-        [Description("先頭移動のキーです。VOICEPEAKの設定値と同じものを指定してください。例: cursor up, F3, Q")]
+        [Description("先頭移動のキーです。VOICEPEAKの設定値と同じものを指定してください。例: cursor up, F3, home")]
         public string MoveToStartKey
         {
             get { return State.Settings.AppConfig.Ui.MoveToStartKey; }
@@ -374,16 +374,25 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("Ui")]
-        [DisplayName("03)playShortcut")]
-        [Description("再生ショートカットです。VOICEPEAKの設定値と同じものを指定してください。仕様上 Ctrl+Space 等の複合ショートカットは使用できません。")]
-        public string PlayShortcut
+        [DisplayName("03)playShortcutModifier")]
+        [Description("再生ショートカットの修飾子キーです。VOICEPEAKの設定値に応じて、空文字/ctrl/alt/shiftのいずれかを指定してください。")]
+        public string PlayShortcutModifier
         {
-            get { return State.Settings.AppConfig.Ui.PlayShortcut; }
-            set { State.Settings.AppConfig.Ui.PlayShortcut = value ?? string.Empty; }
+            get { return State.Settings.AppConfig.Ui.PlayShortcutModifier; }
+            set { State.Settings.AppConfig.Ui.PlayShortcutModifier = value ?? string.Empty; }
         }
 
         [Category("Ui")]
-        [DisplayName("04)delayBeforePlayShortcutMs")]
+        [DisplayName("04)playShortcutKey")]
+        [Description("再生ショートカットのキーです。VOICEPEAKの設定値と同じものを指定してください。例: spacebar, F3, home")]
+        public string PlayShortcutKey
+        {
+            get { return State.Settings.AppConfig.Ui.PlayShortcutKey; }
+            set { State.Settings.AppConfig.Ui.PlayShortcutKey = value ?? string.Empty; }
+        }
+
+        [Category("Ui")]
+        [DisplayName("05)delayBeforePlayShortcutMs")]
         [Description("再生ボタンを押す前の待機時間です。")]
         public int DelayBeforePlayShortcutMs
         {

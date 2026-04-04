@@ -39,14 +39,18 @@
 
 - `MoveToStartModifier` (`default: "ctrl"`)
   - 先頭移動の修飾子キーです
-  - 空文字または`ctrl`または`alt`を指定してください
+  - 空文字または`ctrl`または`alt`を指定してください(`shift`は指定できません)
 - `MoveToStartKey` (`default: "cursor up"`)
   - 先頭移動キーです
   - VOICEPEAKの設定値と同じものを指定してください
-  - 主な指定値は`cursor up`, `cursor down`, `cursor left`, `cursor right`, `F1-F12`, `space`, `home`, `end`です
-- `PlayShortcut` (`default: "Space"`)
-  - 再生ショートカットです
+  - 主な指定値は`cursor up`, `cursor down`, `cursor left`, `cursor right`, `F1-F12`, `spacebar`, `home`, `end`, `a-z`, `0-9`, 記号キー(`@`, `-`, `[`, `]`など)です
+- `PlayShortcutModifier` (`default: ""`)
+  - 再生ショートカットの修飾子キーです
+  - 空文字または`ctrl`または`alt`または`shift`を指定してください
+- `PlayShortcutKey` (`default: "spacebar"`)
+  - 再生ショートカットのキーです
   - VOICEPEAKの設定値と同じものを指定してください
+  - 主な指定値は`cursor up`, `cursor down`, `cursor left`, `cursor right`, `F1-F12`, `spacebar`, `home`, `end`, `a-z`, `0-9`, 記号キー(`@`, `-`, `[`, `]`など)です
 - `DelayBeforePlayShortcutMs` (`default: 60`)
   - 再生ボタンを押す前の待機時間です
 - 入力失敗時クリック設定は`Deprecated.LegacyPrimeClickOnInputFailureRetryEnabled`へ退避されています
@@ -150,15 +154,19 @@
 - 数値設定が許容範囲にあること
 - `MoveToStartModifier`が空文字/`ctrl`/`alt`のいずれかであること
 - `MoveToStartKey`が有効なキー形式であること
-- `PlayShortcut`が有効形式であること
+- `PlayShortcutModifier`が空文字/`ctrl`/`alt`/`shift`のいずれかであること
+- `PlayShortcutKey`が有効なキー形式であること
 - `SentenceBreakTriggers`が`null`でなく、各要素が空文字でないこと
 - `ReplaceRules`が`null`でないこと
 
-`PlayShortcut`でサポートしている主な形式です。
+`PlayShortcutKey`でサポートしている主な形式です。
 
 - `F3`
-- `Space`
+- `Spacebar`
 - `Home`
 - `End`
+- `A`
+- `0`
+- `@`
 
-`Delete`や`Enter`は`PlayShortcut`設定値としてサポートしていません。
+`Delete`や`Enter`は`PlayShortcutKey`設定値としてサポートしていません。

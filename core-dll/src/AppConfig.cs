@@ -39,7 +39,8 @@ public sealed class UiConfig
 {
     public string MoveToStartModifier { get; set; } = "ctrl";
     public string MoveToStartKey { get; set; } = "cursor up";
-    public string PlayShortcut { get; set; } = "Space";
+    public string PlayShortcutModifier { get; set; } = string.Empty;
+    public string PlayShortcutKey { get; set; } = "spacebar";
     public int DelayBeforePlayShortcutMs { get; set; } = 60;
 }
 
@@ -147,9 +148,14 @@ internal static class AppConfigValidator
             throw new InvalidOperationException("ui.moveToStartKey は有効なキーを指定してください（例: cursor up, F3, home）");
         }
 
-        if (!VoicepeakUiController.IsValidPlayShortcut(config.Ui.PlayShortcut))
+        if (!VoicepeakUiController.IsValidPlayShortcutModifier(config.Ui.PlayShortcutModifier))
         {
-            throw new InvalidOperationException("ui.playShortcut は修飾なしキーのみ指定できます（例: F3, Space, Home）");
+            throw new InvalidOperationException("ui.playShortcutModifier は空文字/ctrl/alt/shift のいずれかを指定してください");
+        }
+
+        if (!VoicepeakUiController.IsValidPlayShortcutKey(config.Ui.PlayShortcutKey))
+        {
+            throw new InvalidOperationException("ui.playShortcutKey は有効なキーを指定してください（例: spacebar, F3, home）");
         }
 
         EnsureNonNegative(config.InputTiming.ActionDelayMs, "inputTiming.actionDelayMs は 0 以上で指定してください");

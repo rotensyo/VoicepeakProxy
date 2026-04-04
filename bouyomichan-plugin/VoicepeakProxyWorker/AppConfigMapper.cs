@@ -33,7 +33,8 @@ internal static class AppConfigMapper
 
         config.Ui.MoveToStartModifier = data.Ui.MoveToStartModifier ?? string.Empty;
         config.Ui.MoveToStartKey = data.Ui.MoveToStartKey ?? string.Empty;
-        config.Ui.PlayShortcut = data.Ui.PlayShortcut ?? string.Empty;
+        config.Ui.PlayShortcutModifier = data.Ui.PlayShortcutModifier ?? string.Empty;
+        config.Ui.PlayShortcutKey = data.Ui.PlayShortcutKey ?? string.Empty;
         config.Ui.DelayBeforePlayShortcutMs = data.Ui.DelayBeforePlayShortcutMs;
 
         config.Deprecated.EnableLegacyPrimeInputClick = data.Deprecated.EnableLegacyPrimeInputClick;
@@ -100,7 +101,8 @@ internal static class AppConfigMapper
 
         data.Ui.MoveToStartModifier = config.Ui.MoveToStartModifier ?? string.Empty;
         data.Ui.MoveToStartKey = config.Ui.MoveToStartKey ?? string.Empty;
-        data.Ui.PlayShortcut = config.Ui.PlayShortcut ?? string.Empty;
+        data.Ui.PlayShortcutModifier = config.Ui.PlayShortcutModifier ?? string.Empty;
+        data.Ui.PlayShortcutKey = config.Ui.PlayShortcutKey ?? string.Empty;
         data.Ui.DelayBeforePlayShortcutMs = config.Ui.DelayBeforePlayShortcutMs;
 
         data.Deprecated.EnableLegacyPrimeInputClick = config.Deprecated.EnableLegacyPrimeInputClick;

@@ -49,15 +49,29 @@ public class UiControllerTests
     }
 
     [TestMethod]
-    public void IsValidPlayShortcut_AcceptsOnlyNonModifierKeys()
+    public void IsValidPlayShortcutModifier_ReturnsExpectedValues()
     {
-        // 再生ショートカットは修飾なしのみ許可
-        Assert.IsTrue(VoicepeakUiController.IsValidPlayShortcut("F3"));
-        Assert.IsTrue(VoicepeakUiController.IsValidPlayShortcut("Space"));
-        Assert.IsTrue(VoicepeakUiController.IsValidPlayShortcut("Home"));
-        Assert.IsFalse(VoicepeakUiController.IsValidPlayShortcut("Ctrl+F4"));
-        Assert.IsFalse(VoicepeakUiController.IsValidPlayShortcut("Shift+Space"));
-        Assert.IsFalse(VoicepeakUiController.IsValidPlayShortcut("Alt+F3"));
+        // 再生修飾子は空文字とctrlとaltとshiftを許可
+        Assert.IsTrue(VoicepeakUiController.IsValidPlayShortcutModifier(string.Empty));
+        Assert.IsTrue(VoicepeakUiController.IsValidPlayShortcutModifier("CTRL"));
+        Assert.IsTrue(VoicepeakUiController.IsValidPlayShortcutModifier("alt"));
+        Assert.IsTrue(VoicepeakUiController.IsValidPlayShortcutModifier("shift"));
+        Assert.IsFalse(VoicepeakUiController.IsValidPlayShortcutModifier(null));
+    }
+
+    [TestMethod]
+    public void IsValidPlayShortcutKey_ReturnsExpectedValues()
+    {
+        // 再生キーは英数記号を含む許可集合のみ有効
+        Assert.IsTrue(VoicepeakUiController.IsValidPlayShortcutKey("F3"));
+        Assert.IsTrue(VoicepeakUiController.IsValidPlayShortcutKey("Spacebar"));
+        Assert.IsTrue(VoicepeakUiController.IsValidPlayShortcutKey("Home"));
+        Assert.IsTrue(VoicepeakUiController.IsValidPlayShortcutKey("A"));
+        Assert.IsTrue(VoicepeakUiController.IsValidPlayShortcutKey("9"));
+        Assert.IsTrue(VoicepeakUiController.IsValidPlayShortcutKey("@"));
+        Assert.IsFalse(VoicepeakUiController.IsValidPlayShortcutKey("Ctrl+F4"));
+        Assert.IsFalse(VoicepeakUiController.IsValidPlayShortcutKey("Shift+Space"));
+        Assert.IsFalse(VoicepeakUiController.IsValidPlayShortcutKey("Alt+F3"));
     }
 
     [TestMethod]
@@ -74,11 +88,14 @@ public class UiControllerTests
     [TestMethod]
     public void IsValidMoveToStartKey_ReturnsExpectedValues()
     {
-        // 先頭移動キーは許可集合のみ有効
+        // 先頭移動キーは英数記号を含む許可集合のみ有効
         Assert.IsTrue(VoicepeakUiController.IsValidMoveToStartKey("cursor up"));
         Assert.IsTrue(VoicepeakUiController.IsValidMoveToStartKey("CURSOR LEFT"));
         Assert.IsTrue(VoicepeakUiController.IsValidMoveToStartKey("F3"));
         Assert.IsTrue(VoicepeakUiController.IsValidMoveToStartKey("home"));
+        Assert.IsTrue(VoicepeakUiController.IsValidMoveToStartKey("Z"));
+        Assert.IsTrue(VoicepeakUiController.IsValidMoveToStartKey("0"));
+        Assert.IsTrue(VoicepeakUiController.IsValidMoveToStartKey("@"));
         Assert.IsFalse(VoicepeakUiController.IsValidMoveToStartKey("up"));
         Assert.IsFalse(VoicepeakUiController.IsValidMoveToStartKey("delete"));
     }
@@ -660,7 +677,7 @@ public class UiControllerTests
         // 再生前にフォーカス解除してショートカット送信
         var messages = ReflectionTestHelper.RunInSta(() =>
         {
-            UiConfig ui = new UiConfig { PlayShortcut = "Space", DelayBeforePlayShortcutMs = 0 };
+            UiConfig ui = new UiConfig { PlayShortcutModifier = string.Empty, PlayShortcutKey = "spacebar", DelayBeforePlayShortcutMs = 0 };
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
             VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
 
@@ -674,12 +691,64 @@ public class UiControllerTests
     }
 
     [TestMethod]
+    public void PressPlay_WithCtrlModifier_SendsSinglePlayKey()
+    {
+        // 再生修飾子指定時も主キー単体を送信
+        var messages = ReflectionTestHelper.RunInSta(() =>
+        {
+            UiConfig ui = new UiConfig
+            {
+                PlayShortcutModifier = "ctrl",
+                PlayShortcutKey = "spacebar",
+                DelayBeforePlayShortcutMs = 0
+            };
+            using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
+            VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
+
+            bool result = controller.PressPlay(window.Handle);
+            Assert.IsTrue(result);
+            return window.Messages.ToArray();
+        });
+
+        Assert.AreEqual(1, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == 0x20));
+        Assert.AreEqual(1, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == 0x20));
+        Assert.AreEqual(0, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == 0x11));
+        Assert.AreEqual(0, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == 0x11));
+    }
+
+    [TestMethod]
+    public void PressPlay_WithShiftModifier_SendsSinglePlayKey()
+    {
+        // Shift修飾子指定時も主キー単体を送信
+        var messages = ReflectionTestHelper.RunInSta(() =>
+        {
+            UiConfig ui = new UiConfig
+            {
+                PlayShortcutModifier = "shift",
+                PlayShortcutKey = "A",
+                DelayBeforePlayShortcutMs = 0
+            };
+            using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
+            VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
+
+            bool result = controller.PressPlay(window.Handle);
+            Assert.IsTrue(result);
+            return window.Messages.ToArray();
+        });
+
+        Assert.AreEqual(1, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == 0x41));
+        Assert.AreEqual(1, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == 0x41));
+        Assert.AreEqual(0, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == 0x10));
+        Assert.AreEqual(0, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == 0x10));
+    }
+
+    [TestMethod]
     public void PressPlay_CompositeShortcut_DoesNotPrimeFocusBeforeSpace()
     {
         // Space停止はKillFocusのみでフォーカス投入しない
         var messages = ReflectionTestHelper.RunInSta(() =>
         {
-            UiConfig ui = new UiConfig { PlayShortcut = "Space", DelayBeforePlayShortcutMs = 0, MoveToStartModifier = "ctrl", MoveToStartKey = "cursor up" };
+            UiConfig ui = new UiConfig { PlayShortcutModifier = string.Empty, PlayShortcutKey = "spacebar", DelayBeforePlayShortcutMs = 0, MoveToStartModifier = "ctrl", MoveToStartKey = "cursor up" };
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
             VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
 

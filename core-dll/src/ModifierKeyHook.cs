@@ -33,7 +33,8 @@ internal enum ModifierOverrideMode
 {
     Neutralize,
     Ctrl,
-    Alt
+    Alt,
+    Shift
 }
 
 // 修飾キー中立化フックの制御
@@ -163,6 +164,9 @@ internal sealed class ModifierKeyHookController
                 break;
             case ModifierOverrideMode.Alt:
                 token = "ALT";
+                break;
+            case ModifierOverrideMode.Shift:
+                token = "SHIFT";
                 break;
             default:
                 token = "NONE";
@@ -814,6 +818,12 @@ internal sealed class ModifierHookPipeServer
                     return "OK";
                 }
 
+                if (string.Equals(parts[1], "SHIFT", StringComparison.OrdinalIgnoreCase))
+                {
+                    _state.SetModifierOverrideMode(ModifierOverrideMode.Shift);
+                    return "OK";
+                }
+
                 if (string.Equals(parts[1], "NONE", StringComparison.OrdinalIgnoreCase))
                 {
                     _state.SetModifierOverrideMode(ModifierOverrideMode.Neutralize);
@@ -945,9 +955,10 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
         {
             bool forcedCtrl = ShouldForceCtrl(vKey);
             bool forcedAlt = ShouldForceAlt(vKey);
-            bool neutralized = !forcedCtrl && !forcedAlt && ShouldNeutralize(vKey);
+            bool forcedShift = ShouldForceShift(vKey);
+            bool neutralized = !forcedCtrl && !forcedAlt && !forcedShift && ShouldNeutralize(vKey);
             _state.RecordCall(ModifierHookApi.GetKeyState, vKey, GetCurrentThreadId(), neutralized);
-            if (forcedCtrl || forcedAlt)
+            if (forcedCtrl || forcedAlt || forcedShift)
             {
                 return unchecked((short)0x8000);
             }
@@ -972,9 +983,10 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
         {
             bool forcedCtrl = ShouldForceCtrl(vKey);
             bool forcedAlt = ShouldForceAlt(vKey);
-            bool neutralized = !forcedCtrl && !forcedAlt && ShouldNeutralize(vKey);
+            bool forcedShift = ShouldForceShift(vKey);
+            bool neutralized = !forcedCtrl && !forcedAlt && !forcedShift && ShouldNeutralize(vKey);
             _state.RecordCall(ModifierHookApi.GetAsyncKeyState, vKey, GetCurrentThreadId(), neutralized);
-            if (forcedCtrl || forcedAlt)
+            if (forcedCtrl || forcedAlt || forcedShift)
             {
                 return unchecked((short)0x8000);
             }
@@ -1101,6 +1113,22 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
         return vKey == VkMenu || vKey == VkLMenu || vKey == VkRMenu;
     }
 
+    // Shift上書き対象か判定
+    private bool ShouldForceShift(int vKey)
+    {
+        if (!_state.IsEnabled())
+        {
+            return false;
+        }
+
+        if (_state.GetModifierOverrideMode() != ModifierOverrideMode.Shift)
+        {
+            return false;
+        }
+
+        return vKey == VkShift || vKey == VkLShift || vKey == VkRShift;
+    }
+
     // キーボード状態配列へ上書きを適用
     private void ApplyKeyboardStateOverride(IntPtr lpKeyState)
     {
@@ -1114,6 +1142,9 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
             WriteKeyboardState(lpKeyState, VkControl, 0x80);
             WriteKeyboardState(lpKeyState, VkLControl, 0x80);
             WriteKeyboardState(lpKeyState, VkRControl, 0x80);
+            WriteKeyboardState(lpKeyState, VkShift, 0);
+            WriteKeyboardState(lpKeyState, VkLShift, 0);
+            WriteKeyboardState(lpKeyState, VkRShift, 0);
             WriteKeyboardState(lpKeyState, VkMenu, 0);
             WriteKeyboardState(lpKeyState, VkLMenu, 0);
             WriteKeyboardState(lpKeyState, VkRMenu, 0);
@@ -1125,9 +1156,26 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
             WriteKeyboardState(lpKeyState, VkControl, 0);
             WriteKeyboardState(lpKeyState, VkLControl, 0);
             WriteKeyboardState(lpKeyState, VkRControl, 0);
+            WriteKeyboardState(lpKeyState, VkShift, 0);
+            WriteKeyboardState(lpKeyState, VkLShift, 0);
+            WriteKeyboardState(lpKeyState, VkRShift, 0);
             WriteKeyboardState(lpKeyState, VkMenu, 0x80);
             WriteKeyboardState(lpKeyState, VkLMenu, 0x80);
             WriteKeyboardState(lpKeyState, VkRMenu, 0x80);
+            return;
+        }
+
+        if (mode == ModifierOverrideMode.Shift)
+        {
+            WriteKeyboardState(lpKeyState, VkControl, 0);
+            WriteKeyboardState(lpKeyState, VkLControl, 0);
+            WriteKeyboardState(lpKeyState, VkRControl, 0);
+            WriteKeyboardState(lpKeyState, VkShift, 0x80);
+            WriteKeyboardState(lpKeyState, VkLShift, 0x80);
+            WriteKeyboardState(lpKeyState, VkRShift, 0x80);
+            WriteKeyboardState(lpKeyState, VkMenu, 0);
+            WriteKeyboardState(lpKeyState, VkLMenu, 0);
+            WriteKeyboardState(lpKeyState, VkRMenu, 0);
             return;
         }
 

@@ -31,6 +31,8 @@ public class AppConfigValidationTests
         Assert.AreEqual(8000, config.Hook.HookConnectTotalWaitMs);
         Assert.AreEqual("ctrl", config.Ui.MoveToStartModifier);
         Assert.AreEqual("cursor up", config.Ui.MoveToStartKey);
+        Assert.AreEqual(string.Empty, config.Ui.PlayShortcutModifier);
+        Assert.AreEqual("spacebar", config.Ui.PlayShortcutKey);
         Assert.IsFalse(config.Deprecated.EnableLegacyPrimeInputClick);
         Assert.IsTrue(config.Deprecated.LegacyPrimeClickAtValidationEnabled);
         Assert.IsFalse(config.Deprecated.LegacyPrimeClickBeforeTextFocusWhenUninitializedEnabled);
@@ -127,23 +129,34 @@ public class AppConfigValidationTests
     }
 
     [TestMethod]
-    public void Validate_InvalidPlayShortcut_Throws()
+    public void Validate_InvalidPlayShortcutKey_Throws()
     {
-        // 再生ショートカット不正を拒否
+        // 再生キー不正を拒否
         InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
-            ValidateWith(config => config.Ui.PlayShortcut = "Delete"));
+            ValidateWith(config => config.Ui.PlayShortcutKey = "Delete"));
 
-        StringAssert.Contains(ex.Message, "ui.playShortcut");
+        StringAssert.Contains(ex.Message, "ui.playShortcutKey");
     }
 
     [TestMethod]
-    public void Validate_ModifierPlayShortcut_Throws()
+    public void Validate_InvalidPlayShortcutModifier_Throws()
     {
-        // 修飾付き再生ショートカットを拒否
+        // 再生修飾子不正を拒否
         InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
-            ValidateWith(config => config.Ui.PlayShortcut = "Ctrl+F4"));
+            ValidateWith(config => config.Ui.PlayShortcutModifier = "meta"));
 
-        StringAssert.Contains(ex.Message, "ui.playShortcut");
+        StringAssert.Contains(ex.Message, "ui.playShortcutModifier");
+    }
+
+    [TestMethod]
+    public void Validate_PlayShortcutModifierAndKey_IsAllowed()
+    {
+        // 再生修飾子と再生キーの有効値を許可
+        ValidateWith(config =>
+        {
+            config.Ui.PlayShortcutModifier = "shift";
+            config.Ui.PlayShortcutKey = "spacebar";
+        });
     }
 
     [TestMethod]

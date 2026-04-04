@@ -521,6 +521,16 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     {
         return ExecuteWithModifierIsolation(mainHwnd, "press_play", action: () =>
         {
+            if (!TryParsePlayShortcutKey(_ui.PlayShortcutKey, out VirtualKey key))
+            {
+                return false;
+            }
+
+            if (!TryParsePlayShortcutModifier(_ui.PlayShortcutModifier, out ModifierOverrideMode mode, out bool useModifier))
+            {
+                return false;
+            }
+
             if (!KillFocusCore(mainHwnd))
             {
                 return false;
@@ -531,7 +541,32 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 Thread.Sleep(_ui.DelayBeforePlayShortcutMs);
             }
 
-            return SendShortcut(mainHwnd, _ui.PlayShortcut);
+            if (!useModifier)
+            {
+                return SendKey(mainHwnd, key);
+            }
+
+            if (!_modifierIsolationCoordinator.SetModifierOverride(mainHwnd, "press_play", mode))
+            {
+                return false;
+            }
+
+            bool sent = false;
+            bool resetOk = true;
+            try
+            {
+                sent = SendKey(mainHwnd, key);
+            }
+            finally
+            {
+                resetOk = _modifierIsolationCoordinator.SetModifierOverride(mainHwnd, "press_play", ModifierOverrideMode.Neutralize);
+                if (!resetOk)
+                {
+                    _log.Warn("press_play_override_reset_failed");
+                }
+            }
+
+            return sent && resetOk;
         });
     }
 
@@ -625,25 +660,26 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return ShortcutSpec.TryParse(raw, out _);
     }
 
-    // 再生ショートカットは修飾なしキーのみ許可
-    internal static bool IsValidPlayShortcut(string raw)
+    // 再生ショートカット修飾子の妥当性を判定
+    internal static bool IsValidPlayShortcutModifier(string raw)
     {
-        if (!ShortcutSpec.TryParse(raw, out ShortcutSpec spec))
-        {
-            return false;
-        }
+        return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAltShift, out _, out _);
+    }
 
-        return !spec.Control && !spec.Shift && !spec.Alt;
+    // 再生ショートカットキーの妥当性を判定
+    internal static bool IsValidPlayShortcutKey(string raw)
+    {
+        return TryParseShortcutKey(raw, out _);
     }
 
     internal static bool IsValidMoveToStartModifier(string raw)
     {
-        return TryParseMoveToStartModifier(raw, out _, out _);
+        return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAlt, out _, out _);
     }
 
     internal static bool IsValidMoveToStartKey(string raw)
     {
-        return TryParseMoveToStartKey(raw, out _);
+        return TryParseShortcutKey(raw, out _);
     }
 
     internal static bool ShouldPressPlayBeforeMoveToStartDuringPlayback(UiConfig ui)
@@ -653,8 +689,32 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             && !IsFunctionKeyMoveToStartKey(source.MoveToStartKey);
     }
 
+    // 再生ショートカット修飾子を解析
+    private static bool TryParsePlayShortcutModifier(string raw, out ModifierOverrideMode mode, out bool useModifier)
+    {
+        return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAltShift, out mode, out useModifier);
+    }
+
+    // 再生ショートカットキーを解析
+    private static bool TryParsePlayShortcutKey(string raw, out VirtualKey key)
+    {
+        return TryParseShortcutKey(raw, out key);
+    }
+
     // 先頭移動の修飾子設定を解析
     private static bool TryParseMoveToStartModifier(string raw, out ModifierOverrideMode mode, out bool useModifier)
+    {
+        return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAlt, out mode, out useModifier);
+    }
+
+    // 先頭移動キー設定を解析
+    private static bool TryParseMoveToStartKey(string raw, out VirtualKey key)
+    {
+        return TryParseShortcutKey(raw, out key);
+    }
+
+    // 共通ショートカット修飾子を解析
+    private static bool TryParseShortcutModifier(string raw, ModifierAllowance allowance, out ModifierOverrideMode mode, out bool useModifier)
     {
         mode = ModifierOverrideMode.Neutralize;
         useModifier = false;
@@ -669,16 +729,23 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             return true;
         }
 
-        if (normalized == "ctrl")
+        if (normalized == "ctrl" && (allowance & ModifierAllowance.Ctrl) != 0)
         {
             mode = ModifierOverrideMode.Ctrl;
             useModifier = true;
             return true;
         }
 
-        if (normalized == "alt")
+        if (normalized == "alt" && (allowance & ModifierAllowance.Alt) != 0)
         {
             mode = ModifierOverrideMode.Alt;
+            useModifier = true;
+            return true;
+        }
+
+        if (normalized == "shift" && (allowance & ModifierAllowance.Shift) != 0)
+        {
+            mode = ModifierOverrideMode.Shift;
             useModifier = true;
             return true;
         }
@@ -686,8 +753,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return false;
     }
 
-    // 先頭移動キー設定を解析
-    private static bool TryParseMoveToStartKey(string raw, out VirtualKey key)
+    // 共通ショートカットキーを解析
+    private static bool TryParseShortcutKey(string raw, out VirtualKey key)
     {
         key = 0;
         string normalized = NormalizeMoveToStartKey(raw);
@@ -698,7 +765,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
         switch (normalized)
         {
-            case "space":
+            case "spacebar":
                 key = VirtualKey.Space;
                 return true;
             case "home":
@@ -730,7 +797,40 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             }
         }
 
+        if (normalized.Length == 1)
+        {
+            char c = normalized[0];
+            if (c >= 'a' && c <= 'z')
+            {
+                key = (VirtualKey)((int)'A' + (c - 'a'));
+                return true;
+            }
+
+            if (c >= '0' && c <= '9')
+            {
+                key = (VirtualKey)c;
+                return true;
+            }
+
+            short vkScan = VkKeyScan(c);
+            if (vkScan != -1)
+            {
+                key = (VirtualKey)(vkScan & 0xFF);
+                return true;
+            }
+        }
+
         return false;
+    }
+
+    [Flags]
+    private enum ModifierAllowance
+    {
+        Ctrl = 1,
+        Alt = 2,
+        Shift = 4,
+        CtrlAlt = Ctrl | Alt,
+        CtrlAltShift = Ctrl | Alt | Shift
     }
 
     // 先頭移動キー文字列を正規化
@@ -797,21 +897,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         {
             return ReadInputResult.Fail(ReadInputSource.Exception, string.Empty, 0);
         }
-    }
-
-    private bool SendShortcut(IntPtr hwnd, string shortcut)
-    {
-        if (!ShortcutSpec.TryParse(shortcut, out ShortcutSpec spec))
-        {
-            return false;
-        }
-
-        if (spec.Control || spec.Shift || spec.Alt)
-        {
-            return false;
-        }
-
-        return SendKeyDown(hwnd, spec.Key) && SendKeyUp(hwnd, spec.Key);
     }
 
     private bool SendKey(IntPtr hwnd, VirtualKey key)
@@ -1492,6 +1577,9 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern short VkKeyScan(char ch);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct POINT

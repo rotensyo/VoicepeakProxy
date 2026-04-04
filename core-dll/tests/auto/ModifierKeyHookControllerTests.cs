@@ -82,6 +82,34 @@ public class ModifierKeyHookControllerTests
     }
 
     [TestMethod]
+    public void SetModifierOverride_WhenShift_SendsShiftCommand()
+    {
+        string lastCommand = null;
+        FakeModifierHookConnection connection = new FakeModifierHookConnection
+        {
+            SendHandler = (string command, int timeoutMs, out string response) =>
+            {
+                lastCommand = command;
+                response = command == "PING" ? "PONG" : "OK";
+                return true;
+            }
+        };
+        FakeModifierHookPlatform platform = new FakeModifierHookPlatform
+        {
+            ConnectResults = new Queue<bool>(new[] { true }),
+            ConnectionToReturn = connection
+        };
+        ModifierKeyHookController controller = new ModifierKeyHookController(100, 100, 500, platform);
+        AppLogger log = new AppLogger(new TestLogger());
+
+        Assert.IsTrue(controller.EnsureInjected(123, log));
+        bool ok = controller.SetModifierOverride(ModifierOverrideMode.Shift, log);
+
+        Assert.IsTrue(ok);
+        Assert.AreEqual("OVERRIDE|SHIFT", lastCommand);
+    }
+
+    [TestMethod]
     public void SetModifierOverride_WhenFailed_ThenRetryReconnects()
     {
         int sendAttempt = 0;

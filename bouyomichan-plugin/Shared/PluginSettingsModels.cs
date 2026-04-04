@@ -158,7 +158,8 @@ public sealed class UiConfigData
 {
     public string MoveToStartModifier { get; set; }
     public string MoveToStartKey { get; set; }
-    public string PlayShortcut { get; set; }
+    public string PlayShortcutModifier { get; set; }
+    public string PlayShortcutKey { get; set; }
     public int DelayBeforePlayShortcutMs { get; set; }
 }
 

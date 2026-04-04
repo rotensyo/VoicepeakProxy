@@ -58,7 +58,7 @@
 ## ショートカット形式エラー
 
 - `MoveToStartModifier`は空文字/`ctrl`/`alt`のみ指定できます
-- `MoveToStartKey`は`cursor up/cursor down/cursor left/cursor right`, `F1-F12`, `space`, `home`, `end`を指定できます
+- `MoveToStartKey`は`cursor up/cursor down/cursor left/cursor right`, `F1-F12`, `spacebar`, `home`, `end`を指定できます
 - クリック注入は`Ui.Composite...`設定で明示制御します
-- それ以外のショートカットは`Space`, `Home`, `End`と`Ctrl`/`Shift`/`Alt`の組み合わせを使用してください
+- それ以外のショートカットは`Spacebar`, `Home`, `End`と`Ctrl`/`Shift`/`Alt`の組み合わせを使用してください
 - `Delete`や`Enter`は設定値としてサポートしていません
