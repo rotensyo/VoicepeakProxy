@@ -40,8 +40,7 @@ internal static class AppConfigMapper
         config.Ui.PlayShortcutKey = data.Ui.PlayShortcutKey ?? uiDefaults.PlayShortcutKey;
         config.Ui.DelayBeforePlayShortcutMs = data.Ui.DelayBeforePlayShortcutMs;
 
-        config.InputTiming.CharDelayBaseMs = data.InputTiming.CharDelayBaseMs;
-        config.InputTiming.DeleteKeyDelayBaseMs = data.InputTiming.DeleteKeyDelayBaseMs;
+        config.InputTiming.KeyStrokeIntervalMs = data.InputTiming.KeyStrokeIntervalMs;
         config.InputTiming.ActionDelayMs = data.InputTiming.ActionDelayMs;
         config.InputTiming.PostTypeWaitPerCharMs = data.InputTiming.PostTypeWaitPerCharMs;
         config.InputTiming.PostTypeWaitMinMs = data.InputTiming.PostTypeWaitMinMs;
@@ -104,8 +103,7 @@ internal static class AppConfigMapper
         data.Ui.PlayShortcutKey = config.Ui.PlayShortcutKey ?? string.Empty;
         data.Ui.DelayBeforePlayShortcutMs = config.Ui.DelayBeforePlayShortcutMs;
 
-        data.InputTiming.CharDelayBaseMs = config.InputTiming.CharDelayBaseMs;
-        data.InputTiming.DeleteKeyDelayBaseMs = config.InputTiming.DeleteKeyDelayBaseMs;
+        data.InputTiming.KeyStrokeIntervalMs = config.InputTiming.KeyStrokeIntervalMs;
         data.InputTiming.ActionDelayMs = config.InputTiming.ActionDelayMs;
         data.InputTiming.PostTypeWaitPerCharMs = config.InputTiming.PostTypeWaitPerCharMs;
         data.InputTiming.PostTypeWaitMinMs = config.InputTiming.PostTypeWaitMinMs;

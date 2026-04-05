@@ -161,8 +161,7 @@ public sealed class UiConfigData
     // 入力タイミング関連設定
     public sealed class InputTimingConfigData
     {
-        public int CharDelayBaseMs { get; set; }
-        public int DeleteKeyDelayBaseMs { get; set; }
+        public int KeyStrokeIntervalMs { get; set; }
         public int ActionDelayMs { get; set; }
         public int PostTypeWaitPerCharMs { get; set; }
         public int PostTypeWaitMinMs { get; set; }

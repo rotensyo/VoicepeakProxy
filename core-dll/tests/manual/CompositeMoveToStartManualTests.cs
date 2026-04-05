@@ -140,7 +140,7 @@ public class CompositeMoveToStartManualTests
         config.Audio.StopConfirmMs = 300;
         config.Audio.MaxSpeakingDurationSec = 30;
         config.InputTiming.ActionDelayMs = 20;
-        config.InputTiming.CharDelayBaseMs = 1;
+        config.InputTiming.KeyStrokeIntervalMs = 1;
         config.InputTiming.PostTypeWaitPerCharMs = 4;
         config.InputTiming.PostTypeWaitMinMs = 100;
         return config;

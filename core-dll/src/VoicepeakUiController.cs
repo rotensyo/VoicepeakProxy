@@ -134,6 +134,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 return false;
             }
 
+            SleepKeyStrokeInterval();
+
             int clearInputMaxPasses = Math.Max(1, _inputTiming.ClearInputMaxPasses);
             for (int pass = 0; pass < clearInputMaxPasses; pass++)
             {
@@ -164,6 +166,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             {
                 return false;
             }
+
+            SleepKeyStrokeInterval();
 
             if (!PressDeleteCore(mainHwnd))
             {
@@ -483,10 +487,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             return false;
         }
 
-        if (_inputTiming.DeleteKeyDelayBaseMs > 0)
-        {
-            Thread.Sleep(_inputTiming.DeleteKeyDelayBaseMs);
-        }
+        SleepKeyStrokeInterval();
 
         return true;
     }
@@ -1064,6 +1065,15 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         if (actionDelayMs > 0)
         {
             Thread.Sleep(actionDelayMs);
+        }
+    }
+
+    // キー操作間隔を待機
+    private void SleepKeyStrokeInterval()
+    {
+        if (_inputTiming.KeyStrokeIntervalMs > 0)
+        {
+            Thread.Sleep(_inputTiming.KeyStrokeIntervalMs);
         }
     }
 

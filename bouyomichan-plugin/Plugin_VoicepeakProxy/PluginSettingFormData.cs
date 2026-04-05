@@ -433,25 +433,16 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("InputTiming")]
-        [DisplayName("01)charDelayBaseMs")]
-        [Description("文字入力時の1文字ごとの遅延です。")]
-        public int CharDelayBaseMs
+        [DisplayName("01)keyStrokeIntervalMs")]
+        [Description("キー操作ごとの待機時間です。0の場合は待機しません。")]
+        public int KeyStrokeIntervalMs
         {
-            get { return State.Settings.AppConfig.InputTiming.CharDelayBaseMs; }
-            set { State.Settings.AppConfig.InputTiming.CharDelayBaseMs = value; }
+            get { return State.Settings.AppConfig.InputTiming.KeyStrokeIntervalMs; }
+            set { State.Settings.AppConfig.InputTiming.KeyStrokeIntervalMs = value; }
         }
 
         [Category("InputTiming")]
-        [DisplayName("02)deleteKeyDelayBaseMs")]
-        [Description("文字削除時の1文字ごとの遅延です。")]
-        public int DeleteKeyDelayBaseMs
-        {
-            get { return State.Settings.AppConfig.InputTiming.DeleteKeyDelayBaseMs; }
-            set { State.Settings.AppConfig.InputTiming.DeleteKeyDelayBaseMs = value; }
-        }
-
-        [Category("InputTiming")]
-        [DisplayName("03)actionDelayMs")]
+        [DisplayName("02)actionDelayMs")]
         [Description("文字入力欄フォーカスなどのUIアクション時の待機時間です。")]
         public int ActionDelayMs
         {
@@ -460,7 +451,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("InputTiming")]
-        [DisplayName("04)postTypeWaitPerCharMs")]
+        [DisplayName("03)postTypeWaitPerCharMs")]
         [Description("文字入力後の待機時間算出に使用する倍率です。文字入力完了後に再生失敗する場合は、値を増やして再生前の待機時間を伸ばしてみてください。")]
         public int PostTypeWaitPerCharMs
         {
@@ -469,7 +460,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("InputTiming")]
-        [DisplayName("05)postTypeWaitMinMs")]
+        [DisplayName("04)postTypeWaitMinMs")]
         [Description("文字入力後待機時間の最小値です。文字入力完了後に再生失敗する場合は、値を増やして再生前の待機時間を伸ばしてみてください。")]
         public int PostTypeWaitMinMs
         {
@@ -478,7 +469,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("InputTiming")]
-        [DisplayName("06)clearInputMaxPasses")]
+        [DisplayName("05)clearInputMaxPasses")]
         [Description("入力クリア処理の最大繰り返し回数です。入力文字が削除しきれていない場合は増やしてみてください。")]
         public int ClearInputMaxPasses
         {

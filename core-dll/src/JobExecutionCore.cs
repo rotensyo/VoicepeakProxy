@@ -174,8 +174,8 @@ internal static class JobExecutionCore
         }
 
         string expected = InputTextNormalizer.Normalize(text);
-        int charDelay = config.InputTiming.CharDelayBaseMs;
-        if (!ui.TypeText(hwnd, expected, charDelay))
+        int keyStrokeIntervalMs = config.InputTiming.KeyStrokeIntervalMs;
+        if (!ui.TypeText(hwnd, expected, keyStrokeIntervalMs))
         {
             log.Warn("prepare_failed_detail reason=type_text_failed cause=wm_char_input_failed");
             return false;
@@ -388,11 +388,11 @@ internal static class JobExecutionCore
         string target = targetText ?? string.Empty;
         InputValidateResult bootValidate = InputValidateResult.Fail("unknown", "unknown", string.Empty);
         bool bootInputOk = false;
-        int charDelay = config.InputTiming.CharDelayBaseMs;
+        int keyStrokeIntervalMs = config.InputTiming.KeyStrokeIntervalMs;
 
         for (int attempt = 0; attempt <= config.Startup.BootValidationMaxRetries; attempt++)
         {
-            bootValidate = ValidateInputText(config, ui, process, hwnd, target, charDelay, useProbeGuardChars: true);
+            bootValidate = ValidateInputText(config, ui, process, hwnd, target, keyStrokeIntervalMs, useProbeGuardChars: true);
             if (bootValidate.Success)
             {
                 bootInputOk = true;
@@ -479,7 +479,7 @@ internal static class JobExecutionCore
         Process process,
         IntPtr hwnd,
         string text,
-        int charDelay,
+        int keyStrokeIntervalMs,
         bool useProbeGuardChars)
     {
         if (!ui.IsAlive(process))
@@ -499,7 +499,7 @@ internal static class JobExecutionCore
 
         string expected = InputTextNormalizer.Normalize(text);
         string toType = useProbeGuardChars ? ("A" + expected) : expected;
-        if (!ui.TypeText(hwnd, toType, charDelay))
+        if (!ui.TypeText(hwnd, toType, keyStrokeIntervalMs))
         {
             return InputValidateResult.Fail("type_text_failed", "wm_char_input_failed", string.Empty);
         }
@@ -620,7 +620,7 @@ internal static class JobExecutionCore
         if (string.Equals(phase, "pre", StringComparison.Ordinal))
         {
             string normalized = InputTextNormalizer.Normalize(nextText);
-            int typingMs = normalized.Length * config.InputTiming.CharDelayBaseMs;
+            int typingMs = normalized.Length * config.InputTiming.KeyStrokeIntervalMs;
             int postTypeWaitMs = ComputePostTypeWaitMs(normalized, config.InputTiming.PostTypeWaitPerCharMs, config.InputTiming.PostTypeWaitMinMs);
             requiredByFormulaMs += typingMs + postTypeWaitMs;
         }

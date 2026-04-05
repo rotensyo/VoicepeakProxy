@@ -61,12 +61,9 @@
 
 ## InputTimingConfig
 
-- `CharDelayBaseMs` (`default: 0`)
-  - 文字入力時の1文字ごとのディレイです
-  - より高速化したい場合は`0`で最速入力になります
-- `DeleteKeyDelayBaseMs` (`default: 0`)
-  - `Delete`1回ごとの待機です
-  - より高速化したい場合は`0`で最速削除になります
+- `KeyStrokeIntervalMs` (`default: 0`)
+  - 文字入力時・クリア時のキー操作ごとの待機時間です
+  - `0`の場合は待機せずに次のキー操作へ進みます
 - `ActionDelayMs` (`default: 5`)
   - 文字入力欄フォーカスなどのUIアクション時の待機時間です
 - `PostTypeWaitPerCharMs` (`default: 5`)
