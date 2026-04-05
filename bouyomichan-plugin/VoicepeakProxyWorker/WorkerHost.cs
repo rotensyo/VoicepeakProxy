@@ -343,6 +343,7 @@ internal sealed class WorkerFileLogger : IAppLogger, IDisposable
     public WorkerFileLogger(string logPath)
     {
         _logPath = logPath;
+        ResetLogFile();
     }
 
     public void Debug(string message)
@@ -372,6 +373,25 @@ internal sealed class WorkerFileLogger : IAppLogger, IDisposable
         {
             string line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff") + " [" + level + "] " + message;
             File.AppendAllText(_logPath, line + Environment.NewLine, Encoding.UTF8);
+        }
+    }
+
+    // 起動時にログを初期化
+    private void ResetLogFile()
+    {
+        try
+        {
+            string directory = Path.GetDirectoryName(_logPath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            File.WriteAllText(_logPath, string.Empty, Encoding.UTF8);
+        }
+        catch
+        {
+            // 初期化失敗時も継続
         }
     }
 
