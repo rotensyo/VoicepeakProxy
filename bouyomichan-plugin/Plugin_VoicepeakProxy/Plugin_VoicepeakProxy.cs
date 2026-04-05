@@ -36,7 +36,7 @@ namespace Plugin_VoicepeakProxy
         private Thread _workerStartThread;
         private BouyomiChan _bouyomi;
 
-        public string Name { get { return "VoicepeakProxy"; } }
+        public string Name { get { return "VoicepeakProxy for 棒読みちゃん"; } }
 
         public string Version { get { return "2026/03/22版"; } }
 
@@ -44,7 +44,7 @@ namespace Plugin_VoicepeakProxy
         {
             get
             {
-                return "棒読みちゃんの読み上げ文字列をVOICEPEAKへ転送します。";
+                return "棒読みちゃんの文字列をVOICEPEAKへ転送します。";
             }
         }
 
@@ -72,6 +72,7 @@ namespace Plugin_VoicepeakProxy
             _settingsState = new PluginSettingsState();
             _settingsState.Configure(_settingsPath, _logger);
             _settingsState.LoadFromJson();
+            _logger.SetMinimumLevel(_settingsState.Settings.AppConfig.Debug.LogMinimumLevel);
             _settingFormData = new PluginSettingFormData(_settingsState);
 
             PluginRuntimeConfig runtime = _settingsState.Settings.Plugin;
@@ -206,6 +207,8 @@ namespace Plugin_VoicepeakProxy
         {
             try
             {
+                // 自動起動待機はバックグラウンドで実行
+                WorkerProcessManager.EnsureVoicepeakStartedIfNeeded(runtime, logger);
                 WorkerProcessManager.EnsureStarted(runtime, settingsPath, logger);
 
                 bool shouldShutdown;
@@ -361,6 +364,56 @@ namespace Plugin_VoicepeakProxy
     // Workerプロセスの起動停止を管理
     internal static class WorkerProcessManager
     {
+        private const int VoicepeakAutostartDetectTimeoutMs = 30000;
+        private const int VoicepeakAutostartPollIntervalMs = 200;
+        private const int VoicepeakAutostartReadySettleMs = 500;
+
+        // 必要時のみVOICEPEAK起動を保証
+        public static void EnsureVoicepeakStartedIfNeeded(PluginRuntimeConfig runtime, FileLogger logger)
+        {
+            int processCount = GetVoicepeakProcessCount();
+            if (processCount > 0)
+            {
+                logger.Info("voicepeak_autostart_skipped reason=already_running count=" + processCount);
+                return;
+            }
+
+            string exePath = (runtime.VoicepeakExePath ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(exePath))
+            {
+                logger.Info("voicepeak_autostart_skipped reason=exe_path_empty");
+                return;
+            }
+
+            if (!File.Exists(exePath))
+            {
+                throw new InvalidOperationException("VOICEPEAK自動起動に失敗しました。voicepeak.exeのパスが見つかりません。 path=" + exePath);
+            }
+
+            string templatePath = (runtime.VoicepeakTemplatePath ?? string.Empty).Trim();
+            if (!string.IsNullOrEmpty(templatePath) && !File.Exists(templatePath))
+            {
+                throw new InvalidOperationException("VOICEPEAK自動起動に失敗しました。テンプレート.vppのパスが見つかりません。 path=" + templatePath);
+            }
+
+            ProcessStartInfo psi = new ProcessStartInfo();
+            psi.FileName = exePath;
+            psi.WorkingDirectory = Path.GetDirectoryName(exePath) ?? string.Empty;
+            psi.UseShellExecute = false;
+            psi.CreateNoWindow = false;
+            psi.Arguments = string.IsNullOrEmpty(templatePath) ? string.Empty : ("\"" + templatePath + "\"");
+
+            Process started = Process.Start(psi);
+            if (started == null)
+            {
+                throw new InvalidOperationException("VOICEPEAK自動起動に失敗しました。voicepeak.exeを開始できませんでした。 path=" + exePath);
+            }
+
+            logger.Info("voicepeak_autostart_started pid=" + started.Id + " path=" + exePath);
+            WaitForVoicepeakProcess(started, VoicepeakAutostartDetectTimeoutMs, VoicepeakAutostartPollIntervalMs);
+            logger.Info("voicepeak_autostart_ok pid=" + started.Id);
+        }
+
         // shutdown送信後に停止を実行
         public static void SendShutdown(PluginRuntimeConfig runtime, FileLogger logger)
         {
@@ -584,6 +637,102 @@ namespace Plugin_VoicepeakProxy
         private static string ResolveWorkerPath(string basePath)
         {
             return Path.Combine(Path.Combine(basePath, "VoicepeakProxyWorker"), "VoicepeakProxyWorker.exe");
+        }
+
+        // VOICEPEAK起動完了を待機
+        private static void WaitForVoicepeakProcess(Process startedProcess, int timeoutMs, int pollIntervalMs)
+        {
+            int startedAt = Environment.TickCount;
+            int waitMs = timeoutMs <= 0 ? VoicepeakAutostartDetectTimeoutMs : timeoutMs;
+            int pollMs = pollIntervalMs <= 0 ? VoicepeakAutostartPollIntervalMs : pollIntervalMs;
+
+            while (true)
+            {
+                if (HasReadyVoicepeakMainWindow())
+                {
+                    Thread.Sleep(VoicepeakAutostartReadySettleMs);
+                    return;
+                }
+
+                try
+                {
+                    if (startedProcess != null && startedProcess.HasExited)
+                    {
+                        throw new InvalidOperationException("VOICEPEAK自動起動に失敗しました。プロセスが早期終了しました。 exitCode=" + startedProcess.ExitCode);
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                    throw;
+                }
+                catch
+                {
+                }
+
+                int elapsed = unchecked(Environment.TickCount - startedAt);
+                if (elapsed >= waitMs)
+                {
+                    throw new InvalidOperationException("VOICEPEAK自動起動に失敗しました。起動待機がタイムアウトしました。 waitedMs=" + elapsed);
+                }
+
+                Thread.Sleep(pollMs);
+            }
+        }
+
+        // VOICEPEAKプロセス数を取得
+        private static int GetVoicepeakProcessCount()
+        {
+            try
+            {
+                Process[] processes = Process.GetProcessesByName("voicepeak");
+                return processes == null ? 0 : processes.Length;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        // VOICEPEAKのメインウィンドウ生成完了を判定
+        private static bool HasReadyVoicepeakMainWindow()
+        {
+            Process[] processes;
+            try
+            {
+                processes = Process.GetProcessesByName("voicepeak");
+            }
+            catch
+            {
+                return false;
+            }
+
+            if (processes == null || processes.Length == 0)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < processes.Length; i++)
+            {
+                Process p = processes[i];
+                try
+                {
+                    if (p.HasExited)
+                    {
+                        continue;
+                    }
+
+                    p.Refresh();
+                    if (p.MainWindowHandle != IntPtr.Zero)
+                    {
+                        return true;
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            return false;
         }
 
         // shutdown送信用設定を作成
@@ -882,17 +1031,39 @@ namespace Plugin_VoicepeakProxy
     // プラグインログをファイルへ出力
     internal sealed class FileLogger : IDisposable
     {
+        private enum LogMinimumLevel
+        {
+            Info,
+            Warn
+        }
+
         private readonly object _sync = new object();
         private readonly string _filePath;
+        private LogMinimumLevel _minimumLevel;
 
         public FileLogger(string filePath)
         {
             _filePath = filePath;
+            _minimumLevel = LogMinimumLevel.Info;
             ResetLogFile();
+        }
+
+        // 最小ログレベルを更新
+        public void SetMinimumLevel(string level)
+        {
+            lock (_sync)
+            {
+                _minimumLevel = ParseMinimumLevel(level);
+            }
         }
 
         public void Info(string message)
         {
+            if (!ShouldWriteInfo())
+            {
+                return;
+            }
+
             Write("INFO", message);
         }
 
@@ -914,6 +1085,27 @@ namespace Plugin_VoicepeakProxy
                 string line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff") + " [" + level + "] " + message;
                 File.AppendAllText(_filePath, line + Environment.NewLine, Encoding.UTF8);
             }
+        }
+
+        // INFO出力可否を判定
+        private bool ShouldWriteInfo()
+        {
+            lock (_sync)
+            {
+                return _minimumLevel == LogMinimumLevel.Info;
+            }
+        }
+
+        // 文字列から最小ログレベルへ変換
+        private static LogMinimumLevel ParseMinimumLevel(string level)
+        {
+            string normalized = (level ?? string.Empty).Trim().ToLowerInvariant();
+            if (normalized == "info")
+            {
+                return LogMinimumLevel.Info;
+            }
+
+            return LogMinimumLevel.Warn;
         }
 
         // 起動時にログを初期化

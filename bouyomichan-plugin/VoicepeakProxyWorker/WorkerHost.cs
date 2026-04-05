@@ -270,6 +270,7 @@ internal sealed class WorkerHost
         try
         {
             PluginSettingsFile settings = _settingsProvider.GetCurrent();
+            _logger.SetMinimumLevel(settings.AppConfig.Debug.LogMinimumLevel);
             AppConfig config = AppConfigMapper.Map(settings.AppConfig);
             ValidateInputOnceResult validate = VoicepeakOneShot.ValidateInputOnce(config, _logger);
             if (!validate.Succeeded)
@@ -337,13 +338,30 @@ internal sealed class WorkerSettingsProvider
 // Workerログをファイルへ出力
 internal sealed class WorkerFileLogger : IAppLogger, IDisposable
 {
+    private enum LogMinimumLevel
+    {
+        Info,
+        Warn
+    }
+
     private readonly object _sync = new object();
     private readonly string _logPath;
+    private LogMinimumLevel _minimumLevel;
 
     public WorkerFileLogger(string logPath)
     {
         _logPath = logPath;
+        _minimumLevel = LogMinimumLevel.Info;
         ResetLogFile();
+    }
+
+    // 最小ログレベルを更新
+    public void SetMinimumLevel(string level)
+    {
+        lock (_sync)
+        {
+            _minimumLevel = ParseMinimumLevel(level);
+        }
     }
 
     public void Debug(string message)
@@ -353,6 +371,11 @@ internal sealed class WorkerFileLogger : IAppLogger, IDisposable
 
     public void Info(string message)
     {
+        if (!ShouldWriteInfo())
+        {
+            return;
+        }
+
         Write("INFO", message);
     }
 
@@ -374,6 +397,27 @@ internal sealed class WorkerFileLogger : IAppLogger, IDisposable
             string line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff") + " [" + level + "] " + message;
             File.AppendAllText(_logPath, line + Environment.NewLine, Encoding.UTF8);
         }
+    }
+
+    // INFO出力可否を判定
+    private bool ShouldWriteInfo()
+    {
+        lock (_sync)
+        {
+            return _minimumLevel == LogMinimumLevel.Info;
+        }
+    }
+
+    // 文字列から最小ログレベルへ変換
+    private static LogMinimumLevel ParseMinimumLevel(string level)
+    {
+        string normalized = (level ?? string.Empty).Trim().ToLowerInvariant();
+        if (normalized == "info")
+        {
+            return LogMinimumLevel.Info;
+        }
+
+        return LogMinimumLevel.Warn;
     }
 
     // 起動時にログを初期化

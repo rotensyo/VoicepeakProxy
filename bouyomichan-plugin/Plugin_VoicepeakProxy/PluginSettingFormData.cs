@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Drawing.Design;
+using System.IO;
 using System.Text;
+using System.Windows.Forms;
 using BouyomiVoicepeakBridge.Shared;
 using FNF.XmlSerializerSetting;
 
@@ -155,8 +158,28 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("Plugin")]
-        [DisplayName("01)Pipe名")]
-        [Description("PluginとWorkerの接続に使用するPipe名です。")]
+        [DisplayName("01)VOICEPEAK 自動起動用本体パス")]
+        [Description("VOICEPEAK自動起動に使用するvoicepeak.exeのパスです。空文字の場合は自動起動は行いません。")]
+        [Editor(typeof(VoicepeakExePathEditor), typeof(UITypeEditor))]
+        public string VoicepeakExePath
+        {
+            get { return State.Settings.Plugin.VoicepeakExePath; }
+            set { State.Settings.Plugin.VoicepeakExePath = value ?? string.Empty; }
+        }
+
+        [Category("Plugin")]
+        [DisplayName("02)VOICEPEAK 自動起動用.vppファイルパス")]
+        [Description("VOICEPEAK自動起動時に開く.vppファイルのパスです。空文字の場合は何も指定せずに起動します。")]
+        [Editor(typeof(VoicepeakTemplatePathEditor), typeof(UITypeEditor))]
+        public string VoicepeakTemplatePath
+        {
+            get { return State.Settings.Plugin.VoicepeakTemplatePath; }
+            set { State.Settings.Plugin.VoicepeakTemplatePath = value ?? string.Empty; }
+        }
+
+        [Category("Plugin")]
+        [DisplayName("03)Pipe名")]
+        [Description("PluginとWorkerの接続に使用するPipe名です。通常は設定を変更する必要はありません。")]
         public string PipeName
         {
             get { return State.Settings.Plugin.PipeName; }
@@ -164,14 +187,13 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("Plugin")]
-        [DisplayName("02)Pipe接続タイムアウト(ms)")]
+        [DisplayName("04)Pipe接続タイムアウト(ms)")]
         [Description("Worker接続待ち時間をミリ秒で指定します。")]
         public int PipeConnectTimeoutMs
         {
             get { return State.Settings.Plugin.PipeConnectTimeoutMs; }
             set { State.Settings.Plugin.PipeConnectTimeoutMs = value; }
         }
-
     }
 
     // Queue設定タブ
@@ -218,7 +240,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Audio")]
         [DisplayName("02)pollIntervalMs")]
-        [Description("音声監視を行う間隔です。")]
+        [Description("音声監視を行う間隔をミリ秒で指定します。")]
         public int PollIntervalMs
         {
             get { return State.Settings.AppConfig.Audio.PollIntervalMs; }
@@ -227,7 +249,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Audio")]
         [DisplayName("03)startConfirmTimeoutMs")]
-        [Description("再生実行から発話開始を待つ最大時間です。")]
+        [Description("再生実行から発話開始を待つ最大時間をミリ秒で指定します。")]
         public int StartConfirmTimeoutMs
         {
             get { return State.Settings.AppConfig.Audio.StartConfirmTimeoutMs; }
@@ -245,7 +267,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Audio")]
         [DisplayName("05)stopConfirmMs")]
-        [Description("発話開始後、この時間だけ無音が続いたら発話終了と判定します。")]
+        [Description("発話開始後、この時間(ミリ秒)だけ無音が続いたら発話終了と判定します。")]
         public int StopConfirmMs
         {
             get { return State.Settings.AppConfig.Audio.StopConfirmMs; }
@@ -294,7 +316,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Startup")]
         [DisplayName("03)bootValidationRetryIntervalMs")]
-        [Description("起動時入力検証の再試行待機時間です。")]
+        [Description("起動時入力検証の再試行待機時間をミリ秒で指定します。")]
         public int BootValidationRetryIntervalMs
         {
             get { return State.Settings.AppConfig.Startup.BootValidationRetryIntervalMs; }
@@ -317,7 +339,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Hook")]
         [DisplayName("01)hookCommandTimeoutMs")]
-        [Description("修飾キー中立化フックへのコマンド送信タイムアウトです。")]
+        [Description("修飾キー中立化フックへのコマンド送信タイムアウトをミリ秒で指定します。")]
         public int HookCommandTimeoutMs
         {
             get { return State.Settings.AppConfig.Hook.HookCommandTimeoutMs; }
@@ -326,7 +348,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Hook")]
         [DisplayName("02)hookConnectTimeoutMs")]
-        [Description("修飾キー中立化フックの接続試行1回あたりのタイムアウトです。")]
+        [Description("修飾キー中立化フックの接続試行1回あたりのタイムアウトをミリ秒で指定します。")]
         public int HookConnectTimeoutMs
         {
             get { return State.Settings.AppConfig.Hook.HookConnectTimeoutMs; }
@@ -335,7 +357,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Hook")]
         [DisplayName("03)hookConnectTotalWaitMs")]
-        [Description("修飾キー中立化フックの接続待機総最大時間です。")]
+        [Description("修飾キー中立化フックの接続待機総最大時間をミリ秒で指定します。")]
         public int HookConnectTotalWaitMs
         {
             get { return State.Settings.AppConfig.Hook.HookConnectTotalWaitMs; }
@@ -357,7 +379,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Ui")]
         [DisplayName("01)moveToStartModifier")]
-        [Description("先頭移動の修飾子キーです。VOICEPEAKの設定値に応じて、空文字/ctrl/altのいずれかを指定してください。shiftや、ctrlとaltの複合は現在非対応です。")]
+        [Description("「先頭に移動」ショートカットの修飾子キーです。VOICEPEAKの設定値に応じて、空文字/ctrl/altのいずれかを指定してください。shiftや、ctrlとaltの複合は現在非対応です。")]
         public string MoveToStartModifier
         {
             get { return State.Settings.AppConfig.Ui.MoveToStartModifier; }
@@ -366,7 +388,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Ui")]
         [DisplayName("02)moveToStartKey")]
-        [Description("先頭移動のキーです。VOICEPEAKの設定値と同じものを指定してください。例: cursor up, F3, home")]
+        [Description("「先頭に移動」ショートカットのキーです。VOICEPEAKの設定値と同じものを指定してください。例: cursor up, F3, home")]
         public string MoveToStartKey
         {
             get { return State.Settings.AppConfig.Ui.MoveToStartKey; }
@@ -375,7 +397,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Ui")]
         [DisplayName("03)clearInputSelectAllModifier")]
-        [Description("入力欄全選択の修飾子キーです。VOICEPEAKの設定値に応じて、空文字/ctrl/altのいずれかを指定してください。")]
+        [Description("「すべてを選択」ショートカットの修飾子キーです。VOICEPEAKの設定値に応じて、空文字/ctrl/altのいずれかを指定してください。")]
         public string ClearInputSelectAllModifier
         {
             get { return State.Settings.AppConfig.Ui.ClearInputSelectAllModifier; }
@@ -384,7 +406,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Ui")]
         [DisplayName("04)clearInputSelectAllKey")]
-        [Description("入力欄全選択のキーです。VOICEPEAKの設定値と同じものを指定してください。例: a")]
+        [Description("「すべてを選択」ショートカットのキーです。VOICEPEAKの設定値と同じものを指定してください。例: a")]
         public string ClearInputSelectAllKey
         {
             get { return State.Settings.AppConfig.Ui.ClearInputSelectAllKey; }
@@ -393,7 +415,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Ui")]
         [DisplayName("05)playShortcutModifier")]
-        [Description("再生ショートカットの修飾子キーです。VOICEPEAKの設定値に応じて、空文字/ctrl/alt/shiftのいずれかを指定してください。")]
+        [Description("「再生/停止」ショートカットの修飾子キーです。VOICEPEAKの設定値に応じて、空文字/ctrl/alt/shiftのいずれかを指定してください。")]
         public string PlayShortcutModifier
         {
             get { return State.Settings.AppConfig.Ui.PlayShortcutModifier; }
@@ -402,7 +424,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Ui")]
         [DisplayName("06)playShortcutKey")]
-        [Description("再生ショートカットのキーです。VOICEPEAKの設定値と同じものを指定してください。例: spacebar, F3, home")]
+        [Description("「再生/停止」ショートカットのキーです。VOICEPEAKの設定値と同じものを指定してください。例: spacebar, F3, home")]
         public string PlayShortcutKey
         {
             get { return State.Settings.AppConfig.Ui.PlayShortcutKey; }
@@ -411,7 +433,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Ui")]
         [DisplayName("07)delayBeforePlayShortcutMs")]
-        [Description("再生ボタンを押す前の待機時間です。")]
+        [Description("再生ボタンを押す前の待機時間をミリ秒で指定します。")]
         public int DelayBeforePlayShortcutMs
         {
             get { return State.Settings.AppConfig.Ui.DelayBeforePlayShortcutMs; }
@@ -434,7 +456,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("InputTiming")]
         [DisplayName("01)keyStrokeIntervalMs")]
-        [Description("キー操作ごとの待機時間です。0の場合は待機しません。")]
+        [Description("キー操作ごとの待機時間をミリ秒で指定します。0の場合は待機しません。")]
         public int KeyStrokeIntervalMs
         {
             get { return State.Settings.AppConfig.InputTiming.KeyStrokeIntervalMs; }
@@ -443,7 +465,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("InputTiming")]
         [DisplayName("02)actionDelayMs")]
-        [Description("文字入力欄フォーカスなどのUIアクション時の待機時間です。")]
+        [Description("文字入力欄フォーカスなどのUIアクション時の待機時間をミリ秒で指定します。")]
         public int ActionDelayMs
         {
             get { return State.Settings.AppConfig.InputTiming.ActionDelayMs; }
@@ -599,6 +621,102 @@ namespace Plugin_VoicepeakProxy
         {
             get { return State.Settings.AppConfig.Debug.LogModifierHookStats; }
             set { State.Settings.AppConfig.Debug.LogModifierHookStats = value; }
+        }
+
+        [Category("Debug")]
+        [DisplayName("03)logMinimumLevel")]
+        public string LogMinimumLevel
+        {
+            get { return State.Settings.AppConfig.Debug.LogMinimumLevel; }
+            set { State.Settings.AppConfig.Debug.LogMinimumLevel = (value ?? string.Empty).Trim().ToLowerInvariant(); }
+        }
+    }
+
+    // ファイル選択エディタ共通基底
+    internal abstract class FilePathEditorBase : UITypeEditor
+    {
+        // モーダルダイアログ編集を指定
+        public override UITypeEditorEditStyle GetEditStyle(ITypeDescriptorContext context)
+        {
+            return UITypeEditorEditStyle.Modal;
+        }
+
+        // ファイル選択ダイアログで値を編集
+        public override object EditValue(ITypeDescriptorContext context, IServiceProvider provider, object value)
+        {
+            string current = (value as string) ?? string.Empty;
+            using (OpenFileDialog dialog = new OpenFileDialog())
+            {
+                dialog.Title = GetDialogTitle();
+                dialog.Filter = GetFilter();
+                dialog.CheckFileExists = true;
+                dialog.Multiselect = false;
+
+                if (!string.IsNullOrEmpty(current))
+                {
+                    try
+                    {
+                        if (File.Exists(current))
+                        {
+                            dialog.InitialDirectory = Path.GetDirectoryName(current) ?? string.Empty;
+                            dialog.FileName = Path.GetFileName(current);
+                        }
+                        else
+                        {
+                            string dir = Path.GetDirectoryName(current) ?? string.Empty;
+                            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                            {
+                                dialog.InitialDirectory = dir;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                DialogResult result = dialog.ShowDialog();
+                if (result == DialogResult.OK)
+                {
+                    return dialog.FileName ?? string.Empty;
+                }
+            }
+
+            return current;
+        }
+
+        // ダイアログタイトルを取得
+        protected abstract string GetDialogTitle();
+
+        // ダイアログフィルタを取得
+        protected abstract string GetFilter();
+    }
+
+    // voicepeak.exe選択エディタ
+    internal sealed class VoicepeakExePathEditor : FilePathEditorBase
+    {
+        protected override string GetDialogTitle()
+        {
+            return "voicepeak.exeを選択";
+        }
+
+        protected override string GetFilter()
+        {
+            return "VOICEPEAK executable (voicepeak.exe)|voicepeak.exe|Executable (*.exe)|*.exe|All files (*.*)|*.*";
+        }
+    }
+
+    // テンプレートvpp選択エディタ
+    internal sealed class VoicepeakTemplatePathEditor : FilePathEditorBase
+    {
+        protected override string GetDialogTitle()
+        {
+            return "テンプレート.vppを選択";
+        }
+
+        protected override string GetFilter()
+        {
+            return "VOICEPEAK project (*.vpp)|*.vpp|All files (*.*)|*.*";
         }
     }
 

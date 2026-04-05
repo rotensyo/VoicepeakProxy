@@ -77,6 +77,7 @@ internal static class AppConfigMapper
 
         config.Debug.LogTextCandidates = data.Debug.LogTextCandidates;
         config.Debug.LogModifierHookStats = data.Debug.LogModifierHookStats;
+        config.Debug.LogMinimumLevel = data.Debug.LogMinimumLevel ?? "warn";
 
         return config;
     }
@@ -140,6 +141,7 @@ internal static class AppConfigMapper
 
         data.Debug.LogTextCandidates = config.Debug.LogTextCandidates;
         data.Debug.LogModifierHookStats = config.Debug.LogModifierHookStats;
+        data.Debug.LogMinimumLevel = config.Debug.LogMinimumLevel ?? "warn";
 
         data.Normalize();
         return data;

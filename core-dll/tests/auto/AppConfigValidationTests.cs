@@ -35,6 +35,7 @@ public class AppConfigValidationTests
         Assert.AreEqual("spacebar", config.Ui.PlayShortcutKey);
         CollectionAssert.AreEqual(new[] { "。", "！", "？", "!", "?" }, config.Text.SentenceBreakTriggers);
         Assert.AreEqual(BootValidationMode.Required, config.Validation.BootValidation);
+        Assert.AreEqual("warn", config.Debug.LogMinimumLevel);
     }
 
     [TestMethod]
@@ -90,6 +91,7 @@ public class AppConfigValidationTests
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Hook.HookConnectTimeoutMs = 0));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Hook.HookConnectTotalWaitMs = 0));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Ui.DelayBeforePlayShortcutMs = -1));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Debug.LogMinimumLevel = "error"));
     }
 
     [TestMethod]
@@ -253,6 +255,7 @@ public class AppConfigValidationTests
             config.Hook.HookConnectTimeoutMs = 1;
             config.Hook.HookConnectTotalWaitMs = 1;
             config.Ui.DelayBeforePlayShortcutMs = 0;
+            config.Debug.LogMinimumLevel = "info";
         });
     }
 

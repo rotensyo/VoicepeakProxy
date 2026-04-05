@@ -91,6 +91,7 @@ public sealed class DebugConfig
 {
     public bool LogTextCandidates { get; set; } = false;
     public bool LogModifierHookStats { get; set; } = false;
+    public string LogMinimumLevel { get; set; } = "warn";
 }
 
 // 置換ルール定義
@@ -116,6 +117,7 @@ internal static class AppConfigValidator
         EnsureNotNull(config.Queue, "queue は null にできません");
         EnsureNotNull(config.Validation, "validation は null にできません");
         EnsureNotNull(config.Debug, "debug は null にできません");
+        EnsureNotNull(config.Debug.LogMinimumLevel, "debug.logMinimumLevel は null にできません");
 
         EnsureNotNull(config.Startup.BootValidationText, "startup.bootValidationText は null にできません");
         EnsureNonNegative(config.Startup.BootValidationMaxRetries, "startup.bootValidationMaxRetries は 0 以上で指定してください");
@@ -186,7 +188,25 @@ internal static class AppConfigValidator
         {
             throw new InvalidOperationException("text.replaceRules は null にできません");
         }
+
+        if (!IsValidLogMinimumLevel(config.Debug.LogMinimumLevel))
+        {
+            throw new InvalidOperationException("debug.logMinimumLevel は info/warn のいずれかを指定してください");
+        }
+
         EnsureNonNegative(config.Queue.MaxQueuedJobs, "queue.maxQueuedJobs は 0 以上で指定してください");
+    }
+
+    // ログ最小レベル文字列を検証
+    private static bool IsValidLogMinimumLevel(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        string normalized = value.Trim().ToLowerInvariant();
+        return normalized == "info" || normalized == "warn";
     }
 
     // null禁止を検証

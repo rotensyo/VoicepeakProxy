@@ -22,6 +22,8 @@ namespace BouyomiVoicepeakBridge.Shared
                 Plugin = new PluginRuntimeConfig();
             }
 
+            Plugin.Normalize();
+
             if (AppConfig == null)
             {
                 AppConfig = new AppConfigData();
@@ -36,11 +38,34 @@ namespace BouyomiVoicepeakBridge.Shared
     {
         public string PipeName { get; set; }
         public int PipeConnectTimeoutMs { get; set; }
+        public string VoicepeakExePath { get; set; }
+        public string VoicepeakTemplatePath { get; set; }
 
         public PluginRuntimeConfig()
         {
             PipeName = "voicepeak_proxy_bridge";
             PipeConnectTimeoutMs = 1500;
+            VoicepeakExePath = string.Empty;
+            VoicepeakTemplatePath = string.Empty;
+        }
+
+        // 不足項目を既定値で補完
+        public void Normalize()
+        {
+            if (PipeName == null)
+            {
+                PipeName = string.Empty;
+            }
+
+            if (VoicepeakExePath == null)
+            {
+                VoicepeakExePath = string.Empty;
+            }
+
+            if (VoicepeakTemplatePath == null)
+            {
+                VoicepeakTemplatePath = string.Empty;
+            }
         }
     }
 
@@ -119,6 +144,7 @@ namespace BouyomiVoicepeakBridge.Shared
             }
 
             Text.Normalize();
+            Debug.Normalize();
         }
     }
 
@@ -224,6 +250,26 @@ public sealed class UiConfigData
     {
         public bool LogTextCandidates { get; set; }
         public bool LogModifierHookStats { get; set; }
+        public string LogMinimumLevel { get; set; }
+
+        public DebugConfigData()
+        {
+            LogMinimumLevel = "warn";
+        }
+
+        // 不足項目を既定値で補完
+        public void Normalize()
+        {
+            string raw = LogMinimumLevel ?? string.Empty;
+            string normalized = raw.Trim().ToLowerInvariant();
+            if (string.IsNullOrEmpty(normalized))
+            {
+                LogMinimumLevel = "warn";
+                return;
+            }
+
+            LogMinimumLevel = normalized;
+        }
     }
 
     // 置換ルール
