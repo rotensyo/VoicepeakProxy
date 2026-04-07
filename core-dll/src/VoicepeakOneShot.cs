@@ -286,7 +286,7 @@ public static class VoicepeakOneShot
             }
             else
             {
-                if (!ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs))
+                if (!JobExecutionCore.TryClearInputWithRetry(config, ui, process, hwnd, log, "oneshot_clear"))
                 {
                     result = new ClearInputOnceResult { Status = ClearInputOnceStatus.ClearInputFailed };
                 }
@@ -510,7 +510,7 @@ public static class VoicepeakOneShot
                 if (!ui.PrepareForPlayback(process, hwnd, config.InputTiming.ActionDelayMs))
                 {
                     log.Warn($"job_dropped jobId={job.JobId} reason=move_to_start_failed");
-                    ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs);
+                    JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, killFocusAfterClear: false);
                     result = new SpeakOnceResult { Status = SpeakOnceStatus.MoveToStartFailed, SegmentsExecuted = executed };
                     break;
                 }
@@ -518,7 +518,7 @@ public static class VoicepeakOneShot
                 if (!ui.PressPlay(hwnd))
                 {
                     log.Warn($"job_dropped jobId={job.JobId} reason=play_failed");
-                    ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs);
+                    JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, killFocusAfterClear: false);
                     result = new SpeakOnceResult { Status = SpeakOnceStatus.PlayFailed, SegmentsExecuted = executed };
                     break;
                 }
@@ -536,7 +536,7 @@ public static class VoicepeakOneShot
                 {
                     log.Error("monitor_timeout reason=start_confirm");
                     log.Warn($"job_dropped jobId={job.JobId} reason=start_confirm_failed");
-                    ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs);
+                    JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, killFocusAfterClear: false);
                     result = new SpeakOnceResult { Status = SpeakOnceStatus.StartConfirmTimeout, SegmentsExecuted = executed };
                     break;
                 }
@@ -625,7 +625,7 @@ public static class VoicepeakOneShot
         if (!prepared)
         {
             log.Warn($"job_dropped jobId={jobId} reason=prepare_failed");
-            ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs);
+            JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, killFocusAfterClear: false);
             return false;
         }
 

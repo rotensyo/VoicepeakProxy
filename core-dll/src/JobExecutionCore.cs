@@ -167,14 +167,14 @@ internal static class JobExecutionCore
             return false;
         }
 
-        if (!TryClearInputWithRetry(config, ui, process, hwnd, log))
+        if (!TryClearInputWithRetry(config, ui, process, hwnd, log, "prepare"))
         {
             return false;
         }
 
         string expected = InputTextNormalizer.Normalize(text);
         int keyStrokeIntervalMs = config.InputTiming.KeyStrokeIntervalMs;
-        if (!TryTypeTextWithSingleRetry(config, ui, process, hwnd, expected, keyStrokeIntervalMs, log))
+        if (!TryTypeTextWithRetry(config, ui, process, hwnd, expected, keyStrokeIntervalMs, log, "prepare"))
         {
             return false;
         }
@@ -189,14 +189,15 @@ internal static class JobExecutionCore
     }
 
     // 文字入力後の反映確認と再入力リトライ
-    private static bool TryTypeTextWithSingleRetry(
+    internal static bool TryTypeTextWithRetry(
         AppConfig config,
         IVoicepeakUiController ui,
         Process process,
         IntPtr hwnd,
         string expected,
         int keyStrokeIntervalMs,
-        AppLogger log)
+        AppLogger log,
+        string context)
     {
         int maxRetries = Math.Max(0, config.InputTiming.TypeTextRetryMaxRetries);
         int maxAttempts = maxRetries + 1;
@@ -209,7 +210,7 @@ internal static class JobExecutionCore
                 SleepRetryWait(config.InputTiming.TypeTextRetryWaitMs);
                 if (!ui.PrepareForTextInput(process, hwnd, config.InputTiming.ActionDelayMs))
                 {
-                    log.Warn($"prepare_failed_detail reason=prepare_text_input_failed_on_retry cause=shortcut_not_applied_or_context_mismatch attempt={attempt}");
+                    Warn(log, $"{context}_failed_detail reason=prepare_text_input_failed_on_retry cause=shortcut_not_applied_or_context_mismatch attempt={attempt}");
                     return false;
                 }
             }
@@ -218,15 +219,15 @@ internal static class JobExecutionCore
             {
                 if (attempt >= maxRetries)
                 {
-                    log.Warn(isRetry
-                        ? $"prepare_failed_detail reason=type_text_failed_on_retry cause=wm_char_input_failed attempt={attempt}"
-                        : "prepare_failed_detail reason=type_text_failed cause=wm_char_input_failed");
+                    Warn(log, isRetry
+                        ? $"{context}_failed_detail reason=type_text_failed_on_retry cause=wm_char_input_failed attempt={attempt}"
+                        : $"{context}_failed_detail reason=type_text_failed cause=wm_char_input_failed");
                     return false;
                 }
 
-                log.Warn(isRetry
-                    ? $"prepare_retry_detail reason=type_text_failed_before_retry cause=wm_char_input_failed attempt={attempt}"
-                    : "prepare_retry_detail reason=type_text_failed_before_retry cause=wm_char_input_failed attempt=0");
+                Warn(log, isRetry
+                    ? $"{context}_retry_detail reason=type_text_failed_before_retry cause=wm_char_input_failed attempt={attempt}"
+                    : $"{context}_retry_detail reason=type_text_failed_before_retry cause=wm_char_input_failed attempt=0");
                 continue;
             }
 
@@ -237,22 +238,22 @@ internal static class JobExecutionCore
 
             if (attempt >= maxRetries)
             {
-                log.Warn(isRetry
-                    ? $"prepare_failed_detail reason=typed_text_not_reflected_after_retry cause=input_context_not_focused attempt={attempt}"
-                    : "prepare_failed_detail reason=typed_text_not_reflected cause=input_context_not_focused");
+                Warn(log, isRetry
+                    ? $"{context}_failed_detail reason=typed_text_not_reflected_after_retry cause=input_context_not_focused attempt={attempt}"
+                    : $"{context}_failed_detail reason=typed_text_not_reflected cause=input_context_not_focused");
                 return false;
             }
 
-            log.Warn(isRetry
-                ? $"prepare_retry_detail reason=typed_text_not_reflected_before_retry cause=input_context_not_focused attempt={attempt}"
-                : "prepare_retry_detail reason=typed_text_not_reflected_before_wait cause=input_context_not_focused");
+            Warn(log, isRetry
+                ? $"{context}_retry_detail reason=typed_text_not_reflected_before_retry cause=input_context_not_focused attempt={attempt}"
+                : $"{context}_retry_detail reason=typed_text_not_reflected_before_wait cause=input_context_not_focused");
         }
 
         return false;
     }
 
     // 入力クリア失敗時の再試行
-    private static bool TryClearInputWithRetry(AppConfig config, IVoicepeakUiController ui, Process process, IntPtr hwnd, AppLogger log)
+    internal static bool TryClearInputWithRetry(AppConfig config, IVoicepeakUiController ui, Process process, IntPtr hwnd, AppLogger log, string context)
     {
         int maxRetries = Math.Max(0, config.InputTiming.ClearInputRetryMaxRetries);
         int maxAttempts = maxRetries + 1;
@@ -265,11 +266,11 @@ internal static class JobExecutionCore
 
             if (attempt >= maxRetries)
             {
-                log.Warn("prepare_failed_detail reason=clear_input_failed cause=move_to_start_or_delete_not_applied");
+                Warn(log, $"{context}_failed_detail reason=clear_input_failed cause=move_to_start_or_delete_not_applied");
                 return false;
             }
 
-            log.Warn($"prepare_retry_detail reason=clear_input_failed_before_retry cause=move_to_start_or_delete_not_applied attempt={attempt}");
+            Warn(log, $"{context}_retry_detail reason=clear_input_failed_before_retry cause=move_to_start_or_delete_not_applied attempt={attempt}");
             SleepRetryWait(config.InputTiming.ClearInputRetryWaitMs);
         }
 
@@ -673,10 +674,19 @@ internal static class JobExecutionCore
             return;
         }
 
-        ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs);
+        TryClearInputWithRetry(config, ui, process, hwnd, null, "finalize");
         if (killFocusAfterClear)
         {
             ui.KillFocus(hwnd);
+        }
+    }
+
+    // ログがある場合のみ警告を出力
+    private static void Warn(AppLogger log, string message)
+    {
+        if (log != null)
+        {
+            log.Warn(message);
         }
     }
 

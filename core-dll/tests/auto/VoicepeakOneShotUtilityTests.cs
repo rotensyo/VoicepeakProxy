@@ -251,12 +251,36 @@ public class VoicepeakOneShotUtilityTests
     [TestMethod]
     public void ClearInputOnceCore_ClearInputFailed_ReturnsStatus()
     {
+        AppConfig config = new AppConfig();
+        config.InputTiming.ClearInputRetryMaxRetries = 1;
+        config.InputTiming.ClearInputRetryWaitMs = 0;
         FakeVoicepeakUiController ui = CreateResolvedUi();
         ui.ClearInputHandler = () => false;
 
-        ClearInputOnceResult result = VoicepeakOneShot.ClearInputOnceCore(new AppConfig(), new AppLogger(new TestLogger()), ui);
+        ClearInputOnceResult result = VoicepeakOneShot.ClearInputOnceCore(config, new AppLogger(new TestLogger()), ui);
 
         Assert.AreEqual(ClearInputOnceStatus.ClearInputFailed, result.Status);
+        Assert.AreEqual(2, ui.ClearInputCalls);
+    }
+
+    [TestMethod]
+    public void ClearInputOnceCore_ClearInputRetry_SucceedsWithinConfiguredRetries()
+    {
+        AppConfig config = new AppConfig();
+        config.InputTiming.ClearInputRetryMaxRetries = 2;
+        config.InputTiming.ClearInputRetryWaitMs = 0;
+        int clearAttempts = 0;
+        FakeVoicepeakUiController ui = CreateResolvedUi();
+        ui.ClearInputHandler = () =>
+        {
+            clearAttempts++;
+            return clearAttempts >= 2;
+        };
+
+        ClearInputOnceResult result = VoicepeakOneShot.ClearInputOnceCore(config, new AppLogger(new TestLogger()), ui);
+
+        Assert.AreEqual(ClearInputOnceStatus.Completed, result.Status);
+        Assert.AreEqual(2, ui.ClearInputCalls);
     }
 
     [TestMethod]
