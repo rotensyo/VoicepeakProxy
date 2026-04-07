@@ -129,6 +129,31 @@ public class ExecutionLogicTests
     }
 
     [TestMethod]
+    public void PrepareSegment_ClearInputRetry_SucceedsWithinConfiguredRetries()
+    {
+        // 入力クリア失敗を再試行で回復
+        AppConfig config = new AppConfig();
+        config.InputTiming.ClearInputRetryMaxRetries = 2;
+        config.InputTiming.ClearInputRetryWaitMs = 0;
+        int clearAttempts = 0;
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ClearInputHandler = () =>
+            {
+                clearAttempts++;
+                return clearAttempts >= 2;
+            },
+            ReadInputHandler = _ => ReadInputResult.Ok("hello", 5, ReadInputSource.PrimaryUiA),
+            VisibleInputBlockCountHandler = _ => 1
+        };
+
+        bool actual = JobExecutionCore.PrepareSegment(config, ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()));
+
+        Assert.IsTrue(actual);
+        Assert.AreEqual(2, ui.ClearInputCalls);
+    }
+
+    [TestMethod]
     public void PrepareSegment_UsesPrepareForTextInputBeforeClearAndType()
     {
         // 入力準備の順序を固定
@@ -161,20 +186,65 @@ public class ExecutionLogicTests
     }
 
     [TestMethod]
-    public void PrepareSegment_InputEmptyAfterType_ReturnsFalse()
+    public void PrepareSegment_InputEmptyAfterType_RetriesOnceAndSucceeds()
     {
-        // 入力反映なし時は失敗を返す
+        // 入力反映なし時は1回だけ再入力して成功
+        AppConfig config = new AppConfig();
+        config.InputTiming.TypeTextRetryWaitMs = 0;
         Queue<ReadInputResult> reads = new Queue<ReadInputResult>();
         reads.Enqueue(ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA));
+        reads.Enqueue(ReadInputResult.Ok("hello", 5, ReadInputSource.PrimaryUiA));
         FakeVoicepeakUiController ui = new FakeVoicepeakUiController
         {
             ReadInputHandler = _ => reads.Count > 0 ? reads.Dequeue() : ReadInputResult.Ok("hello", 5, ReadInputSource.PrimaryUiA),
             VisibleInputBlockCountHandler = _ => 1
         };
 
-        bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()));
+        bool actual = JobExecutionCore.PrepareSegment(config, ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()));
+
+        Assert.IsTrue(actual);
+        Assert.AreEqual(2, ui.PrepareForTextInputCalls);
+        Assert.AreEqual(2, ui.TypedTexts.Count);
+    }
+
+    [TestMethod]
+    public void PrepareSegment_InputEmptyAfterRetry_ReturnsFalse()
+    {
+        // 再入力後も反映なしなら失敗
+        AppConfig config = new AppConfig();
+        config.InputTiming.TypeTextRetryWaitMs = 0;
+        config.InputTiming.TypeTextRetryMaxRetries = 1;
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ReadInputHandler = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA),
+            VisibleInputBlockCountHandler = _ => 1
+        };
+
+        bool actual = JobExecutionCore.PrepareSegment(config, ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()));
 
         Assert.IsFalse(actual);
+        Assert.AreEqual(2, ui.PrepareForTextInputCalls);
+        Assert.AreEqual(2, ui.TypedTexts.Count);
+    }
+
+    [TestMethod]
+    public void PrepareSegment_InputEmptyAfterType_RespectsRetryMaxRetries()
+    {
+        // 再入力回数設定どおりに試行
+        AppConfig config = new AppConfig();
+        config.InputTiming.TypeTextRetryMaxRetries = 2;
+        config.InputTiming.TypeTextRetryWaitMs = 0;
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ReadInputHandler = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA),
+            VisibleInputBlockCountHandler = _ => 1
+        };
+
+        bool actual = JobExecutionCore.PrepareSegment(config, ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()));
+
+        Assert.IsFalse(actual);
+        Assert.AreEqual(3, ui.PrepareForTextInputCalls);
+        Assert.AreEqual(3, ui.TypedTexts.Count);
     }
 
     [TestMethod]

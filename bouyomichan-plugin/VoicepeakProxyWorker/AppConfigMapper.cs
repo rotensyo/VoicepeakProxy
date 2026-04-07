@@ -41,6 +41,10 @@ internal static class AppConfigMapper
         config.Ui.DelayBeforePlayShortcutMs = data.Ui.DelayBeforePlayShortcutMs;
 
         config.InputTiming.KeyStrokeIntervalMs = data.InputTiming.KeyStrokeIntervalMs;
+        config.InputTiming.TypeTextRetryWaitMs = data.InputTiming.TypeTextRetryWaitMs;
+        config.InputTiming.TypeTextRetryMaxRetries = data.InputTiming.TypeTextRetryMaxRetries;
+        config.InputTiming.ClearInputRetryWaitMs = data.InputTiming.ClearInputRetryWaitMs;
+        config.InputTiming.ClearInputRetryMaxRetries = data.InputTiming.ClearInputRetryMaxRetries;
         config.InputTiming.ActionDelayMs = data.InputTiming.ActionDelayMs;
         config.InputTiming.PostTypeWaitPerCharMs = data.InputTiming.PostTypeWaitPerCharMs;
         config.InputTiming.PostTypeWaitMinMs = data.InputTiming.PostTypeWaitMinMs;
@@ -105,6 +109,10 @@ internal static class AppConfigMapper
         data.Ui.DelayBeforePlayShortcutMs = config.Ui.DelayBeforePlayShortcutMs;
 
         data.InputTiming.KeyStrokeIntervalMs = config.InputTiming.KeyStrokeIntervalMs;
+        data.InputTiming.TypeTextRetryWaitMs = config.InputTiming.TypeTextRetryWaitMs;
+        data.InputTiming.TypeTextRetryMaxRetries = config.InputTiming.TypeTextRetryMaxRetries;
+        data.InputTiming.ClearInputRetryWaitMs = config.InputTiming.ClearInputRetryWaitMs;
+        data.InputTiming.ClearInputRetryMaxRetries = config.InputTiming.ClearInputRetryMaxRetries;
         data.InputTiming.ActionDelayMs = config.InputTiming.ActionDelayMs;
         data.InputTiming.PostTypeWaitPerCharMs = config.InputTiming.PostTypeWaitPerCharMs;
         data.InputTiming.PostTypeWaitMinMs = config.InputTiming.PostTypeWaitMinMs;

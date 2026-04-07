@@ -48,6 +48,10 @@ public sealed class UiConfig
 public sealed class InputTimingConfig
 {
     public int KeyStrokeIntervalMs { get; set; } = 0;
+    public int TypeTextRetryWaitMs { get; set; } = 1000;
+    public int TypeTextRetryMaxRetries { get; set; } = 2;
+    public int ClearInputRetryWaitMs { get; set; } = 1000;
+    public int ClearInputRetryMaxRetries { get; set; } = 2;
     public int ActionDelayMs { get; set; } = 5;
     public int PostTypeWaitPerCharMs { get; set; } = 5;
     public int PostTypeWaitMinMs { get; set; } = 300;
@@ -154,6 +158,10 @@ internal static class AppConfigValidator
 
         EnsureNonNegative(config.InputTiming.ActionDelayMs, "inputTiming.actionDelayMs は 0 以上で指定してください");
         EnsureNonNegative(config.InputTiming.KeyStrokeIntervalMs, "inputTiming.keyStrokeIntervalMs は 0 以上で指定してください");
+        EnsureNonNegative(config.InputTiming.TypeTextRetryWaitMs, "inputTiming.typeTextRetryWaitMs は 0 以上で指定してください");
+        EnsureNonNegative(config.InputTiming.TypeTextRetryMaxRetries, "inputTiming.typeTextRetryMaxRetries は 0 以上で指定してください");
+        EnsureNonNegative(config.InputTiming.ClearInputRetryWaitMs, "inputTiming.clearInputRetryWaitMs は 0 以上で指定してください");
+        EnsureNonNegative(config.InputTiming.ClearInputRetryMaxRetries, "inputTiming.clearInputRetryMaxRetries は 0 以上で指定してください");
         EnsureNonNegative(config.InputTiming.PostTypeWaitPerCharMs, "inputTiming.postTypeWaitPerCharMs は 0 以上で指定してください");
         EnsureNonNegative(config.InputTiming.PostTypeWaitMinMs, "inputTiming.postTypeWaitMinMs は 0 以上で指定してください");
         EnsurePositive(config.InputTiming.ClearInputMaxPasses, "inputTiming.clearInputMaxPasses は 1 以上で指定してください");

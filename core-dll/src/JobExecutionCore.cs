@@ -167,17 +167,15 @@ internal static class JobExecutionCore
             return false;
         }
 
-        if (!ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs))
+        if (!TryClearInputWithRetry(config, ui, process, hwnd, log))
         {
-            log.Warn("prepare_failed_detail reason=clear_input_failed cause=move_to_start_or_delete_not_applied");
             return false;
         }
 
         string expected = InputTextNormalizer.Normalize(text);
         int keyStrokeIntervalMs = config.InputTiming.KeyStrokeIntervalMs;
-        if (!ui.TypeText(hwnd, expected, keyStrokeIntervalMs))
+        if (!TryTypeTextWithSingleRetry(config, ui, process, hwnd, expected, keyStrokeIntervalMs, log))
         {
-            log.Warn("prepare_failed_detail reason=type_text_failed cause=wm_char_input_failed");
             return false;
         }
 
@@ -187,13 +185,106 @@ internal static class JobExecutionCore
             Thread.Sleep(postTypeWaitMs);
         }
 
-        if (expected.Length > 0 && IsInputEmptyState(ui, hwnd))
+        return true;
+    }
+
+    // 文字入力後の反映確認と再入力リトライ
+    private static bool TryTypeTextWithSingleRetry(
+        AppConfig config,
+        IVoicepeakUiController ui,
+        Process process,
+        IntPtr hwnd,
+        string expected,
+        int keyStrokeIntervalMs,
+        AppLogger log)
+    {
+        int maxRetries = Math.Max(0, config.InputTiming.TypeTextRetryMaxRetries);
+        int maxAttempts = maxRetries + 1;
+
+        for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
-            log.Warn("prepare_failed_detail reason=typed_text_not_reflected cause=input_context_not_focused");
-            return false;
+            bool isRetry = attempt > 0;
+            if (isRetry)
+            {
+                SleepRetryWait(config.InputTiming.TypeTextRetryWaitMs);
+                if (!ui.PrepareForTextInput(process, hwnd, config.InputTiming.ActionDelayMs))
+                {
+                    log.Warn($"prepare_failed_detail reason=prepare_text_input_failed_on_retry cause=shortcut_not_applied_or_context_mismatch attempt={attempt}");
+                    return false;
+                }
+            }
+
+            if (!ui.TypeText(hwnd, expected, keyStrokeIntervalMs))
+            {
+                if (attempt >= maxRetries)
+                {
+                    log.Warn(isRetry
+                        ? $"prepare_failed_detail reason=type_text_failed_on_retry cause=wm_char_input_failed attempt={attempt}"
+                        : "prepare_failed_detail reason=type_text_failed cause=wm_char_input_failed");
+                    return false;
+                }
+
+                log.Warn(isRetry
+                    ? $"prepare_retry_detail reason=type_text_failed_before_retry cause=wm_char_input_failed attempt={attempt}"
+                    : "prepare_retry_detail reason=type_text_failed_before_retry cause=wm_char_input_failed attempt=0");
+                continue;
+            }
+
+            if (expected.Length == 0 || !IsInputEmptyState(ui, hwnd))
+            {
+                return true;
+            }
+
+            if (attempt >= maxRetries)
+            {
+                log.Warn(isRetry
+                    ? $"prepare_failed_detail reason=typed_text_not_reflected_after_retry cause=input_context_not_focused attempt={attempt}"
+                    : "prepare_failed_detail reason=typed_text_not_reflected cause=input_context_not_focused");
+                return false;
+            }
+
+            log.Warn(isRetry
+                ? $"prepare_retry_detail reason=typed_text_not_reflected_before_retry cause=input_context_not_focused attempt={attempt}"
+                : "prepare_retry_detail reason=typed_text_not_reflected_before_wait cause=input_context_not_focused");
         }
 
-        return true;
+        return false;
+    }
+
+    // 入力クリア失敗時の再試行
+    private static bool TryClearInputWithRetry(AppConfig config, IVoicepeakUiController ui, Process process, IntPtr hwnd, AppLogger log)
+    {
+        int maxRetries = Math.Max(0, config.InputTiming.ClearInputRetryMaxRetries);
+        int maxAttempts = maxRetries + 1;
+        for (int attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            if (ui.ClearInput(process, hwnd, config.InputTiming.ActionDelayMs))
+            {
+                return true;
+            }
+
+            if (attempt >= maxRetries)
+            {
+                log.Warn("prepare_failed_detail reason=clear_input_failed cause=move_to_start_or_delete_not_applied");
+                return false;
+            }
+
+            log.Warn($"prepare_retry_detail reason=clear_input_failed_before_retry cause=move_to_start_or_delete_not_applied attempt={attempt}");
+            SleepRetryWait(config.InputTiming.ClearInputRetryWaitMs);
+        }
+
+        return false;
+    }
+
+    // リトライ待機を実行
+    private static void SleepRetryWait(int waitMs)
+    {
+        if (waitMs <= 0)
+        {
+            return;
+        }
+
+        Thread.Sleep(waitMs);
     }
 
     // 入力欄が空状態か判定

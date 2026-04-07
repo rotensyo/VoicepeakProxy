@@ -198,6 +198,10 @@ public sealed class UiConfigData
     public sealed class InputTimingConfigData
     {
         public int KeyStrokeIntervalMs { get; set; }
+        public int TypeTextRetryWaitMs { get; set; }
+        public int TypeTextRetryMaxRetries { get; set; }
+        public int ClearInputRetryWaitMs { get; set; }
+        public int ClearInputRetryMaxRetries { get; set; }
         public int ActionDelayMs { get; set; }
         public int PostTypeWaitPerCharMs { get; set; }
         public int PostTypeWaitMinMs { get; set; }

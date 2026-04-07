@@ -32,7 +32,7 @@ public class VoicepeakEngineExecuteJobTests
     {
         TestLogger logger = new TestLogger();
         FakeVoicepeakUiController ui = CreateResolvedUi();
-        ui.ClearInputHandler = () => ui.ClearInputCalls > 1;
+        ui.ClearInputHandler = () => false;
 
         using CancellationTokenSource cts = new CancellationTokenSource();
         VoicepeakEngine engine = CreateEngine(ui, new FakeAudioSessionReader(), logger, cts);

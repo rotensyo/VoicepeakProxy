@@ -21,6 +21,10 @@ public class AppConfigValidationTests
         Assert.AreEqual(300, config.Audio.StopConfirmMs);
         Assert.AreEqual("初期化完了", config.Validation.ValidationText);
         Assert.AreEqual(0, config.InputTiming.KeyStrokeIntervalMs);
+        Assert.AreEqual(1000, config.InputTiming.TypeTextRetryWaitMs);
+        Assert.AreEqual(2, config.InputTiming.TypeTextRetryMaxRetries);
+        Assert.AreEqual(1000, config.InputTiming.ClearInputRetryWaitMs);
+        Assert.AreEqual(2, config.InputTiming.ClearInputRetryMaxRetries);
         Assert.AreEqual(5, config.InputTiming.PostTypeWaitPerCharMs);
         Assert.AreEqual(300, config.InputTiming.PostTypeWaitMinMs);
         Assert.AreEqual(10, config.InputTiming.ClearInputMaxPasses);
@@ -85,6 +89,10 @@ public class AppConfigValidationTests
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.PostTypeWaitPerCharMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.PostTypeWaitMinMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.KeyStrokeIntervalMs = -1));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.TypeTextRetryWaitMs = -1));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.TypeTextRetryMaxRetries = -1));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.ClearInputRetryWaitMs = -1));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.ClearInputRetryMaxRetries = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.ClearInputMaxPasses = 0));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Hook.HookCommandTimeoutMs = 0));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Hook.HookConnectTimeoutMs = 0));
@@ -249,6 +257,10 @@ public class AppConfigValidationTests
             config.InputTiming.PostTypeWaitPerCharMs = 0;
             config.InputTiming.PostTypeWaitMinMs = 0;
             config.InputTiming.KeyStrokeIntervalMs = 0;
+            config.InputTiming.TypeTextRetryWaitMs = 0;
+            config.InputTiming.TypeTextRetryMaxRetries = 0;
+            config.InputTiming.ClearInputRetryWaitMs = 0;
+            config.InputTiming.ClearInputRetryMaxRetries = 0;
             config.InputTiming.ClearInputMaxPasses = 1;
             config.Hook.HookCommandTimeoutMs = 1;
             config.Hook.HookConnectTimeoutMs = 1;

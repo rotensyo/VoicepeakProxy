@@ -490,13 +490,50 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.InputTiming.PostTypeWaitMinMs = value; }
         }
 
-        [Category("03)文字削除設定")]
-        [DisplayName("05)clearInputMaxPasses")]
+        [Category("03)文字入力失敗時リトライ設定")]
+        [DisplayName("05)typeTextRetryWaitMs")]
+        [Description("入力失敗時のリトライ前待機時間をミリ秒で指定します。0の場合は待機しません。")]
+        public int TypeTextRetryWaitMs
+        {
+            get { return State.Settings.AppConfig.InputTiming.TypeTextRetryWaitMs; }
+            set { State.Settings.AppConfig.InputTiming.TypeTextRetryWaitMs = value; }
+        }
+
+        [Category("03)文字入力失敗時リトライ設定")]
+        [DisplayName("06)typeTextRetryMaxRetries")]
+        [Description("入力失敗時のリトライ回数です。0の場合はリトライしません。")]
+        public int TypeTextRetryMaxRetries
+        {
+            get { return State.Settings.AppConfig.InputTiming.TypeTextRetryMaxRetries; }
+            set { State.Settings.AppConfig.InputTiming.TypeTextRetryMaxRetries = value; }
+        }
+
+
+        [Category("04)文字削除設定")]
+        [DisplayName("07)clearInputMaxPasses")]
         [Description("入力クリア処理の最大繰り返し回数です。入力文字が削除しきれない場合は増やしてみてください。")]
         public int ClearInputMaxPasses
         {
             get { return State.Settings.AppConfig.InputTiming.ClearInputMaxPasses; }
             set { State.Settings.AppConfig.InputTiming.ClearInputMaxPasses = value; }
+        }
+
+        [Category("05)文字削除失敗時リトライ設定")]
+        [DisplayName("08)clearInputRetryWaitMs")]
+        [Description("入力クリア失敗時のリトライ前待機時間をミリ秒で指定します。0の場合は待機しません。")]
+        public int ClearInputRetryWaitMs
+        {
+            get { return State.Settings.AppConfig.InputTiming.ClearInputRetryWaitMs; }
+            set { State.Settings.AppConfig.InputTiming.ClearInputRetryWaitMs = value; }
+        }
+
+        [Category("05)文字削除失敗時リトライ設定")]
+        [DisplayName("09)clearInputRetryMaxRetries")]
+        [Description("入力クリア失敗時のリトライ回数です。0の場合はリトライしません。")]
+        public int ClearInputRetryMaxRetries
+        {
+            get { return State.Settings.AppConfig.InputTiming.ClearInputRetryMaxRetries; }
+            set { State.Settings.AppConfig.InputTiming.ClearInputRetryMaxRetries = value; }
         }
     }
 
