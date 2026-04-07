@@ -72,35 +72,33 @@ namespace BouyomiVoicepeakBridge.Shared
     // コア設定のルート
     public sealed class AppConfigData
     {
-        public StartupConfigData Startup { get; set; }
+        public ValidationConfigData Validation { get; set; }
         public HookConfigData Hook { get; set; }
         public UiConfigData Ui { get; set; }
         public InputTimingConfigData InputTiming { get; set; }
         public AudioConfigData Audio { get; set; }
         public TextConfigData Text { get; set; }
-        public QueueConfigData Queue { get; set; }
-        public ValidationConfigData Validation { get; set; }
+        public RuntimeConfigData Runtime { get; set; }
         public DebugConfigData Debug { get; set; }
 
         public AppConfigData()
         {
-            Startup = new StartupConfigData();
+            Validation = new ValidationConfigData();
             Hook = new HookConfigData();
             Ui = new UiConfigData();
             InputTiming = new InputTimingConfigData();
             Audio = new AudioConfigData();
             Text = new TextConfigData();
-            Queue = new QueueConfigData();
-            Validation = new ValidationConfigData();
+            Runtime = new RuntimeConfigData();
             Debug = new DebugConfigData();
         }
 
         // 不足項目を既定値で補完
         public void Normalize()
         {
-            if (Startup == null)
+            if (Validation == null)
             {
-                Startup = new StartupConfigData();
+                Validation = new ValidationConfigData();
             }
 
             if (Hook == null)
@@ -128,14 +126,9 @@ namespace BouyomiVoicepeakBridge.Shared
                 Text = new TextConfigData();
             }
 
-            if (Queue == null)
+            if (Runtime == null)
             {
-                Queue = new QueueConfigData();
-            }
-
-            if (Validation == null)
-            {
-                Validation = new ValidationConfigData();
+                Runtime = new RuntimeConfigData();
             }
 
             if (Debug == null)
@@ -143,6 +136,7 @@ namespace BouyomiVoicepeakBridge.Shared
                 Debug = new DebugConfigData();
             }
 
+            Validation.Normalize();
             Text.Normalize();
             Debug.Normalize();
         }
@@ -156,13 +150,29 @@ namespace BouyomiVoicepeakBridge.Shared
         Disabled
     }
 
-    // 起動時処理関連設定
-public sealed class StartupConfigData
-{
-    public string BootValidationText { get; set; }
-    public int BootValidationMaxRetries { get; set; }
-    public int BootValidationRetryIntervalMs { get; set; }
-}
+    // 検証関連設定
+    public sealed class ValidationConfigData
+    {
+        public string ValidationText { get; set; }
+        public int ValidationMaxRetries { get; set; }
+        public int ValidationRetryIntervalMs { get; set; }
+
+        public ValidationConfigData()
+        {
+            ValidationText = "初期化完了";
+            ValidationMaxRetries = 2;
+            ValidationRetryIntervalMs = 1000;
+        }
+
+        // 不足項目を既定値で補完
+        public void Normalize()
+        {
+            if (ValidationText == null)
+            {
+                ValidationText = string.Empty;
+            }
+        }
+    }
 
     // フック関連設定
     public sealed class HookConfigData
@@ -233,16 +243,17 @@ public sealed class UiConfigData
         }
     }
 
-    // キュー関連設定
-    public sealed class QueueConfigData
+    // 実行制御関連設定
+    public sealed class RuntimeConfigData
     {
         public int MaxQueuedJobs { get; set; }
-    }
-
-    // 検証関連設定
-    public sealed class ValidationConfigData
-    {
         public BootValidationModeOption BootValidation { get; set; }
+
+        public RuntimeConfigData()
+        {
+            MaxQueuedJobs = 500;
+            BootValidation = BootValidationModeOption.Required;
+        }
     }
 
     // デバッグ設定

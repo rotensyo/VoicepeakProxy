@@ -106,21 +106,21 @@ namespace Plugin_VoicepeakProxy
         public SettingsBase Setting { get { return _state; } }
 
         public GeneralTab P01General;
-        public StartupTab P02Startup;
-        public HookTab P03Hook;
+        public ValidationTab P02Validation;
         public UiTab P04Ui;
         public InputTimingTab P05InputTiming;
         public AudioTab P06Audio;
         public TextTab P07Text;
         // public QueueTab P08Queue;
         // public ValidationTab P09Validation;
+        public HookTab P03Hook;
         public DebugTab P10Debug;
 
         public PluginSettingFormData(PluginSettingsState state)
         {
             _state = state;
             P01General = new GeneralTab(_state);
-            P02Startup = new StartupTab(_state);
+            P02Validation = new ValidationTab(_state);
             P03Hook = new HookTab(_state);
             P04Ui = new UiTab(_state);
             P05InputTiming = new InputTimingTab(_state);
@@ -154,10 +154,10 @@ namespace Plugin_VoicepeakProxy
 
         public override string GetName()
         {
-            return "General";
+            return "プラグイン";
         }
 
-        [Category("Plugin")]
+        [Category("01)VOICEPEAK自動起動設定")]
         [DisplayName("01)VOICEPEAK 自動起動用本体パス")]
         [Description("VOICEPEAK自動起動に使用するvoicepeak.exeのパスです。空文字の場合は自動起動は行いません。")]
         [Editor(typeof(VoicepeakExePathEditor), typeof(UITypeEditor))]
@@ -167,7 +167,7 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.Plugin.VoicepeakExePath = value ?? string.Empty; }
         }
 
-        [Category("Plugin")]
+        [Category("01)VOICEPEAK自動起動設定")]
         [DisplayName("02)VOICEPEAK 自動起動用.vppファイルパス")]
         [Description("VOICEPEAK自動起動時に開く.vppファイルのパスです。空文字の場合は何も指定せずに起動します。")]
         [Editor(typeof(VoicepeakTemplatePathEditor), typeof(UITypeEditor))]
@@ -177,7 +177,7 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.Plugin.VoicepeakTemplatePath = value ?? string.Empty; }
         }
 
-        [Category("Plugin")]
+        [Category("02)Worker-Pipe")]
         [DisplayName("03)Pipe名")]
         [Description("PluginとWorkerの接続に使用するPipe名です。通常は設定を変更する必要はありません。")]
         public string PipeName
@@ -186,7 +186,7 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.Plugin.PipeName = value ?? string.Empty; }
         }
 
-        [Category("Plugin")]
+        [Category("02)Worker-Pipe")]
         [DisplayName("04)Pipe接続タイムアウト(ms)")]
         [Description("Worker接続待ち時間をミリ秒で指定します。")]
         public int PipeConnectTimeoutMs
@@ -226,10 +226,10 @@ namespace Plugin_VoicepeakProxy
 
         public override string GetName()
         {
-            return "Audio";
+            return "音声";
         }
 
-        [Category("Audio")]
+        [Category("01)音声監視設定")]
         [DisplayName("01)peakThreshold")]
         [Description("発話中判定に使う音量の閾値です。")]
         public float PeakThreshold
@@ -238,7 +238,7 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Audio.PeakThreshold = value; }
         }
 
-        [Category("Audio")]
+        [Category("01)音声監視設定")]
         [DisplayName("02)pollIntervalMs")]
         [Description("音声監視を行う間隔をミリ秒で指定します。")]
         public int PollIntervalMs
@@ -247,7 +247,7 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Audio.PollIntervalMs = value; }
         }
 
-        [Category("Audio")]
+        [Category("02)発話開始・終了確認設定")]
         [DisplayName("03)startConfirmTimeoutMs")]
         [Description("再生実行から発話開始を待つ最大時間をミリ秒で指定します。")]
         public int StartConfirmTimeoutMs
@@ -256,7 +256,7 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Audio.StartConfirmTimeoutMs = value; }
         }
 
-        [Category("Audio")]
+        [Category("02)発話開始・終了確認設定")]
         [DisplayName("04)startConfirmMaxRetries")]
         [Description("発話開始が確認されなかった際に再生をリトライする回数です。")]
         public int StartConfirmMaxRetries
@@ -265,7 +265,7 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Audio.StartConfirmMaxRetries = value; }
         }
 
-        [Category("Audio")]
+        [Category("02)発話開始・終了確認設定")]
         [DisplayName("05)stopConfirmMs")]
         [Description("発話開始後、この時間(ミリ秒)だけ無音が続いたら発話終了と判定します。")]
         public int StopConfirmMs
@@ -274,7 +274,7 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Audio.StopConfirmMs = value; }
         }
 
-        [Category("Audio")]
+        [Category("02)発話開始・終了確認設定")]
         [DisplayName("06)maxSpeakingDurationSec")]
         [Description("発話開始後、この秒数を超えても終了しない場合はエラーとします。")]
         public int MaxSpeakingDurationSec
@@ -284,43 +284,43 @@ namespace Plugin_VoicepeakProxy
         }
     }
 
-    // Startup設定タブ
-    internal sealed class StartupTab : TabBase
+    // Validation設定タブ
+    internal sealed class ValidationTab : TabBase
     {
-        public StartupTab(PluginSettingsState state) : base(state)
+        public ValidationTab(PluginSettingsState state) : base(state)
         {
         }
 
         public override string GetName()
         {
-            return "Startup";
+            return "起動時入力検証";
         }
 
-        [Category("Startup")]
-        [DisplayName("01)bootValidationText")]
-        [Description("起動時に入力/再生の確認を行う文字列です。")]
-        public string BootValidationText
+        [Category("01)起動時入力検証設定")]
+        [DisplayName("01)validationText")]
+        [Description("プラグイン起動時に入力/再生の確認を行う文字列です。")]
+        public string ValidationText
         {
-            get { return State.Settings.AppConfig.Startup.BootValidationText; }
-            set { State.Settings.AppConfig.Startup.BootValidationText = value ?? string.Empty; }
+            get { return State.Settings.AppConfig.Validation.ValidationText; }
+            set { State.Settings.AppConfig.Validation.ValidationText = value ?? string.Empty; }
         }
 
-        [Category("Startup")]
-        [DisplayName("02)bootValidationMaxRetries")]
-        [Description("起動時の入力検証失敗時の再試行回数です。")]
-        public int BootValidationMaxRetries
+        [Category("01)起動時入力検証設定")]
+        [DisplayName("02)validationMaxRetries")]
+        [Description("プラグイン起動時の入力検証に失敗した際の再試行回数です。")]
+        public int ValidationMaxRetries
         {
-            get { return State.Settings.AppConfig.Startup.BootValidationMaxRetries; }
-            set { State.Settings.AppConfig.Startup.BootValidationMaxRetries = value; }
+            get { return State.Settings.AppConfig.Validation.ValidationMaxRetries; }
+            set { State.Settings.AppConfig.Validation.ValidationMaxRetries = value; }
         }
 
-        [Category("Startup")]
-        [DisplayName("03)bootValidationRetryIntervalMs")]
-        [Description("起動時入力検証の再試行待機時間をミリ秒で指定します。")]
-        public int BootValidationRetryIntervalMs
+        [Category("01)起動時入力検証設定")]
+        [DisplayName("03)validationRetryIntervalMs")]
+        [Description("入力検証の再試行待機時間をミリ秒で指定します。")]
+        public int ValidationRetryIntervalMs
         {
-            get { return State.Settings.AppConfig.Startup.BootValidationRetryIntervalMs; }
-            set { State.Settings.AppConfig.Startup.BootValidationRetryIntervalMs = value; }
+            get { return State.Settings.AppConfig.Validation.ValidationRetryIntervalMs; }
+            set { State.Settings.AppConfig.Validation.ValidationRetryIntervalMs = value; }
         }
 
     }
@@ -337,7 +337,7 @@ namespace Plugin_VoicepeakProxy
             return "Hook";
         }
 
-        [Category("Hook")]
+        [Category("01)Hook")]
         [DisplayName("01)hookCommandTimeoutMs")]
         [Description("修飾キー中立化フックへのコマンド送信タイムアウトをミリ秒で指定します。")]
         public int HookCommandTimeoutMs
@@ -346,7 +346,7 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Hook.HookCommandTimeoutMs = value; }
         }
 
-        [Category("Hook")]
+        [Category("01)Hook")]
         [DisplayName("02)hookConnectTimeoutMs")]
         [Description("修飾キー中立化フックの接続試行1回あたりのタイムアウトをミリ秒で指定します。")]
         public int HookConnectTimeoutMs
@@ -355,7 +355,7 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Hook.HookConnectTimeoutMs = value; }
         }
 
-        [Category("Hook")]
+        [Category("01)Hook")]
         [DisplayName("03)hookConnectTotalWaitMs")]
         [Description("修飾キー中立化フックの接続待機総最大時間をミリ秒で指定します。")]
         public int HookConnectTotalWaitMs
@@ -374,10 +374,10 @@ namespace Plugin_VoicepeakProxy
 
         public override string GetName()
         {
-            return "Ui";
+            return "UI操作・ショートカット";
         }
 
-        [Category("Ui")]
+        [Category("01)「先頭に移動」ショートカット設定")]
         [DisplayName("01)moveToStartModifier")]
         [Description("「先頭に移動」ショートカットの修飾子キーです。VOICEPEAKの設定値に応じて、空文字/ctrl/altのいずれかを指定してください。shiftや、ctrlとaltの複合は現在非対応です。")]
         public string MoveToStartModifier
@@ -386,7 +386,7 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Ui.MoveToStartModifier = value ?? string.Empty; }
         }
 
-        [Category("Ui")]
+        [Category("01)「先頭に移動」ショートカット設定")]
         [DisplayName("02)moveToStartKey")]
         [Description("「先頭に移動」ショートカットのキーです。VOICEPEAKの設定値と同じものを指定してください。例: cursor up, F3, home")]
         public string MoveToStartKey
@@ -395,7 +395,7 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Ui.MoveToStartKey = value ?? string.Empty; }
         }
 
-        [Category("Ui")]
+        [Category("02)「すべてを選択」ショートカット設定")]
         [DisplayName("03)clearInputSelectAllModifier")]
         [Description("「すべてを選択」ショートカットの修飾子キーです。VOICEPEAKの設定値に応じて、空文字/ctrl/altのいずれかを指定してください。")]
         public string ClearInputSelectAllModifier
@@ -404,7 +404,7 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Ui.ClearInputSelectAllModifier = value ?? string.Empty; }
         }
 
-        [Category("Ui")]
+        [Category("02)「すべてを選択」ショートカット設定")]
         [DisplayName("04)clearInputSelectAllKey")]
         [Description("「すべてを選択」ショートカットのキーです。VOICEPEAKの設定値と同じものを指定してください。例: a")]
         public string ClearInputSelectAllKey
@@ -413,7 +413,7 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Ui.ClearInputSelectAllKey = value ?? string.Empty; }
         }
 
-        [Category("Ui")]
+        [Category("03)「再生/停止」ショートカット設定")]
         [DisplayName("05)playShortcutModifier")]
         [Description("「再生/停止」ショートカットの修飾子キーです。VOICEPEAKの設定値に応じて、空文字/ctrl/alt/shiftのいずれかを指定してください。")]
         public string PlayShortcutModifier
@@ -422,7 +422,7 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Ui.PlayShortcutModifier = value ?? string.Empty; }
         }
 
-        [Category("Ui")]
+        [Category("03)「再生/停止」ショートカット設定")]
         [DisplayName("06)playShortcutKey")]
         [Description("「再生/停止」ショートカットのキーです。VOICEPEAKの設定値と同じものを指定してください。例: spacebar, F3, home")]
         public string PlayShortcutKey
@@ -431,9 +431,9 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Ui.PlayShortcutKey = value ?? string.Empty; }
         }
 
-        [Category("Ui")]
+        [Category("04)再生実行ディレイ設定")]
         [DisplayName("07)delayBeforePlayShortcutMs")]
-        [Description("再生ボタンを押す前の待機時間をミリ秒で指定します。")]
+        [Description("再生アクション実行前の待機時間をミリ秒で指定します。")]
         public int DelayBeforePlayShortcutMs
         {
             get { return State.Settings.AppConfig.Ui.DelayBeforePlayShortcutMs; }
@@ -451,10 +451,10 @@ namespace Plugin_VoicepeakProxy
 
         public override string GetName()
         {
-            return "InputTiming";
+            return "文字入力";
         }
 
-        [Category("InputTiming")]
+        [Category("01)文字入力ディレイ設定")]
         [DisplayName("01)keyStrokeIntervalMs")]
         [Description("キー操作ごとの待機時間をミリ秒で指定します。0の場合は待機しません。")]
         public int KeyStrokeIntervalMs
@@ -463,7 +463,7 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.InputTiming.KeyStrokeIntervalMs = value; }
         }
 
-        [Category("InputTiming")]
+        [Category("01)文字入力ディレイ設定")]
         [DisplayName("02)actionDelayMs")]
         [Description("文字入力欄フォーカスなどのUIアクション時の待機時間をミリ秒で指定します。")]
         public int ActionDelayMs
@@ -472,7 +472,7 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.InputTiming.ActionDelayMs = value; }
         }
 
-        [Category("InputTiming")]
+        [Category("02)文字入力後待機時間設定")]
         [DisplayName("03)postTypeWaitPerCharMs")]
         [Description("文字入力後の待機時間算出に使用する倍率です。文字入力完了後に再生失敗する場合は、値を増やして再生前の待機時間を伸ばしてみてください。")]
         public int PostTypeWaitPerCharMs
@@ -481,7 +481,7 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.InputTiming.PostTypeWaitPerCharMs = value; }
         }
 
-        [Category("InputTiming")]
+        [Category("02)文字入力後待機時間設定")]
         [DisplayName("04)postTypeWaitMinMs")]
         [Description("文字入力後待機時間の最小値です。文字入力完了後に再生失敗する場合は、値を増やして再生前の待機時間を伸ばしてみてください。")]
         public int PostTypeWaitMinMs
@@ -490,9 +490,9 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.InputTiming.PostTypeWaitMinMs = value; }
         }
 
-        [Category("InputTiming")]
+        [Category("03)文字削除設定")]
         [DisplayName("05)clearInputMaxPasses")]
-        [Description("入力クリア処理の最大繰り返し回数です。入力文字が削除しきれていない場合は増やしてみてください。")]
+        [Description("入力クリア処理の最大繰り返し回数です。入力文字が削除しきれない場合は増やしてみてください。")]
         public int ClearInputMaxPasses
         {
             get { return State.Settings.AppConfig.InputTiming.ClearInputMaxPasses; }
@@ -509,19 +509,19 @@ namespace Plugin_VoicepeakProxy
 
         public override string GetName()
         {
-            return "Text";
+            return "文章操作";
         }
 
-        [Category("Text")]
+        [Category("01)入力ブロック分割設定")]
         [DisplayName("01)sendEnterAfterSentenceBreak")]
-        [Description("trueにすると Text.sentenceBreakTriggers で指定した句点等の改行区切りで入力ブロックを分割します。")]
+        [Description("TrueにするとsentenceBreakTriggersで指定した改行区切りで入力ブロックを分割します。")]
         public bool SendEnterAfterSentenceBreak
         {
             get { return State.Settings.AppConfig.Text.SendEnterAfterSentenceBreak; }
             set { State.Settings.AppConfig.Text.SendEnterAfterSentenceBreak = value; }
         }
 
-        [Category("Text")]
+        [Category("01)入力ブロック分割設定")]
         [DisplayName("02)sentenceBreakTriggers(改行区切り)")]
         [Description("入力ブロックの分割対象文字列です。1行に1トリガーを指定してください。")]
         [Editor(typeof(System.ComponentModel.Design.MultilineStringEditor), typeof(System.Drawing.Design.UITypeEditor))]
@@ -537,7 +537,7 @@ namespace Plugin_VoicepeakProxy
             }
         }
 
-        [Category("Text")]
+        [Category("02)置換設定")]
         [DisplayName("03)replaceRules(from=>to,改行区切り)")]
         [Description("ポーズ調整等に利用可能な入力文字の置換ルールです。1行に1ルールを指定してください。(例: 。=>。　。)")]
         [Editor(typeof(System.ComponentModel.Design.MultilineStringEditor), typeof(System.Drawing.Design.UITypeEditor))]
@@ -609,6 +609,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Debug")]
         [DisplayName("01)logTextCandidates")]
+        [Description("入力欄候補収集の詳細ログを出力します。")]
         public bool LogTextCandidates
         {
             get { return State.Settings.AppConfig.Debug.LogTextCandidates; }
@@ -617,6 +618,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Debug")]
         [DisplayName("02)logModifierHookStats")]
+        [Description("修飾キー中立化フックの統計ログを出力します。")]
         public bool LogModifierHookStats
         {
             get { return State.Settings.AppConfig.Debug.LogModifierHookStats; }
@@ -625,6 +627,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Debug")]
         [DisplayName("03)logMinimumLevel")]
+        [Description("ログレベルを変更します。info/warnで指定できます。")]
         public string LogMinimumLevel
         {
             get { return State.Settings.AppConfig.Debug.LogMinimumLevel; }

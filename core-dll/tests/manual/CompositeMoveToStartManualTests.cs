@@ -16,8 +16,8 @@ public class CompositeMoveToStartManualTests
 
         // 起動時検証を有効化
         AppConfig config = CreateManualConfig();
-        config.Validation.BootValidation = BootValidationMode.Required;
-        config.Startup.BootValidationText = "フォーカス確認です。";
+        config.Runtime.BootValidation = BootValidationMode.Required;
+        config.Validation.ValidationText = "フォーカス確認です。";
 
         using VoicepeakRuntime runtime = VoicepeakRuntime.Start(config, new ConsoleAppLogger());
 

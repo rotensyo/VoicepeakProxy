@@ -14,10 +14,10 @@ public class VoicepeakOneShotUtilityTests
     }
 
     [TestMethod]
-    public void ValidateInputOnceCore_UsesBootValidationTextAndCanSucceed()
+    public void ValidateInputOnceCore_UsesValidationTextAndCanSucceed()
     {
         AppConfig config = new AppConfig();
-        config.Startup.BootValidationText = string.Empty;
+        config.Validation.ValidationText = string.Empty;
         ValidateInputOnceResult result = VoicepeakOneShot.ValidateInputOnceCore(
             config,
             new AppLogger(new TestLogger()),
@@ -97,7 +97,7 @@ public class VoicepeakOneShotUtilityTests
         audio.Snapshots.Enqueue(new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" });
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
         AppConfig config = new AppConfig();
-        config.Startup.BootValidationText = "A";
+        config.Validation.ValidationText = "A";
         config.Audio.StopConfirmMs = 1;
 
         ValidateInputOnceResult result = VoicepeakOneShot.ValidateInputOnceCore(
@@ -139,7 +139,7 @@ public class VoicepeakOneShotUtilityTests
         FakeVoicepeakUiController ui = CreateResolvedUi();
         ui.ReadInputHandler = _ => ReadInputResult.Ok("AX", 2, ReadInputSource.PrimaryUiA);
         AppConfig config = new AppConfig();
-        config.Startup.BootValidationText = "A";
+        config.Validation.ValidationText = "A";
 
         ValidateInputOnceResult result = VoicepeakOneShot.ValidateInputOnceCore(
             config,
@@ -160,7 +160,7 @@ public class VoicepeakOneShotUtilityTests
         FakeAudioSessionReader audio = new FakeAudioSessionReader();
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
         AppConfig config = new AppConfig();
-        config.Startup.BootValidationText = "A";
+        config.Validation.ValidationText = "A";
         config.Audio.StartConfirmTimeoutMs = 1;
         config.Audio.StartConfirmMaxRetries = 0;
 
@@ -174,15 +174,15 @@ public class VoicepeakOneShotUtilityTests
     }
 
     [TestMethod]
-    public void ValidateInputOnceCore_InputValidation_RetriesByBootValidationMaxRetries()
+    public void ValidateInputOnceCore_InputValidation_RetriesByValidationMaxRetries()
     {
         FakeVoicepeakUiController ui = CreateResolvedUi();
         ui.ReadInputHandler = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA);
         ui.ClearInputHandler = () => ui.ClearInputCalls > 1;
         AppConfig config = new AppConfig();
-        config.Startup.BootValidationText = string.Empty;
-        config.Startup.BootValidationMaxRetries = 1;
-        config.Startup.BootValidationRetryIntervalMs = 0;
+        config.Validation.ValidationText = string.Empty;
+        config.Validation.ValidationMaxRetries = 1;
+        config.Validation.ValidationRetryIntervalMs = 0;
 
         ValidateInputOnceResult result = VoicepeakOneShot.ValidateInputOnceCore(
             config,

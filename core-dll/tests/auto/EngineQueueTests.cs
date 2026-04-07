@@ -77,7 +77,7 @@ public class EngineQueueTests
     {
         // 上限超過でQueueFull
         AppConfig config = CreateConfig();
-        config.Queue.MaxQueuedJobs = 1;
+        config.Runtime.MaxQueuedJobs = 1;
         using CancellationTokenSource cts = new CancellationTokenSource();
         object engine = ReflectionTestHelper.CreateVoicepeakEngine(config, cts, new TestLogger());
         try

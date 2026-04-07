@@ -55,7 +55,7 @@ public sealed class VoicepeakRuntime : IDisposable
                 throw new InvalidOperationException("engineFactory returned null.");
             }
 
-            bool ok = engine.BootValidate(config.Validation.BootValidation);
+            bool ok = engine.BootValidate(config.Runtime.BootValidation);
             if (!ok)
             {
                 appLogger.Error("boot_validation_failed");

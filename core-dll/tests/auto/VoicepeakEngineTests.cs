@@ -54,7 +54,7 @@ public class VoicepeakEngineTests
         FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
         ui.ReadInputHandler = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA);
         AppConfig config = CreateEngineConfig();
-        config.Startup.BootValidationText = string.Empty;
+        config.Validation.ValidationText = string.Empty;
         TestLogger logger = new TestLogger();
 
         using CancellationTokenSource cts = new CancellationTokenSource();
@@ -158,7 +158,7 @@ public class VoicepeakEngineTests
         AppConfig config = CreateEngineConfig();
         config.Ui.MoveToStartModifier = string.Empty;
         config.Ui.MoveToStartKey = "F3";
-        config.Startup.BootValidationText = string.Empty;
+        config.Validation.ValidationText = string.Empty;
 
         using CancellationTokenSource cts = new CancellationTokenSource();
         VoicepeakEngine engine = new VoicepeakEngine(config, cts, new AppLogger(new TestLogger()), ui, new FakeAudioSessionReader(), false);
@@ -439,7 +439,7 @@ public class VoicepeakEngineTests
         };
 
         AppConfig config = CreateEngineConfig();
-        config.Startup.BootValidationText = string.Empty;
+        config.Validation.ValidationText = string.Empty;
 
         using CancellationTokenSource cts = new CancellationTokenSource();
         VoicepeakEngine engine = new VoicepeakEngine(config, cts, new AppLogger(new TestLogger()), ui, new FakeAudioSessionReader(), false);
@@ -466,9 +466,9 @@ public class VoicepeakEngineTests
     private static AppConfig CreateEngineConfig()
     {
         AppConfig config = new AppConfig();
-        config.Startup.BootValidationText = "abc";
-        config.Startup.BootValidationMaxRetries = 0;
-        config.Startup.BootValidationRetryIntervalMs = 0;
+        config.Validation.ValidationText = "abc";
+        config.Validation.ValidationMaxRetries = 0;
+        config.Validation.ValidationRetryIntervalMs = 0;
         config.Audio.PollIntervalMs = 1;
         config.Audio.StartConfirmTimeoutMs = 10;
         config.Audio.StopConfirmMs = 1;

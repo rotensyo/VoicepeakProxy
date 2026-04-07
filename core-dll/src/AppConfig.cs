@@ -6,23 +6,22 @@ namespace VoicepeakProxyCore;
 // 実行時設定のルート
 public sealed class AppConfig
 {
-    public StartupConfig Startup { get; set; } = new StartupConfig();
+    public ValidationConfig Validation { get; set; } = new ValidationConfig();
     public HookConfig Hook { get; set; } = new HookConfig();
     public UiConfig Ui { get; set; } = new UiConfig();
     public InputTimingConfig InputTiming { get; set; } = new InputTimingConfig();
     public AudioConfig Audio { get; set; } = new AudioConfig();
     public TextConfig Text { get; set; } = new TextConfig();
-    public QueueConfig Queue { get; set; } = new QueueConfig();
-    public ValidationConfig Validation { get; set; } = new ValidationConfig();
+    public RuntimeConfig Runtime { get; set; } = new RuntimeConfig();
     public DebugConfig Debug { get; set; } = new DebugConfig();
 }
 
-// 起動時処理関連設定
-public sealed class StartupConfig
+// 入力検証関連設定
+public sealed class ValidationConfig
 {
-    public string BootValidationText { get; set; } = "初期化完了";
-    public int BootValidationMaxRetries { get; set; } = 2;
-    public int BootValidationRetryIntervalMs { get; set; } = 1000;
+    public string ValidationText { get; set; } = "初期化完了";
+    public int ValidationMaxRetries { get; set; } = 2;
+    public int ValidationRetryIntervalMs { get; set; } = 1000;
 }
 
 // 修飾キーフック関連設定
@@ -74,15 +73,10 @@ public sealed class TextConfig
     public List<ReplaceRule> ReplaceRules { get; set; } = new List<ReplaceRule>();
 }
 
-// キュー関連設定
-public sealed class QueueConfig
+// 実行制御関連設定
+public sealed class RuntimeConfig
 {
     public int MaxQueuedJobs { get; set; } = 500;
-}
-
-// 検証方針の設定
-public sealed class ValidationConfig
-{
     public BootValidationMode BootValidation { get; set; } = BootValidationMode.Required;
 }
 
@@ -108,20 +102,19 @@ internal static class AppConfigValidator
     public static void Validate(AppConfig config)
     {
         EnsureNotNull(config, "config は null にできません");
-        EnsureNotNull(config.Startup, "startup は null にできません");
+        EnsureNotNull(config.Validation, "validation は null にできません");
         EnsureNotNull(config.Hook, "hook は null にできません");
         EnsureNotNull(config.Ui, "ui は null にできません");
         EnsureNotNull(config.InputTiming, "inputTiming は null にできません");
         EnsureNotNull(config.Audio, "audio は null にできません");
         EnsureNotNull(config.Text, "text は null にできません");
-        EnsureNotNull(config.Queue, "queue は null にできません");
-        EnsureNotNull(config.Validation, "validation は null にできません");
+        EnsureNotNull(config.Runtime, "runtime は null にできません");
         EnsureNotNull(config.Debug, "debug は null にできません");
         EnsureNotNull(config.Debug.LogMinimumLevel, "debug.logMinimumLevel は null にできません");
 
-        EnsureNotNull(config.Startup.BootValidationText, "startup.bootValidationText は null にできません");
-        EnsureNonNegative(config.Startup.BootValidationMaxRetries, "startup.bootValidationMaxRetries は 0 以上で指定してください");
-        EnsureNonNegative(config.Startup.BootValidationRetryIntervalMs, "startup.bootValidationRetryIntervalMs は 0 以上で指定してください");
+        EnsureNotNull(config.Validation.ValidationText, "validation.validationText は null にできません");
+        EnsureNonNegative(config.Validation.ValidationMaxRetries, "validation.validationMaxRetries は 0 以上で指定してください");
+        EnsureNonNegative(config.Validation.ValidationRetryIntervalMs, "validation.validationRetryIntervalMs は 0 以上で指定してください");
 
         EnsurePositive(config.Hook.HookCommandTimeoutMs, "hook.hookCommandTimeoutMs は 1 以上で指定してください");
         EnsurePositive(config.Hook.HookConnectTimeoutMs, "hook.hookConnectTimeoutMs は 1 以上で指定してください");
@@ -194,7 +187,7 @@ internal static class AppConfigValidator
             throw new InvalidOperationException("debug.logMinimumLevel は info/warn のいずれかを指定してください");
         }
 
-        EnsureNonNegative(config.Queue.MaxQueuedJobs, "queue.maxQueuedJobs は 0 以上で指定してください");
+        EnsureNonNegative(config.Runtime.MaxQueuedJobs, "runtime.maxQueuedJobs は 0 以上で指定してください");
     }
 
     // ログ最小レベル文字列を検証

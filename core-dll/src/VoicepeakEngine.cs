@@ -96,7 +96,7 @@ internal sealed class VoicepeakEngine : IDisposable
             process,
             hwnd,
             _log,
-            _config.Startup.BootValidationText);
+            _config.Validation.ValidationText);
         if (result.Kind == BootValidationRunKind.Completed)
         {
             return true;
@@ -131,7 +131,7 @@ internal sealed class VoicepeakEngine : IDisposable
                 switch (job.Mode)
                 {
                     case JobMode.Queue:
-                        if (_queue.Count >= _config.Queue.MaxQueuedJobs)
+                        if (_queue.Count >= _config.Runtime.MaxQueuedJobs)
                         {
                             return new EnqueueResult
                             {

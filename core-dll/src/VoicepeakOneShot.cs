@@ -116,7 +116,7 @@ public static class VoicepeakOneShot
         IVoicepeakUiController ui,
         IAudioSessionReader audio)
     {
-        string targetText = config.Startup.BootValidationText ?? string.Empty;
+        string targetText = config.Validation.ValidationText ?? string.Empty;
 
         ResolveTargetResult resolved = ui.TryResolveTargetDetailed();
         if (!resolved.Success)

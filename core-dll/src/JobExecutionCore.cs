@@ -390,7 +390,7 @@ internal static class JobExecutionCore
         bool bootInputOk = false;
         int keyStrokeIntervalMs = config.InputTiming.KeyStrokeIntervalMs;
 
-        for (int attempt = 0; attempt <= config.Startup.BootValidationMaxRetries; attempt++)
+        for (int attempt = 0; attempt <= config.Validation.ValidationMaxRetries; attempt++)
         {
             bootValidate = ValidateInputText(config, ui, process, hwnd, target, keyStrokeIntervalMs, useProbeGuardChars: true);
             if (bootValidate.Success)
@@ -404,10 +404,10 @@ internal static class JobExecutionCore
                 $"attempt={attempt} reason={bootValidate.Reason} cause={bootValidate.Cause} " +
                 $"expected=\"{SanitizeForLog(target)}\" actual=\"{SanitizeForLog(bootValidate.ActualText)}\"");
 
-            bool hasNextAttempt = attempt < config.Startup.BootValidationMaxRetries;
-            if (hasNextAttempt && config.Startup.BootValidationRetryIntervalMs > 0)
+            bool hasNextAttempt = attempt < config.Validation.ValidationMaxRetries;
+            if (hasNextAttempt && config.Validation.ValidationRetryIntervalMs > 0)
             {
-                Thread.Sleep(config.Startup.BootValidationRetryIntervalMs);
+                Thread.Sleep(config.Validation.ValidationRetryIntervalMs);
             }
         }
 

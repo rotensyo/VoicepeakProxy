@@ -48,7 +48,7 @@ public class RuntimeAndOneShotTests
     public void Enqueue_QueueFull_ReturnsQueueFullStatus()
     {
         AppConfig config = CreateRuntimeConfig();
-        config.Queue.MaxQueuedJobs = 0;
+        config.Runtime.MaxQueuedJobs = 0;
         using VoicepeakRuntime runtime = VoicepeakRuntime.Start(config, new TestLogger());
 
         EnqueueResult result = runtime.Enqueue(new SpeakRequest { Text = "hello", Mode = EnqueueMode.Queue });
@@ -145,8 +145,8 @@ public class RuntimeAndOneShotTests
     private static AppConfig CreateRuntimeConfig()
     {
         AppConfig config = new AppConfig();
-        config.Validation.BootValidation = BootValidationMode.Disabled;
-        config.Queue.MaxQueuedJobs = 10;
+        config.Runtime.BootValidation = BootValidationMode.Disabled;
+        config.Runtime.MaxQueuedJobs = 10;
         return config;
     }
 }

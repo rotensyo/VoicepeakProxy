@@ -18,9 +18,9 @@ internal static class AppConfigMapper
         HookConfig defaults = new AppConfig().Hook;
         UiConfig uiDefaults = new AppConfig().Ui;
 
-        config.Startup.BootValidationText = data.Startup.BootValidationText ?? string.Empty;
-        config.Startup.BootValidationMaxRetries = data.Startup.BootValidationMaxRetries;
-        config.Startup.BootValidationRetryIntervalMs = data.Startup.BootValidationRetryIntervalMs;
+        config.Validation.ValidationText = data.Validation.ValidationText ?? string.Empty;
+        config.Validation.ValidationMaxRetries = data.Validation.ValidationMaxRetries;
+        config.Validation.ValidationRetryIntervalMs = data.Validation.ValidationRetryIntervalMs;
 
         config.Hook.HookCommandTimeoutMs = data.Hook.HookCommandTimeoutMs > 0
             ? data.Hook.HookCommandTimeoutMs
@@ -72,8 +72,8 @@ internal static class AppConfigMapper
             });
         }
 
-        config.Queue.MaxQueuedJobs = data.Queue.MaxQueuedJobs;
-        config.Validation.BootValidation = MapBootValidation(data.Validation.BootValidation);
+        config.Runtime.MaxQueuedJobs = data.Runtime.MaxQueuedJobs;
+        config.Runtime.BootValidation = MapBootValidation(data.Runtime.BootValidation);
 
         config.Debug.LogTextCandidates = data.Debug.LogTextCandidates;
         config.Debug.LogModifierHookStats = data.Debug.LogModifierHookStats;
@@ -88,9 +88,9 @@ internal static class AppConfigMapper
         AppConfig config = source ?? new AppConfig();
         AppConfigData data = new AppConfigData();
 
-        data.Startup.BootValidationText = config.Startup.BootValidationText ?? string.Empty;
-        data.Startup.BootValidationMaxRetries = config.Startup.BootValidationMaxRetries;
-        data.Startup.BootValidationRetryIntervalMs = config.Startup.BootValidationRetryIntervalMs;
+        data.Validation.ValidationText = config.Validation.ValidationText ?? string.Empty;
+        data.Validation.ValidationMaxRetries = config.Validation.ValidationMaxRetries;
+        data.Validation.ValidationRetryIntervalMs = config.Validation.ValidationRetryIntervalMs;
 
         data.Hook.HookCommandTimeoutMs = config.Hook.HookCommandTimeoutMs;
         data.Hook.HookConnectTimeoutMs = config.Hook.HookConnectTimeoutMs;
@@ -135,9 +135,9 @@ internal static class AppConfigMapper
             });
         }
 
-        data.Queue.MaxQueuedJobs = config.Queue.MaxQueuedJobs;
+        data.Runtime.MaxQueuedJobs = config.Runtime.MaxQueuedJobs;
 
-        data.Validation.BootValidation = MapBootValidationBack(config.Validation.BootValidation);
+        data.Runtime.BootValidation = MapBootValidationBack(config.Runtime.BootValidation);
 
         data.Debug.LogTextCandidates = config.Debug.LogTextCandidates;
         data.Debug.LogModifierHookStats = config.Debug.LogModifierHookStats;
