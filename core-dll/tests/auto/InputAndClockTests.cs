@@ -59,6 +59,25 @@ public class InputAndClockTests
     }
 
     [TestMethod]
+    public void Normalize_RemovesNonBmpCharacters()
+    {
+        // 非BMP文字は除去
+        string actual = InputTextNormalizer.Normalize("A🤡B");
+
+        Assert.AreEqual("AB", actual);
+    }
+
+    [TestMethod]
+    public void Normalize_RemovesStandaloneSurrogates()
+    {
+        // 孤立サロゲートも除去
+        string source = string.Concat("A", '\uD83E'.ToString(), "B", '\uDD21'.ToString(), "C");
+        string actual = InputTextNormalizer.Normalize(source);
+
+        Assert.AreEqual("ABC", actual);
+    }
+
+    [TestMethod]
     public void MonoClock_NowMs_IsMonotonic()
     {
         // 単調増加を確認

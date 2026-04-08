@@ -183,6 +183,7 @@ public class ExecutionLogicTests
 
         Assert.IsFalse(actual);
         Assert.IsTrue(logger.WarnMessages.Exists(m => m.Contains("type_text_failed")));
+        Assert.IsTrue(logger.WarnMessages.Exists(m => m.Contains("text=\"hello\"")));
     }
 
     [TestMethod]
@@ -219,12 +220,15 @@ public class ExecutionLogicTests
             ReadInputHandler = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA),
             VisibleInputBlockCountHandler = _ => 1
         };
+        TestLogger logger = new TestLogger();
 
-        bool actual = JobExecutionCore.PrepareSegment(config, ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(new TestLogger()));
+        bool actual = JobExecutionCore.PrepareSegment(config, ui, Process.GetCurrentProcess(), IntPtr.Zero, "hello", new AppLogger(logger));
 
         Assert.IsFalse(actual);
         Assert.AreEqual(2, ui.PrepareForTextInputCalls);
         Assert.AreEqual(2, ui.TypedTexts.Count);
+        Assert.IsTrue(logger.WarnMessages.Exists(m => m.Contains("typed_text_not_reflected_after_retry")));
+        Assert.IsTrue(logger.WarnMessages.Exists(m => m.Contains("text=\"hello\"")));
     }
 
     [TestMethod]

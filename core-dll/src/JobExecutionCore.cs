@@ -219,9 +219,10 @@ internal static class JobExecutionCore
             {
                 if (attempt >= maxRetries)
                 {
+                    string textDetail = BuildTypeTextLogDetail(expected);
                     Warn(log, isRetry
-                        ? $"{context}_failed_detail reason=type_text_failed_on_retry cause=wm_char_input_failed attempt={attempt}"
-                        : $"{context}_failed_detail reason=type_text_failed cause=wm_char_input_failed");
+                        ? $"{context}_failed_detail reason=type_text_failed_on_retry cause=wm_char_input_failed attempt={attempt}{textDetail}"
+                        : $"{context}_failed_detail reason=type_text_failed cause=wm_char_input_failed{textDetail}");
                     return false;
                 }
 
@@ -238,9 +239,10 @@ internal static class JobExecutionCore
 
             if (attempt >= maxRetries)
             {
+                string textDetail = BuildTypeTextLogDetail(expected);
                 Warn(log, isRetry
-                    ? $"{context}_failed_detail reason=typed_text_not_reflected_after_retry cause=input_context_not_focused attempt={attempt}"
-                    : $"{context}_failed_detail reason=typed_text_not_reflected cause=input_context_not_focused");
+                    ? $"{context}_failed_detail reason=typed_text_not_reflected_after_retry cause=input_context_not_focused attempt={attempt}{textDetail}"
+                    : $"{context}_failed_detail reason=typed_text_not_reflected cause=input_context_not_focused{textDetail}");
                 return false;
             }
 
@@ -688,6 +690,13 @@ internal static class JobExecutionCore
         {
             log.Warn(message);
         }
+    }
+
+    // 文字入力失敗ログに対象文字列を付与
+    private static string BuildTypeTextLogDetail(string text)
+    {
+        string safe = text ?? string.Empty;
+        return $" textLength={safe.Length} text=\"{SanitizeForLog(safe)}\"";
     }
 
     // 入力後待機時間を算出
