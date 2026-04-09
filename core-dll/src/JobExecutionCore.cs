@@ -138,17 +138,9 @@ internal readonly struct BootValidationRunResult
 // 単発常駐で共有する実行ロジック
 internal static class JobExecutionCore
 {
-    // 再生中の先頭移動を文脈別に実行
-    public static bool MoveToStartDuringPlayback(AppConfig config, IVoicepeakUiController ui, IntPtr hwnd, int actionDelayMs)
+    // 再生中の先頭移動を実行
+    public static bool MoveToStartDuringPlayback(IVoicepeakUiController ui, IntPtr hwnd, int actionDelayMs)
     {
-        if (VoicepeakUiController.ShouldPressPlayBeforeMoveToStartDuringPlayback(config.Ui))
-        {
-            if (!ui.PressPlay(hwnd))
-            {
-                return false;
-            }
-        }
-
         return ui.MoveToStart(hwnd, actionDelayMs);
     }
 
@@ -326,7 +318,7 @@ internal static class JobExecutionCore
             if (interruptRequested())
             {
                 onInterrupt?.Invoke();
-                MoveToStartDuringPlayback(config, ui, hwnd, config.InputTiming.ActionDelayMs);
+                MoveToStartDuringPlayback(ui, hwnd, config.InputTiming.ActionDelayMs);
                 return SpeakMonitorResult.Interrupted();
             }
 
@@ -358,7 +350,7 @@ internal static class JobExecutionCore
                 long maxMs = config.Audio.MaxSpeakingDurationSec * 1000L;
                 if ((now - speakingStartedAt) > maxMs)
                 {
-                    MoveToStartDuringPlayback(config, ui, hwnd, config.InputTiming.ActionDelayMs);
+                    MoveToStartDuringPlayback(ui, hwnd, config.InputTiming.ActionDelayMs);
                     return SpeakMonitorResult.MaxDuration();
                 }
             }

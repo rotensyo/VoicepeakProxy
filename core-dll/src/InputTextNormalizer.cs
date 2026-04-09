@@ -3,12 +3,6 @@ namespace VoicepeakProxyCore;
 // 入力文字列の正規化を提供
 internal static class InputTextNormalizer
 {
-    // 検証比較向けに改行除去して前後空白を除去
-    public static string Normalize(string value)
-    {
-        return NormalizeForValidation(value);
-    }
-
     // 通常入力向けに改行を区切りへ正規化
     public static string NormalizeForTyping(string value)
     {
@@ -120,43 +114,56 @@ internal static class InputTextNormalizer
         System.Text.StringBuilder builder = new System.Text.StringBuilder(value.Length);
         for (int i = 0; i < value.Length; i++)
         {
-            char c = value[i];
-            if (char.IsHighSurrogate(c))
+            // 絵文字関連シーケンスをまとめてスキップ
+            if (TryGetEmojiSequenceSkipLength(value, i, out int skipLength))
             {
-                if (i + 1 < value.Length && char.IsLowSurrogate(value[i + 1]))
-                {
-                    i++;
-                }
-
+                i += skipLength - 1;
                 continue;
             }
 
-            if (char.IsLowSurrogate(c))
-            {
-                continue;
-            }
-
-            if (IsEmojiControlCharacter(c))
-            {
-                continue;
-            }
-
-            if (IsKeycapBase(c) && TryGetKeycapSequenceLength(value, i, out int keycapLength))
-            {
-                i += keycapLength - 1;
-                continue;
-            }
-
-            if (TryGetEmojiVariationSequenceLength(value, i, out int emojiVariationLength))
-            {
-                i += emojiVariationLength - 1;
-                continue;
-            }
-
-            builder.Append(c);
+            builder.Append(value[i]);
         }
 
         return builder.ToString();
+    }
+
+    // 絵文字関連シーケンスのスキップ長を取得
+    private static bool TryGetEmojiSequenceSkipLength(string value, int index, out int skipLength)
+    {
+        skipLength = 0;
+        char c = value[index];
+
+        if (char.IsHighSurrogate(c))
+        {
+            skipLength = (index + 1 < value.Length && char.IsLowSurrogate(value[index + 1])) ? 2 : 1;
+            return true;
+        }
+
+        if (char.IsLowSurrogate(c))
+        {
+            skipLength = 1;
+            return true;
+        }
+
+        if (IsEmojiControlCharacter(c))
+        {
+            skipLength = 1;
+            return true;
+        }
+
+        if (IsKeycapBase(c) && TryGetKeycapSequenceLength(value, index, out int keycapLength))
+        {
+            skipLength = keycapLength;
+            return true;
+        }
+
+        if (TryGetEmojiVariationSequenceLength(value, index, out int emojiVariationLength))
+        {
+            skipLength = emojiVariationLength;
+            return true;
+        }
+
+        return false;
     }
 
     // 絵文字構成制御文字を判定

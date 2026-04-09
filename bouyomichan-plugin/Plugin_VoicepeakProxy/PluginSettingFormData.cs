@@ -738,47 +738,6 @@ namespace Plugin_VoicepeakProxy
     // 文字列表現の変換を提供
     internal static class TabTextHelper
     {
-        // 行リストを改行結合
-        internal static string JoinLines(List<string> values)
-        {
-            if (values == null || values.Count == 0)
-            {
-                return string.Empty;
-            }
-
-            StringBuilder builder = new StringBuilder();
-            for (int i = 0; i < values.Count; i++)
-            {
-                if (i > 0)
-                {
-                    builder.Append(Environment.NewLine);
-                }
-
-                builder.Append(values[i] ?? string.Empty);
-            }
-
-            return builder.ToString();
-        }
-
-        // 改行文字列を行リストへ変換
-        internal static List<string> SplitLines(string value)
-        {
-            List<string> list = new List<string>();
-            string[] lines = SplitRawLines(value);
-            for (int i = 0; i < lines.Length; i++)
-            {
-                string line = lines[i].Trim();
-                if (line.Length == 0)
-                {
-                    continue;
-                }
-
-                list.Add(line);
-            }
-
-            return list;
-        }
-
         // 改行分割を共通化
         internal static string[] SplitRawLines(string value)
         {

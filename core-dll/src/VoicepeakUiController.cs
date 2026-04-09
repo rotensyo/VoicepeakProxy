@@ -32,21 +32,21 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
     // UI設定とロガーを保持
     public VoicepeakUiController(UiConfig ui, DebugConfig debug, AppLogger log)
-        : this(ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), debug, log, new DefaultVoicepeakProcessApi())
+        : this(ui, new InputTimingConfig(), new HookConfig(), debug, log, new DefaultVoicepeakProcessApi())
     {
     }
 
-    public VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log)
-        : this(ui, inputTiming, hook, text, debug, log, new DefaultVoicepeakProcessApi())
+    public VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, HookConfig hook, DebugConfig debug, AppLogger log)
+        : this(ui, inputTiming, hook, debug, log, new DefaultVoicepeakProcessApi())
     {
     }
 
     internal VoicepeakUiController(UiConfig ui, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
-        : this(ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), debug, log, processApi)
+        : this(ui, new InputTimingConfig(), new HookConfig(), debug, log, processApi)
     {
     }
 
-    internal VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
+    internal VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, HookConfig hook, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
     {
         IVoicepeakProcessApi resolvedProcessApi = processApi ?? new DefaultVoicepeakProcessApi();
         _ui = ui ?? new UiConfig();
@@ -521,13 +521,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return TryParseShortcutKey(raw, out _);
     }
 
-    internal static bool ShouldPressPlayBeforeMoveToStartDuringPlayback(UiConfig ui)
-    {
-        UiConfig source = ui ?? new UiConfig();
-        return string.IsNullOrWhiteSpace(source.MoveToStartModifier)
-            && !IsFunctionKeyMoveToStartKey(source.MoveToStartKey);
-    }
-
     // 再生ショートカット修飾子を解析
     private static bool TryParsePlayShortcutModifier(string raw, out ModifierOverrideMode mode, out bool useModifier)
     {
@@ -699,14 +692,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         Shift = 4,
         CtrlAlt = Ctrl | Alt,
         CtrlAltShift = Ctrl | Alt | Shift
-    }
-
-    // 先頭移動が単独Fキーか判定
-    private static bool IsFunctionKeyMoveToStartKey(string raw)
-    {
-        return TryParseMoveToStartKey(raw, out VirtualKey key)
-            && key >= VirtualKey.F1
-            && key <= VirtualKey.F12;
     }
 
     public ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd)

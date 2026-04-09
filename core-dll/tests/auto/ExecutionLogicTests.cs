@@ -374,6 +374,7 @@ public class ExecutionLogicTests
 
         Assert.AreEqual(SpeakMonitorKind.Interrupted, result.Kind);
         Assert.IsTrue(callbackCalled);
+        Assert.AreEqual(0, ui.PressPlayCalls);
         Assert.AreEqual(1, ui.MoveToStartCalls);
     }
 
@@ -499,6 +500,7 @@ public class ExecutionLogicTests
             null);
 
         Assert.AreEqual(SpeakMonitorKind.MaxDuration, result.Kind);
+        Assert.AreEqual(0, ui.PressPlayCalls);
         Assert.AreEqual(1, ui.MoveToStartCalls);
     }
 
