@@ -8,71 +8,129 @@ namespace VoicepeakProxyCore.Tests;
 public class InputAndClockTests
 {
     [TestMethod]
-    public void Normalize_RemovesNewlinesAndTrims()
+    public void NormalizeForTyping_CompressesMixedWhitespaceNewlineRuns()
     {
-        // 改行除去と前後空白除去を確認
-        string actual = (string)ReflectionTestHelper.InvokeCoreStatic(
-            "InputTextNormalizer",
-            "Normalize",
-            "  \r\n abc \n def \r\n ");
+        // 中間の空白改行混在ランを改行1つへ圧縮
+        string actual = InputTextNormalizer.NormalizeForTyping("  \r\n abc \n \t def \n\r  ghi\r\n ");
 
-        Assert.AreEqual("abc  def", actual);
+        Assert.AreEqual("abc\ndef\nghi", actual);
     }
 
     [TestMethod]
-    public void Normalize_Null_ReturnsEmpty()
+    public void NormalizeForTyping_PreservesInnerSpacesWithoutNewline()
     {
-        // null入力を空文字へ正規化
-        string actual = (string)ReflectionTestHelper.InvokeCoreStatic(
-            "InputTextNormalizer",
-            "Normalize",
-            new object[] { null });
-
-        Assert.AreEqual(string.Empty, actual);
-    }
-
-    [TestMethod]
-    public void Normalize_WhitespaceOnly_ReturnsEmpty()
-    {
-        // 空白のみは空文字
-        string actual = InputTextNormalizer.Normalize("  \r\n  ");
-
-        Assert.AreEqual(string.Empty, actual);
-    }
-
-    [TestMethod]
-    public void Normalize_PreservesInnerSpaces()
-    {
-        // 内部空白は保持
-        string actual = InputTextNormalizer.Normalize(" a  b ");
+        // 改行を含まない内部空白は維持
+        string actual = InputTextNormalizer.NormalizeForTyping(" a  b ");
 
         Assert.AreEqual("a  b", actual);
     }
 
     [TestMethod]
-    public void Normalize_NoNewlines_ReturnsTrimmedText()
+    public void NormalizeForTyping_NewlineOnly_ReturnsEmpty()
+    {
+        // 改行空白のみは空文字
+        string actual = InputTextNormalizer.NormalizeForTyping(" \r\n\n \t ");
+
+        Assert.AreEqual(string.Empty, actual);
+    }
+
+    [TestMethod]
+    public void NormalizeForTyping_RemovesNonBmpCharacters()
+    {
+        // 非BMP文字を除去
+        string actual = InputTextNormalizer.NormalizeForTyping("A🤡\nB");
+
+        Assert.AreEqual("A\nB", actual);
+    }
+
+    [TestMethod]
+    public void NormalizeForTyping_RemovesEmojiSequencesAndKeepsPlainSymbols()
+    {
+        // 絵文字シーケンスは除去し単体記号は保持
+        string actual = InputTextNormalizer.NormalizeForTyping("☠️ ☠ ❤️ © ™ 1️⃣");
+
+        Assert.AreEqual("☠  © ™", actual);
+    }
+
+    [TestMethod]
+    public void NormalizeForTyping_RemovesEmojiJoinControls()
+    {
+        // ZWJとキーキャップ記号を除去
+        string source = string.Concat("A", '\u200D'.ToString(), "B", '\uFE0F'.ToString(), "C", '\u20E3'.ToString(), "D");
+        string actual = InputTextNormalizer.NormalizeForTyping(source);
+
+        Assert.AreEqual("ACD", actual);
+    }
+
+    [TestMethod]
+    public void NormalizeForValidation_RemovesNewlinesAndTrims()
+    {
+        // 検証向けは改行除去とtrim
+        string actual = InputTextNormalizer.NormalizeForValidation("  \r\n abc \n def \r\n ");
+
+        Assert.AreEqual("abc  def", actual);
+    }
+
+    [TestMethod]
+    public void NormalizeForValidation_Null_ReturnsEmpty()
+    {
+        // null入力を空文字へ正規化
+        string actual = InputTextNormalizer.NormalizeForValidation(null);
+
+        Assert.AreEqual(string.Empty, actual);
+    }
+
+    [TestMethod]
+    public void NormalizeForValidation_WhitespaceOnly_ReturnsEmpty()
+    {
+        // 空白のみは空文字
+        string actual = InputTextNormalizer.NormalizeForValidation("  \r\n  ");
+
+        Assert.AreEqual(string.Empty, actual);
+    }
+
+    [TestMethod]
+    public void NormalizeForValidation_PreservesInnerSpaces()
+    {
+        // 内部空白は保持
+        string actual = InputTextNormalizer.NormalizeForValidation(" a  b ");
+
+        Assert.AreEqual("a  b", actual);
+    }
+
+    [TestMethod]
+    public void NormalizeForValidation_NoNewlines_ReturnsTrimmedText()
     {
         // 改行なしはtrimのみ
-        string actual = InputTextNormalizer.Normalize(" abc ");
+        string actual = InputTextNormalizer.NormalizeForValidation(" abc ");
 
         Assert.AreEqual("abc", actual);
     }
 
     [TestMethod]
-    public void Normalize_RemovesNonBmpCharacters()
+    public void NormalizeForValidation_RemovesNonBmpCharacters()
     {
         // 非BMP文字は除去
-        string actual = InputTextNormalizer.Normalize("A🤡B");
+        string actual = InputTextNormalizer.NormalizeForValidation("A🤡B");
 
         Assert.AreEqual("AB", actual);
     }
 
     [TestMethod]
-    public void Normalize_RemovesStandaloneSurrogates()
+    public void NormalizeForValidation_RemovesEmojiSequencesAndKeepsPlainSymbols()
+    {
+        // 絵文字シーケンスは除去し単体記号は保持
+        string actual = InputTextNormalizer.NormalizeForValidation(" ☠️ ☠ ❤️ © ™ 1️⃣ ");
+
+        Assert.AreEqual("☠  © ™", actual);
+    }
+
+    [TestMethod]
+    public void NormalizeForValidation_RemovesStandaloneSurrogates()
     {
         // 孤立サロゲートも除去
         string source = string.Concat("A", '\uD83E'.ToString(), "B", '\uDD21'.ToString(), "C");
-        string actual = InputTextNormalizer.Normalize(source);
+        string actual = InputTextNormalizer.NormalizeForValidation(source);
 
         Assert.AreEqual("ABC", actual);
     }

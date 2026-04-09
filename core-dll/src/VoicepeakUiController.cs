@@ -21,9 +21,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private readonly UiConfig _ui;
     private readonly InputTimingConfig _inputTiming;
     private readonly HookConfig _hook;
-    private readonly TextConfig _text;
     private readonly DebugConfig _debug;
-    private readonly Dictionary<char, List<SentenceBreakTrigger>> _sentenceBreakTriggerIndex;
     private readonly AppLogger _log;
     private readonly VoicepeakTargetResolver _targetResolver;
     private readonly ModifierIsolationCoordinator _modifierIsolationCoordinator;
@@ -54,7 +52,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         _ui = ui ?? new UiConfig();
         _inputTiming = inputTiming ?? new InputTimingConfig();
         _hook = hook ?? new HookConfig();
-        _text = text ?? new TextConfig();
         _debug = debug ?? new DebugConfig();
         _log = log;
         _targetResolver = new VoicepeakTargetResolver(resolvedProcessApi);
@@ -63,7 +60,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             _hook.HookConnectTimeoutMs,
             _hook.HookConnectTotalWaitMs);
         _modifierIsolationCoordinator = new ModifierIsolationCoordinator(modifierKeyHookController, _log);
-        _sentenceBreakTriggerIndex = BuildSentenceBreakTriggerIndex(_text);
     }
 
     // 対象プロセスとメインウィンドウを解決
@@ -233,7 +229,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     public bool TypeText(IntPtr mainHwnd, string text, int charDelayMs)
     {
         string send = text ?? string.Empty;
-        HashSet<int> enterPositions = ComputeSentenceBreakEnterPositions(send);
         if (mainHwnd == IntPtr.Zero)
         {
             _log.Warn("type_text_target_resolve_failed reason=main_hwnd_zero");
@@ -258,7 +253,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 statsProbeStarted = true;
             }
 
-            if (!TryTypeTextByWindowMessages(mainHwnd, send, enterPositions, charDelayMs))
+            if (!TryTypeTextByWindowMessages(mainHwnd, send, charDelayMs))
             {
                 _log.Warn($"type_text_target_send_failed reason=wm_char_failed hwnd=0x{mainHwnd.ToInt64():X}");
                 return false;
@@ -356,12 +351,15 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     }
 
     // WM_CHARとEnter送信で入力
-    private bool TryTypeTextByWindowMessages(IntPtr targetHwnd, string send, HashSet<int> enterPositions, int charDelayMs)
+    private bool TryTypeTextByWindowMessages(IntPtr targetHwnd, string send, int charDelayMs)
     {
         for (int i = 0; i < send.Length; i++)
         {
-            bool isLastCharInSegment = i == send.Length - 1;
-            if (!SendChar(targetHwnd, send[i]))
+            char current = send[i];
+            bool sent = current == '\n' || current == '\r'
+                ? SendKey(targetHwnd, VirtualKey.Return)
+                : SendChar(targetHwnd, current);
+            if (!sent)
             {
                 return false;
             }
@@ -369,19 +367,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             if (charDelayMs > 0)
             {
                 Thread.Sleep(charDelayMs);
-            }
-
-            if (!isLastCharInSegment && enterPositions.Contains(i))
-            {
-                if (!SendKey(targetHwnd, VirtualKey.Return))
-                {
-                    return false;
-                }
-
-                if (charDelayMs > 0)
-                {
-                    Thread.Sleep(charDelayMs);
-                }
             }
         }
         return true;
@@ -1077,56 +1062,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
     }
 
-    private static Dictionary<char, List<SentenceBreakTrigger>> BuildSentenceBreakTriggerIndex(TextConfig text)
-    {
-        var index = new Dictionary<char, List<SentenceBreakTrigger>>();
-        if (text?.SentenceBreakTriggers == null)
-        {
-            return index;
-        }
-
-        var used = new HashSet<string>(StringComparer.Ordinal);
-        int order = 0;
-
-        for (int i = 0; i < text.SentenceBreakTriggers.Count; i++)
-        {
-            string token = text.SentenceBreakTriggers[i];
-            if (!string.IsNullOrEmpty(token))
-            {
-                if (used.Add(token))
-                {
-                    char key = token[0];
-                    if (!index.TryGetValue(key, out List<SentenceBreakTrigger> bucket))
-                    {
-                        bucket = new List<SentenceBreakTrigger>();
-                        index[key] = bucket;
-                    }
-
-                    bucket.Add(new SentenceBreakTrigger(token, order));
-                    order++;
-                }
-            }
-        }
-
-        foreach (List<SentenceBreakTrigger> bucket in index.Values)
-        {
-            // 最長一致優先
-            // 同長は設定順優先
-            bucket.Sort((a, b) =>
-            {
-                int len = b.Text.Length.CompareTo(a.Text.Length);
-                if (len != 0)
-                {
-                    return len;
-                }
-
-                return a.Order.CompareTo(b.Order);
-            });
-        }
-
-        return index;
-    }
-
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr SendMessageTimeout(
         IntPtr hWnd,
@@ -1177,92 +1112,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         Control = 0x11,
         Shift = 0x10,
         Menu = 0x12
-    }
-
-    // 改行挿入位置を事前計算
-    private HashSet<int> ComputeSentenceBreakEnterPositions(string text)
-    {
-        HashSet<int> positions = new HashSet<int>();
-        if (!_text.SendEnterAfterSentenceBreak || string.IsNullOrEmpty(text))
-        {
-            return positions;
-        }
-
-        int index = 0;
-        while (index < text.Length)
-        {
-            SentenceBreakTrigger firstMatched = FindLongestSentenceBreakTrigger(text, index);
-            if (firstMatched == null)
-            {
-                index++;
-                continue;
-            }
-
-            int runEnd = index + firstMatched.Text.Length;
-            while (runEnd < text.Length)
-            {
-                SentenceBreakTrigger nextMatched = FindLongestSentenceBreakTrigger(text, runEnd);
-                if (nextMatched == null)
-                {
-                    break;
-                }
-
-                runEnd += nextMatched.Text.Length;
-            }
-
-            positions.Add(runEnd - 1);
-            index = runEnd;
-        }
-
-        return positions;
-    }
-
-    private SentenceBreakTrigger FindLongestSentenceBreakTrigger(string text, int index)
-    {
-        if (!_sentenceBreakTriggerIndex.TryGetValue(text[index], out List<SentenceBreakTrigger> candidates))
-        {
-            return null;
-        }
-
-        for (int i = 0; i < candidates.Count; i++)
-        {
-            SentenceBreakTrigger candidate = candidates[i];
-            if (MatchesTrigger(text, index, candidate.Text))
-            {
-                return candidate;
-            }
-        }
-
-        return null;
-    }
-
-    // 指定位置でトークン一致を確認
-    private static bool MatchesTrigger(string text, int startIndex, string trigger)
-    {
-        if (string.IsNullOrEmpty(trigger))
-        {
-            return false;
-        }
-
-        if (startIndex < 0 || startIndex + trigger.Length > text.Length)
-        {
-            return false;
-        }
-
-        return string.Compare(text, startIndex, trigger, 0, trigger.Length, StringComparison.Ordinal) == 0;
-    }
-
-    // 改行トリガー情報を保持
-    private sealed class SentenceBreakTrigger
-    {
-        public SentenceBreakTrigger(string text, int order)
-        {
-            Text = text;
-            Order = order;
-        }
-
-        public string Text { get; }
-        public int Order { get; }
     }
 
     private readonly struct TextCandidateInfo

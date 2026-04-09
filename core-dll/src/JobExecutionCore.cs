@@ -172,7 +172,7 @@ internal static class JobExecutionCore
             return false;
         }
 
-        string expected = InputTextNormalizer.Normalize(text);
+        string expected = InputTextNormalizer.NormalizeForTyping(text);
         int keyStrokeIntervalMs = config.InputTiming.KeyStrokeIntervalMs;
         if (!TryTypeTextWithRetry(config, ui, process, hwnd, expected, keyStrokeIntervalMs, log, "prepare"))
         {
@@ -591,7 +591,7 @@ internal static class JobExecutionCore
             return InputValidateResult.Fail("clear_input_failed", "move_to_start_or_delete_not_applied", string.Empty);
         }
 
-        string expected = InputTextNormalizer.Normalize(text);
+        string expected = InputTextNormalizer.NormalizeForValidation(text);
         string toType = useProbeGuardChars ? ("A" + expected) : expected;
         if (!ui.TypeText(hwnd, toType, keyStrokeIntervalMs))
         {
@@ -623,7 +623,7 @@ internal static class JobExecutionCore
             return InputValidateResult.Fail("read_input_failed", "read_input_source_" + read.Source.ToString(), string.Empty);
         }
 
-        string actual = InputTextNormalizer.Normalize(read.Text);
+        string actual = InputTextNormalizer.NormalizeForValidation(read.Text);
         if (!string.Equals(actual, expected, StringComparison.Ordinal))
         {
             return InputValidateResult.Fail("text_mismatch", BuildInputMismatchCause(expected, actual, useProbeGuardChars), actual);
@@ -729,7 +729,7 @@ internal static class JobExecutionCore
         int requiredByFormulaMs = compensation;
         if (string.Equals(phase, "pre", StringComparison.Ordinal))
         {
-            string normalized = InputTextNormalizer.Normalize(nextText);
+            string normalized = InputTextNormalizer.NormalizeForTyping(nextText);
             int typingMs = normalized.Length * config.InputTiming.KeyStrokeIntervalMs;
             int postTypeWaitMs = ComputePostTypeWaitMs(normalized, config.InputTiming.PostTypeWaitPerCharMs, config.InputTiming.PostTypeWaitMinMs);
             requiredByFormulaMs += typingMs + postTypeWaitMs;

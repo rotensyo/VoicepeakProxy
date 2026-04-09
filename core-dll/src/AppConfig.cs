@@ -72,8 +72,6 @@ public sealed class AudioConfig
 // テキスト処理設定
 public sealed class TextConfig
 {
-    public bool SendEnterAfterSentenceBreak { get; set; } = false;
-    public List<string> SentenceBreakTriggers { get; set; } = new List<string> { "。", "！", "？", "!", "?" };
     public List<ReplaceRule> ReplaceRules { get; set; } = new List<ReplaceRule>();
 }
 
@@ -170,20 +168,6 @@ internal static class AppConfigValidator
         EnsurePositive(config.Audio.StartConfirmTimeoutMs, "audio.startConfirmTimeoutMs は 1 以上で指定してください");
         EnsureNonNegative(config.Audio.StartConfirmMaxRetries, "audio.startConfirmMaxRetries は 0 以上で指定してください");
         EnsurePositive(config.Audio.StopConfirmMs, "audio.stopConfirmMs は 1 以上で指定してください");
-
-        if (config.Text.SentenceBreakTriggers == null)
-        {
-            throw new InvalidOperationException("text.sentenceBreakTriggers は null にできません");
-        }
-
-        for (int i = 0; i < config.Text.SentenceBreakTriggers.Count; i++)
-        {
-            string token = config.Text.SentenceBreakTriggers[i];
-            if (string.IsNullOrEmpty(token))
-            {
-                throw new InvalidOperationException($"text.sentenceBreakTriggers[{i}] は空文字を指定できません");
-            }
-        }
 
         if (config.Text.ReplaceRules == null)
         {

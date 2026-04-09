@@ -264,7 +264,7 @@ public class ExecutionLogicTests
         bool actual = JobExecutionCore.PrepareSegment(new AppConfig(), ui, Process.GetCurrentProcess(), IntPtr.Zero, "  a\r\n b  ", new AppLogger(new TestLogger()));
 
         Assert.IsTrue(actual);
-        CollectionAssert.AreEqual(new[] { "a b" }, ui.TypedTexts);
+        CollectionAssert.AreEqual(new[] { "a\nb" }, ui.TypedTexts);
     }
 
     [TestMethod]
@@ -281,6 +281,31 @@ public class ExecutionLogicTests
 
         Assert.IsTrue(actual);
         Assert.AreEqual(1, ui.PrepareForTextInputCalls);
+    }
+
+    [TestMethod]
+    public void ValidateInputText_RemovesNewlinesAndTrimsBeforeTyping()
+    {
+        // 検証入力は改行除去とtrimを適用
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ReadInputHandler = _ => ReadInputResult.Ok("A B", 3, ReadInputSource.PrimaryUiA),
+            VisibleInputBlockCountHandler = _ => 1
+        };
+
+        object result = ReflectionTestHelper.InvokeCoreStatic(
+            "JobExecutionCore",
+            "ValidateInputText",
+            new AppConfig(),
+            ui,
+            Process.GetCurrentProcess(),
+            IntPtr.Zero,
+            "  A\r\n B  ",
+            0,
+            false);
+
+        Assert.IsTrue((bool)ReflectionTestHelper.GetProperty(result, "Success"));
+        CollectionAssert.AreEqual(new[] { "A B" }, ui.TypedTexts);
     }
 
     [TestMethod]

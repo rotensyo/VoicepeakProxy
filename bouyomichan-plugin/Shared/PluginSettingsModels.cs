@@ -222,24 +222,16 @@ public sealed class UiConfigData
     // テキスト処理設定
     public sealed class TextConfigData
     {
-        public bool SendEnterAfterSentenceBreak { get; set; }
-        public List<string> SentenceBreakTriggers { get; set; }
         public List<ReplaceRuleData> ReplaceRules { get; set; }
 
         public TextConfigData()
         {
-            SentenceBreakTriggers = new List<string>();
             ReplaceRules = new List<ReplaceRuleData>();
         }
 
         // 不足項目を既定値で補完
         public void Normalize()
         {
-            if (SentenceBreakTriggers == null)
-            {
-                SentenceBreakTriggers = new List<string>();
-            }
-
             if (ReplaceRules == null)
             {
                 ReplaceRules = new List<ReplaceRuleData>();

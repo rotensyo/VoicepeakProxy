@@ -57,14 +57,6 @@ internal static class AppConfigMapper
         config.Audio.StopConfirmMs = data.Audio.StopConfirmMs;
         config.Audio.MaxSpeakingDurationSec = data.Audio.MaxSpeakingDurationSec;
 
-        config.Text.SendEnterAfterSentenceBreak = data.Text.SendEnterAfterSentenceBreak;
-        config.Text.SentenceBreakTriggers = new List<string>();
-        for (int i = 0; i < data.Text.SentenceBreakTriggers.Count; i++)
-        {
-            string token = data.Text.SentenceBreakTriggers[i] ?? string.Empty;
-            config.Text.SentenceBreakTriggers.Add(token);
-        }
-
         config.Text.ReplaceRules = new List<ReplaceRule>();
         for (int i = 0; i < data.Text.ReplaceRules.Count; i++)
         {
@@ -124,13 +116,6 @@ internal static class AppConfigMapper
         data.Audio.StartConfirmMaxRetries = config.Audio.StartConfirmMaxRetries;
         data.Audio.StopConfirmMs = config.Audio.StopConfirmMs;
         data.Audio.MaxSpeakingDurationSec = config.Audio.MaxSpeakingDurationSec;
-
-        data.Text.SendEnterAfterSentenceBreak = config.Text.SendEnterAfterSentenceBreak;
-        data.Text.SentenceBreakTriggers = new List<string>();
-        for (int i = 0; i < config.Text.SentenceBreakTriggers.Count; i++)
-        {
-            data.Text.SentenceBreakTriggers.Add(config.Text.SentenceBreakTriggers[i] ?? string.Empty);
-        }
 
         data.Text.ReplaceRules = new List<ReplaceRuleData>();
         for (int i = 0; i < config.Text.ReplaceRules.Count; i++)

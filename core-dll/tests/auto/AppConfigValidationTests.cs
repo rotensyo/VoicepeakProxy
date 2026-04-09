@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using VoicepeakProxyCore;
 
@@ -37,7 +36,6 @@ public class AppConfigValidationTests
         Assert.AreEqual("a", config.Ui.ClearInputSelectAllKey);
         Assert.AreEqual(string.Empty, config.Ui.PlayShortcutModifier);
         Assert.AreEqual("spacebar", config.Ui.PlayShortcutKey);
-        CollectionAssert.AreEqual(new[] { "。", "！", "？", "!", "?" }, config.Text.SentenceBreakTriggers);
         Assert.AreEqual(BootValidationMode.Required, config.Runtime.BootValidation);
         Assert.AreEqual("warn", config.Debug.LogMinimumLevel);
     }
@@ -198,36 +196,6 @@ public class AppConfigValidationTests
     {
         // 空文字は許可
         ValidateWith(config => config.Validation.ValidationText = string.Empty);
-    }
-
-    [TestMethod]
-    public void Validate_SentenceBreakTriggers_NullOrEmpty_Throw()
-    {
-        // 区切りトリガーの不正値を拒否
-        InvalidOperationException nullEx = Assert.ThrowsException<InvalidOperationException>(() =>
-            ValidateWith(config => config.Text.SentenceBreakTriggers = null));
-        StringAssert.Contains(nullEx.Message, "text.sentenceBreakTriggers");
-
-        InvalidOperationException emptyEx = Assert.ThrowsException<InvalidOperationException>(() =>
-            ValidateWith(config => config.Text.SentenceBreakTriggers = new List<string> { string.Empty }));
-        StringAssert.Contains(emptyEx.Message, "text.sentenceBreakTriggers[0]");
-    }
-
-    [TestMethod]
-    public void Validate_SentenceBreakTriggers_NullElement_Throws()
-    {
-        // 区切りトリガーのnull要素を拒否
-        InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
-            ValidateWith(config => config.Text.SentenceBreakTriggers = new List<string> { null }));
-
-        StringAssert.Contains(ex.Message, "text.sentenceBreakTriggers[0]");
-    }
-
-    [TestMethod]
-    public void Validate_MultiCharacterSentenceBreakTrigger_IsAllowed()
-    {
-        // 複数文字トリガーを許可
-        ValidateWith(config => config.Text.SentenceBreakTriggers = new List<string> { "。", "。、。" });
     }
 
     [TestMethod]

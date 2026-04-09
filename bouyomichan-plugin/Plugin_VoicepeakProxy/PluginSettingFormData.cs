@@ -549,33 +549,8 @@ namespace Plugin_VoicepeakProxy
             return "文章操作";
         }
 
-        [Category("01)入力ブロック分割設定")]
-        [DisplayName("01)sendEnterAfterSentenceBreak")]
-        [Description("TrueにするとsentenceBreakTriggersで指定した改行区切りで入力ブロックを分割します。")]
-        public bool SendEnterAfterSentenceBreak
-        {
-            get { return State.Settings.AppConfig.Text.SendEnterAfterSentenceBreak; }
-            set { State.Settings.AppConfig.Text.SendEnterAfterSentenceBreak = value; }
-        }
-
-        [Category("01)入力ブロック分割設定")]
-        [DisplayName("02)sentenceBreakTriggers(改行区切り)")]
-        [Description("入力ブロックの分割対象文字列です。1行に1トリガーを指定してください。")]
-        [Editor(typeof(System.ComponentModel.Design.MultilineStringEditor), typeof(System.Drawing.Design.UITypeEditor))]
-        public string SentenceBreakTriggersText
-        {
-            get
-            {
-                return TabTextHelper.JoinLines(State.Settings.AppConfig.Text.SentenceBreakTriggers);
-            }
-            set
-            {
-                State.Settings.AppConfig.Text.SentenceBreakTriggers = TabTextHelper.SplitLines(value);
-            }
-        }
-
-        [Category("02)置換設定")]
-        [DisplayName("03)replaceRules(from=>to,改行区切り)")]
+        [Category("01)置換設定")]
+        [DisplayName("01)replaceRules(from=>to,改行区切り)")]
         [Description("ポーズ調整等に利用可能な入力文字の置換ルールです。1行に1ルールを指定してください。(例: 。=>。　。)")]
         [Editor(typeof(System.ComponentModel.Design.MultilineStringEditor), typeof(System.Drawing.Design.UITypeEditor))]
         public string ReplaceRulesText

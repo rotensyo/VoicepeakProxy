@@ -160,7 +160,7 @@ internal static class JobCompiler
         {
             Segment segment = segments[i] ?? new Segment();
             totalPause += segment.PausePreMs;
-            speakableLength += InputTextNormalizer.Normalize(segment.Text).Length;
+            speakableLength += InputTextNormalizer.NormalizeForValidation(segment.Text).Length;
         }
 
         bool isDelayOnly = false;

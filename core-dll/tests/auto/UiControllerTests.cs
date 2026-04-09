@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Windows.Automation;
@@ -14,6 +13,7 @@ public class UiControllerTests
 {
     private const int WmKeyDown = 0x0100;
     private const int WmKeyUp = 0x0101;
+    private const int WmChar = 0x0102;
     private const int VkReturn = 0x0D;
     private const int VkDelete = 0x2E;
     private const int VkPageUp = 0x21;
@@ -230,136 +230,62 @@ public class UiControllerTests
     }
 
     [TestMethod]
-    public void TypeText_DoesNotSendEnterWhenDisabled()
+    public void TypeText_Newline_SendsSingleEnter()
     {
-        // 設定無効時はEnter送信なし
-        int enterCount = ReflectionTestHelper.RunInSta(() =>
+        // 改行1文字でEnterを1回送信
+        var messages = ReflectionTestHelper.RunInSta(() =>
         {
-            UiConfig ui = new UiConfig
-            {
-            };
-            TextConfig text = new TextConfig
-            {
-                SendEnterAfterSentenceBreak = false
-            };
+            UiConfig ui = new UiConfig();
             TestLogger logger = new TestLogger();
-            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new HookConfig(), text, new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
+            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
 
-            bool result = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "TypeText", window.Handle, "A。B", 0);
+            bool result = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "TypeText", window.Handle, "A\nB", 0);
             Assert.IsTrue(result);
-            return window.Messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkReturn);
+            return window.Messages.ToArray();
         });
 
-        Assert.AreEqual(0, enterCount);
+        Assert.AreEqual(1, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkReturn));
+        Assert.AreEqual(1, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkReturn));
     }
 
     [TestMethod]
-    public void TypeText_UsesLongestSentenceBreakTrigger()
+    public void TypeText_ConsecutiveNewlines_SendEnterForEachNewlineChar()
     {
-        // 最長一致トリガーを優先
-        int enterCount = ReflectionTestHelper.RunInSta(() =>
+        // 改行文字ごとにEnterを送信
+        var messages = ReflectionTestHelper.RunInSta(() =>
         {
-            UiConfig ui = new UiConfig
-            {
-            };
-            TextConfig text = new TextConfig
-            {
-                SendEnterAfterSentenceBreak = true,
-                SentenceBreakTriggers = new List<string> { "。", "。、。" }
-            };
-
+            UiConfig ui = new UiConfig();
             TestLogger logger = new TestLogger();
-            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new HookConfig(), text, new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
+            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
 
-            bool result = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "TypeText", window.Handle, "A。、。B。C", 0);
+            bool result = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "TypeText", window.Handle, "A\n\nB\n\n\nC", 0);
             Assert.IsTrue(result);
-            return window.Messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkReturn);
+            return window.Messages.ToArray();
         });
 
-        Assert.AreEqual(2, enterCount);
+        Assert.AreEqual(3, messages.Count(m => m.Msg == WmChar));
+        Assert.AreEqual(5, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkReturn));
     }
 
     [TestMethod]
-    public void TypeText_DoesNotSendEnterAtSegmentEnd()
+    public void TypeText_MixedCrLfAndLfCr_SendEnterForEachNewlineChar()
     {
-        // セグメント末尾のEnter送信を抑止
+        // 改行種別混在でも改行文字ごとにEnterを送信
         int enterCount = ReflectionTestHelper.RunInSta(() =>
         {
-            UiConfig ui = new UiConfig
-            {
-            };
-            TextConfig text = new TextConfig
-            {
-                SendEnterAfterSentenceBreak = true,
-                SentenceBreakTriggers = new List<string> { "。" }
-            };
-
+            UiConfig ui = new UiConfig();
             TestLogger logger = new TestLogger();
-            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new HookConfig(), text, new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
+            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
 
-            bool result = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "TypeText", window.Handle, "A。B。", 0);
+            bool result = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "TypeText", window.Handle, "A\r\nB\n\rC\rD", 0);
             Assert.IsTrue(result);
             return window.Messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkReturn);
         });
 
-        Assert.AreEqual(1, enterCount);
-    }
-
-    [TestMethod]
-    public void TypeText_ConsecutiveSameTriggers_AreTreatedAsSingleBreak()
-    {
-        // 連続する同一トリガーは1回の区切りとして扱う
-        int enterCount = ReflectionTestHelper.RunInSta(() =>
-        {
-            UiConfig ui = new UiConfig
-            {
-            };
-            TextConfig text = new TextConfig
-            {
-                SendEnterAfterSentenceBreak = true,
-                SentenceBreakTriggers = new List<string> { "。" }
-            };
-
-            TestLogger logger = new TestLogger();
-            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new HookConfig(), text, new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
-            using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
-
-            bool result = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "TypeText", window.Handle, "A。。。B", 0);
-            Assert.IsTrue(result);
-            return window.Messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkReturn);
-        });
-
-        Assert.AreEqual(1, enterCount);
-    }
-
-    [TestMethod]
-    public void TypeText_ConsecutiveDifferentTriggers_AreTreatedAsSingleBreak()
-    {
-        // 連続する複合トリガー列も1回の区切りとして扱う
-        int enterCount = ReflectionTestHelper.RunInSta(() =>
-        {
-            UiConfig ui = new UiConfig
-            {
-            };
-            TextConfig text = new TextConfig
-            {
-                SendEnterAfterSentenceBreak = true,
-                SentenceBreakTriggers = new List<string> { "!", "?" }
-            };
-
-            TestLogger logger = new TestLogger();
-            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new HookConfig(), text, new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
-            using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
-
-            bool result = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "TypeText", window.Handle, "A!?B", 0);
-            Assert.IsTrue(result);
-            return window.Messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkReturn);
-        });
-
-        Assert.AreEqual(1, enterCount);
+        Assert.AreEqual(5, enterCount);
     }
 
     [TestMethod]
@@ -714,12 +640,8 @@ public class UiControllerTests
                 MoveToStartModifier = "ctrl",
                 MoveToStartKey = "cursor up"
             };
-            TextConfig text = new TextConfig
-            {
-                SendEnterAfterSentenceBreak = true
-            };
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
-            VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi(), text: text);
+            VoicepeakUiController controller = CreateController(ui, new FakeVoicepeakProcessApi());
 
             Assert.IsTrue(controller.TypeText(window.Handle, "A。B。C", 0));
             window.Messages.Clear();
