@@ -12,6 +12,12 @@ public sealed class VoicepeakRuntime : IDisposable
     private int _disposed;
     private int _accepting;
 
+    // 公開API初期化時に依存解決を有効化
+    static VoicepeakRuntime()
+    {
+        DependencyResolver.EnsureInitialized();
+    }
+
     private VoicepeakRuntime(VoicepeakEngine engine, CancellationTokenSource cts, AppLogger log)
     {
         _engine = engine;

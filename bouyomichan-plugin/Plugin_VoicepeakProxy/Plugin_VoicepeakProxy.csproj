@@ -13,7 +13,7 @@
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <PlatformTarget>x86</PlatformTarget>
-    <BouyomiChanExePath Condition="'$(BouyomiChanExePath)' == ''">D:\Program Files\BouyomiChan_0_1_11_0_Beta21\BouyomiChan.exe</BouyomiChanExePath>
+    <BouyomiChanExePath Condition="'$(BouyomiChanExePath)' == ''"></BouyomiChanExePath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
     <DebugSymbols>true</DebugSymbols>
@@ -62,5 +62,9 @@
       <Link>Shared\JsonFileStore.cs</Link>
     </Compile>
   </ItemGroup>
+  <Target Name="ValidateBouyomiChanReference" BeforeTargets="ResolveReferences">
+    <Error Condition="'$(BouyomiChanExePath)' == ''" Text="BouyomiChanExePath が未指定です。/p:BouyomiChanExePath=&quot;{BouyomiChan.exeへのパス}&quot; を指定してください。" />
+    <Error Condition="'$(BouyomiChanExePath)' != '' and !Exists('$(BouyomiChanExePath)')" Text="BouyomiChanExePath が不正です。存在する BouyomiChan.exe を指定してください。 path=$(BouyomiChanExePath)" />
+  </Target>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

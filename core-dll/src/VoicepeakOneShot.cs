@@ -89,6 +89,12 @@ public static class VoicepeakOneShot
     private const string ModifierGuardUnavailableFatalReason = "reason=modifier_guard_unavailable_fatal";
     private const string ModifierGuardReleaseFailedFatalReason = "reason=modifier_guard_release_failed_fatal";
 
+    // 公開API初期化時に依存解決を有効化
+    static VoicepeakOneShot()
+    {
+        DependencyResolver.EnsureInitialized();
+    }
+
     // 単発入力検証
     public static ValidateInputOnceResult ValidateInputOnce(
         AppConfig config,

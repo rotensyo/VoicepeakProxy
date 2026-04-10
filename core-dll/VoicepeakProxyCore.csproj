@@ -26,4 +26,21 @@
   <ItemGroup>
     <Compile Remove="tests\**\*.cs" />
   </ItemGroup>
+
+  <Target Name="MoveDependenciesToDepsFolder" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <CoreDepsDir>$(OutputPath)VoicepeakProxyCore.deps\</CoreDepsDir>
+    </PropertyGroup>
+
+    <MakeDir Directories="$(CoreDepsDir)" />
+
+    <ItemGroup>
+      <CoreDependencyFiles Include="$(OutputPath)EasyHook*.*" />
+      <CoreDependencyFiles Include="$(OutputPath)EasyLoad*.*" />
+      <CoreDependencyFiles Include="$(OutputPath)NAudio*.*" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(CoreDependencyFiles)" DestinationFolder="$(CoreDepsDir)" Condition="'@(CoreDependencyFiles)' != ''" />
+    <Delete Files="@(CoreDependencyFiles)" Condition="'@(CoreDependencyFiles)' != ''" />
+  </Target>
 </Project>

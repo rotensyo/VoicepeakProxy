@@ -36,4 +36,21 @@
   <Target Name="CleanupLegacyTfmOutput" AfterTargets="Build">
     <RemoveDir Directories="$(OutputPath)$(TargetFramework)" Condition="Exists('$(OutputPath)$(TargetFramework)')" />
   </Target>
+
+  <Target Name="MoveWorkerDependenciesToCoreDepsFolder" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <CoreDepsDir>$(OutputPath)VoicepeakProxyCore.deps\</CoreDepsDir>
+    </PropertyGroup>
+
+    <MakeDir Directories="$(CoreDepsDir)" />
+
+    <ItemGroup>
+      <WorkerDependencyFiles Include="$(OutputPath)EasyHook*.*" />
+      <WorkerDependencyFiles Include="$(OutputPath)EasyLoad*.*" />
+      <WorkerDependencyFiles Include="$(OutputPath)NAudio*.*" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(WorkerDependencyFiles)" DestinationFolder="$(CoreDepsDir)" Condition="'@(WorkerDependencyFiles)' != ''" />
+    <Delete Files="@(WorkerDependencyFiles)" Condition="'@(WorkerDependencyFiles)' != ''" />
+  </Target>
 </Project>
