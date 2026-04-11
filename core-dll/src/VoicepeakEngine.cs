@@ -50,7 +50,7 @@ internal sealed class VoicepeakEngine : IDisposable
         _config = config;
         _appCts = appCts;
         _log = log;
-        _ui = ui ?? new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Debug, _log);
+        _ui = ui ?? new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, _log);
         _audio = audio ?? new AudioSessionReader(_log);
         _worker = null;
         if (startWorker)

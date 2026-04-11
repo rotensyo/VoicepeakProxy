@@ -222,6 +222,7 @@ public sealed class UiConfigData
     // テキスト処理設定
     public sealed class TextConfigData
     {
+        public bool SplitInputBlockOnNewline { get; set; }
         public List<ReplaceRuleData> ReplaceRules { get; set; }
 
         public TextConfigData()

@@ -58,6 +58,7 @@ internal static class AppConfigMapper
         config.Audio.MaxSpeakingDurationSec = data.Audio.MaxSpeakingDurationSec;
 
         config.Text.ReplaceRules = new List<ReplaceRule>();
+        config.Text.SplitInputBlockOnNewline = data.Text.SplitInputBlockOnNewline;
         for (int i = 0; i < data.Text.ReplaceRules.Count; i++)
         {
             ReplaceRuleData rule = data.Text.ReplaceRules[i] ?? new ReplaceRuleData();
@@ -118,6 +119,7 @@ internal static class AppConfigMapper
         data.Audio.MaxSpeakingDurationSec = config.Audio.MaxSpeakingDurationSec;
 
         data.Text.ReplaceRules = new List<ReplaceRuleData>();
+        data.Text.SplitInputBlockOnNewline = config.Text.SplitInputBlockOnNewline;
         for (int i = 0; i < config.Text.ReplaceRules.Count; i++)
         {
             ReplaceRule rule = config.Text.ReplaceRules[i] ?? new ReplaceRule();

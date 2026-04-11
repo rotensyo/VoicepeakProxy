@@ -174,6 +174,7 @@ public class UiControllerTests
                 ui,
                 inputTiming,
                 new HookConfig(),
+                new TextConfig(),
                 new DebugConfig(),
                 new AppLogger(new TestLogger()),
                 new FakeVoicepeakProcessApi());
@@ -212,6 +213,7 @@ public class UiControllerTests
                 ui,
                 inputTiming,
                 new HookConfig(),
+                new TextConfig(),
                 new DebugConfig(),
                 new AppLogger(new TestLogger()),
                 new FakeVoicepeakProcessApi());
@@ -235,7 +237,7 @@ public class UiControllerTests
         {
             UiConfig ui = new UiConfig();
             TestLogger logger = new TestLogger();
-            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new HookConfig(), new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
+            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
 
             bool result = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "TypeText", window.Handle, "A\nB", 0);
@@ -255,7 +257,7 @@ public class UiControllerTests
         {
             UiConfig ui = new UiConfig();
             TestLogger logger = new TestLogger();
-            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new HookConfig(), new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
+            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
 
             bool result = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "TypeText", window.Handle, "A\n\nB\n\n\nC", 0);
@@ -275,7 +277,7 @@ public class UiControllerTests
         {
             UiConfig ui = new UiConfig();
             TestLogger logger = new TestLogger();
-            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new HookConfig(), new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
+            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
             using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
 
             bool result = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "TypeText", window.Handle, "A\r\nB\n\rC\rD", 0);
@@ -284,6 +286,27 @@ public class UiControllerTests
         });
 
         Assert.AreEqual(5, enterCount);
+    }
+
+    [TestMethod]
+    public void TypeText_Newline_WhenSplitInputBlockOnNewlineTrue_SendsEnter()
+    {
+        // 改行分割設定trueではEnter送信を使用
+        var messages = ReflectionTestHelper.RunInSta(() =>
+        {
+            UiConfig ui = new UiConfig();
+            TextConfig text = new TextConfig { SplitInputBlockOnNewline = true };
+            TestLogger logger = new TestLogger();
+            object controller = ReflectionTestHelper.CreateCoreInstance("VoicepeakUiController", ui, new InputTimingConfig(), new HookConfig(), text, new DebugConfig(), ReflectionTestHelper.CreateAppLogger(logger));
+            using ReflectionTestHelper.MessageRecorderWindow window = new ReflectionTestHelper.MessageRecorderWindow();
+
+            bool result = (bool)ReflectionTestHelper.InvokeCoreInstance(controller, "TypeText", window.Handle, "A\nB", 0);
+            Assert.IsTrue(result);
+            return window.Messages.ToArray();
+        });
+
+        Assert.AreEqual(1, messages.Count(m => m.Msg == WmKeyDown && m.WParam.ToInt32() == VkReturn));
+        Assert.AreEqual(1, messages.Count(m => m.Msg == WmKeyUp && m.WParam.ToInt32() == VkReturn));
     }
 
     [TestMethod]
@@ -731,12 +754,14 @@ public class UiControllerTests
         IVoicepeakProcessApi processApi,
         InputTimingConfig inputTiming = null,
         HookConfig hook = null,
+        TextConfig text = null,
         DebugConfig debug = null)
     {
         return new VoicepeakUiController(
             ui,
             inputTiming ?? new InputTimingConfig(),
             hook ?? new HookConfig(),
+            text ?? new TextConfig(),
             debug ?? new DebugConfig(),
             new AppLogger(new TestLogger()),
             processApi);

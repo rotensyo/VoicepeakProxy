@@ -111,7 +111,7 @@ public static class VoicepeakOneShot
         return ValidateInputOnceCore(
             config,
             log,
-            new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Debug, log),
+            new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log),
             new AudioSessionReader(log));
     }
 
@@ -254,7 +254,7 @@ public static class VoicepeakOneShot
         return ClearInputOnceCore(
             config,
             log,
-            new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Debug, log));
+            new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log));
     }
 
     // 依存を差し替えて単発入力削除
@@ -337,7 +337,7 @@ public static class VoicepeakOneShot
             config,
             request,
             log,
-            new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Debug, log),
+            new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log),
             new AudioSessionReader(log));
     }
 
@@ -378,7 +378,7 @@ public static class VoicepeakOneShot
             config,
             request,
             log,
-            new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Debug, log),
+            new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log),
             new AudioSessionReader(log));
     }
 

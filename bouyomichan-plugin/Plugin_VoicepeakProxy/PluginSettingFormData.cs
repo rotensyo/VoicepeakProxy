@@ -230,7 +230,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("01)音声監視設定")]
-        [DisplayName("01)peakThreshold")]
+        [DisplayName("01)発話判定閾値")]
         [Description("発話中判定に使う音量の閾値です。")]
         public float PeakThreshold
         {
@@ -239,7 +239,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("01)音声監視設定")]
-        [DisplayName("02)pollIntervalMs")]
+        [DisplayName("02)音声監視間隔(ms)")]
         [Description("音声監視を行う間隔をミリ秒で指定します。")]
         public int PollIntervalMs
         {
@@ -248,7 +248,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("02)発話開始・終了確認設定")]
-        [DisplayName("03)startConfirmTimeoutMs")]
+        [DisplayName("03)発話開始待機時間(ms)")]
         [Description("再生実行から発話開始を待つ最大時間をミリ秒で指定します。")]
         public int StartConfirmTimeoutMs
         {
@@ -257,7 +257,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("02)発話開始・終了確認設定")]
-        [DisplayName("04)startConfirmMaxRetries")]
+        [DisplayName("04)発話失敗時リトライ回数")]
         [Description("発話開始が確認されなかった際に再生をリトライする回数です。")]
         public int StartConfirmMaxRetries
         {
@@ -266,7 +266,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("02)発話開始・終了確認設定")]
-        [DisplayName("05)stopConfirmMs")]
+        [DisplayName("05)発話終了判定時間(ms)")]
         [Description("発話開始後、この時間(ミリ秒)だけ無音が続いたら発話終了と判定します。")]
         public int StopConfirmMs
         {
@@ -275,8 +275,8 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("02)発話開始・終了確認設定")]
-        [DisplayName("06)maxSpeakingDurationSec")]
-        [Description("発話開始後、この秒数を超えても終了しない場合はエラーとします。")]
+        [DisplayName("06)最大発話時間(s)")]
+        [Description("発話開始後、この秒数を超えても終了しない場合はエラーとします。長時間の読み上げが見込まれる場合は延長してください。")]
         public int MaxSpeakingDurationSec
         {
             get { return State.Settings.AppConfig.Audio.MaxSpeakingDurationSec; }
@@ -297,7 +297,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("01)起動時入力検証設定")]
-        [DisplayName("01)validationText")]
+        [DisplayName("01)起動時検証用テキスト")]
         [Description("プラグイン起動時に入力/再生の確認を行う文字列です。")]
         public string ValidationText
         {
@@ -306,7 +306,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("01)起動時入力検証設定")]
-        [DisplayName("02)validationMaxRetries")]
+        [DisplayName("02)起動検証失敗時リトライ回数")]
         [Description("プラグイン起動時の入力検証に失敗した際の再試行回数です。")]
         public int ValidationMaxRetries
         {
@@ -315,7 +315,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("01)起動時入力検証設定")]
-        [DisplayName("03)validationRetryIntervalMs")]
+        [DisplayName("03)起動検証失敗時リトライ遅延時間(ms)")]
         [Description("入力検証の再試行待機時間をミリ秒で指定します。")]
         public int ValidationRetryIntervalMs
         {
@@ -334,12 +334,12 @@ namespace Plugin_VoicepeakProxy
 
         public override string GetName()
         {
-            return "Hook";
+            return "Hook設定";
         }
 
         [Category("01)Hook")]
-        [DisplayName("01)hookCommandTimeoutMs")]
-        [Description("修飾キー中立化フックへのコマンド送信タイムアウトをミリ秒で指定します。")]
+        [DisplayName("01)コマンド送信タイムアウト(ms)")]
+        [Description("フックへのコマンド送信タイムアウトをミリ秒で指定します。")]
         public int HookCommandTimeoutMs
         {
             get { return State.Settings.AppConfig.Hook.HookCommandTimeoutMs; }
@@ -347,8 +347,8 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("01)Hook")]
-        [DisplayName("02)hookConnectTimeoutMs")]
-        [Description("修飾キー中立化フックの接続試行1回あたりのタイムアウトをミリ秒で指定します。")]
+        [DisplayName("02)接続試行タイムアウト(1回あたり・ms)")]
+        [Description("フックの接続試行1回あたりのタイムアウトをミリ秒で指定します。")]
         public int HookConnectTimeoutMs
         {
             get { return State.Settings.AppConfig.Hook.HookConnectTimeoutMs; }
@@ -356,8 +356,8 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("01)Hook")]
-        [DisplayName("03)hookConnectTotalWaitMs")]
-        [Description("修飾キー中立化フックの接続待機総最大時間をミリ秒で指定します。")]
+        [DisplayName("03)接続試行タイムアウト(合計・ms)")]
+        [Description("フックの接続待機総最大時間をミリ秒で指定します。")]
         public int HookConnectTotalWaitMs
         {
             get { return State.Settings.AppConfig.Hook.HookConnectTotalWaitMs; }
@@ -378,7 +378,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("01)「先頭に移動」ショートカット設定")]
-        [DisplayName("01)moveToStartModifier")]
+        [DisplayName("01)「先頭に移動」ショートカット修飾子")]
         [Description("「先頭に移動」ショートカットの修飾子キーです。VOICEPEAKの設定値に応じて、空文字/ctrl/altのいずれかを指定してください。shiftや、ctrlとaltの複合は現在非対応です。")]
         public string MoveToStartModifier
         {
@@ -387,7 +387,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("01)「先頭に移動」ショートカット設定")]
-        [DisplayName("02)moveToStartKey")]
+        [DisplayName("02)「先頭に移動」ショートカット")]
         [Description("「先頭に移動」ショートカットのキーです。VOICEPEAKの設定値と同じものを指定してください。例: cursor up, F3, home")]
         public string MoveToStartKey
         {
@@ -396,7 +396,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("02)「すべてを選択」ショートカット設定")]
-        [DisplayName("03)clearInputSelectAllModifier")]
+        [DisplayName("03)「すべてを選択」ショートカット修飾子")]
         [Description("「すべてを選択」ショートカットの修飾子キーです。VOICEPEAKの設定値に応じて、空文字/ctrl/altのいずれかを指定してください。")]
         public string ClearInputSelectAllModifier
         {
@@ -405,7 +405,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("02)「すべてを選択」ショートカット設定")]
-        [DisplayName("04)clearInputSelectAllKey")]
+        [DisplayName("04)「すべてを選択」ショートカット")]
         [Description("「すべてを選択」ショートカットのキーです。VOICEPEAKの設定値と同じものを指定してください。例: a")]
         public string ClearInputSelectAllKey
         {
@@ -414,7 +414,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("03)「再生/停止」ショートカット設定")]
-        [DisplayName("05)playShortcutModifier")]
+        [DisplayName("05)「再生/停止」ショートカット修飾子")]
         [Description("「再生/停止」ショートカットの修飾子キーです。VOICEPEAKの設定値に応じて、空文字/ctrl/alt/shiftのいずれかを指定してください。")]
         public string PlayShortcutModifier
         {
@@ -423,7 +423,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("03)「再生/停止」ショートカット設定")]
-        [DisplayName("06)playShortcutKey")]
+        [DisplayName("06)「再生/停止」ショートカット")]
         [Description("「再生/停止」ショートカットのキーです。VOICEPEAKの設定値と同じものを指定してください。例: spacebar, F3, home")]
         public string PlayShortcutKey
         {
@@ -432,7 +432,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("04)再生実行ディレイ設定")]
-        [DisplayName("07)delayBeforePlayShortcutMs")]
+        [DisplayName("07)再生実行前遅延時間(ms)")]
         [Description("再生アクション実行前の待機時間をミリ秒で指定します。")]
         public int DelayBeforePlayShortcutMs
         {
@@ -455,7 +455,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("01)文字入力ディレイ設定")]
-        [DisplayName("01)keyStrokeIntervalMs")]
+        [DisplayName("01)文字入力間隔(ms)")]
         [Description("キー操作ごとの待機時間をミリ秒で指定します。0の場合は待機しません。")]
         public int KeyStrokeIntervalMs
         {
@@ -464,7 +464,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("01)文字入力ディレイ設定")]
-        [DisplayName("02)actionDelayMs")]
+        [DisplayName("02)文字入力系操作遅延時間(ms)")]
         [Description("文字入力欄フォーカスなどのUIアクション時の待機時間をミリ秒で指定します。")]
         public int ActionDelayMs
         {
@@ -473,7 +473,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("02)文字入力後待機時間設定")]
-        [DisplayName("03)postTypeWaitPerCharMs")]
+        [DisplayName("03)入力後待機時間(1文字あたり、ms)")]
         [Description("文字入力後の待機時間算出に使用する倍率です。文字入力完了後に再生失敗する場合は、値を増やして再生前の待機時間を伸ばしてみてください。")]
         public int PostTypeWaitPerCharMs
         {
@@ -482,7 +482,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("02)文字入力後待機時間設定")]
-        [DisplayName("04)postTypeWaitMinMs")]
+        [DisplayName("04)入力後最低待機時間(ms)")]
         [Description("文字入力後待機時間の最小値です。文字入力完了後に再生失敗する場合は、値を増やして再生前の待機時間を伸ばしてみてください。")]
         public int PostTypeWaitMinMs
         {
@@ -491,7 +491,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("03)文字入力失敗時リトライ設定")]
-        [DisplayName("05)typeTextRetryWaitMs")]
+        [DisplayName("05)入力失敗時リトライ遅延時間(ms)")]
         [Description("入力失敗時のリトライ前待機時間をミリ秒で指定します。0の場合は待機しません。")]
         public int TypeTextRetryWaitMs
         {
@@ -500,7 +500,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("03)文字入力失敗時リトライ設定")]
-        [DisplayName("06)typeTextRetryMaxRetries")]
+        [DisplayName("06)入力失敗時リトライ回数")]
         [Description("入力失敗時のリトライ回数です。0の場合はリトライしません。")]
         public int TypeTextRetryMaxRetries
         {
@@ -509,8 +509,8 @@ namespace Plugin_VoicepeakProxy
         }
 
 
-        [Category("04)文字削除設定")]
-        [DisplayName("07)clearInputMaxPasses")]
+        [Category("04)入力クリア設定")]
+        [DisplayName("07)入力クリア処理最大試行回数")]
         [Description("入力クリア処理の最大繰り返し回数です。入力文字が削除しきれない場合は増やしてみてください。")]
         public int ClearInputMaxPasses
         {
@@ -518,8 +518,8 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.InputTiming.ClearInputMaxPasses = value; }
         }
 
-        [Category("05)文字削除失敗時リトライ設定")]
-        [DisplayName("08)clearInputRetryWaitMs")]
+        [Category("05)入力クリア失敗時リトライ設定")]
+        [DisplayName("08)入力クリア失敗時リトライ遅延時間(ms)")]
         [Description("入力クリア失敗時のリトライ前待機時間をミリ秒で指定します。0の場合は待機しません。")]
         public int ClearInputRetryWaitMs
         {
@@ -527,8 +527,8 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.InputTiming.ClearInputRetryWaitMs = value; }
         }
 
-        [Category("05)文字削除失敗時リトライ設定")]
-        [DisplayName("09)clearInputRetryMaxRetries")]
+        [Category("05)入力クリア失敗時リトライ設定")]
+        [DisplayName("09)入力クリア失敗時リトライ回数")]
         [Description("入力クリア失敗時のリトライ回数です。0の場合はリトライしません。")]
         public int ClearInputRetryMaxRetries
         {
@@ -550,7 +550,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("01)置換設定")]
-        [DisplayName("01)replaceRules(from=>to,改行区切り)")]
+        [DisplayName("01)文字置換設定(from=>to,改行区切り)")]
         [Description("ポーズ調整等に利用可能な入力文字の置換ルールです。1行に1ルールを指定してください。(例: 。=>。　。)")]
         [Editor(typeof(System.ComponentModel.Design.MultilineStringEditor), typeof(System.Drawing.Design.UITypeEditor))]
         public string ReplaceRulesText
@@ -604,6 +604,15 @@ namespace Plugin_VoicepeakProxy
 
                 State.Settings.AppConfig.Text.ReplaceRules = rules;
             }
+        }
+
+        [Category("01)置換設定")]
+        [DisplayName("02)改行時入力ブロック分割設定")]
+        [Description("改行時に入力ブロックを分割するかの設定です。trueの場合は分割します。棒読みちゃんは基本的に改行を送らないので、効果は無いかもしれません。")]
+        public bool SplitInputBlockOnNewline
+        {
+            get { return State.Settings.AppConfig.Text.SplitInputBlockOnNewline; }
+            set { State.Settings.AppConfig.Text.SplitInputBlockOnNewline = value; }
         }
     }
 

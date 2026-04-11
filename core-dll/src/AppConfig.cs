@@ -72,6 +72,7 @@ public sealed class AudioConfig
 // テキスト処理設定
 public sealed class TextConfig
 {
+    public bool SplitInputBlockOnNewline { get; set; } = false;
     public List<ReplaceRule> ReplaceRules { get; set; } = new List<ReplaceRule>();
 }
 

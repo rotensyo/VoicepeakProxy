@@ -21,6 +21,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private readonly UiConfig _ui;
     private readonly InputTimingConfig _inputTiming;
     private readonly HookConfig _hook;
+    private readonly TextConfig _text;
     private readonly DebugConfig _debug;
     private readonly AppLogger _log;
     private readonly VoicepeakTargetResolver _targetResolver;
@@ -32,26 +33,27 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
     // UI設定とロガーを保持
     public VoicepeakUiController(UiConfig ui, DebugConfig debug, AppLogger log)
-        : this(ui, new InputTimingConfig(), new HookConfig(), debug, log, new DefaultVoicepeakProcessApi())
+        : this(ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), debug, log, new DefaultVoicepeakProcessApi())
     {
     }
 
-    public VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, HookConfig hook, DebugConfig debug, AppLogger log)
-        : this(ui, inputTiming, hook, debug, log, new DefaultVoicepeakProcessApi())
+    public VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log)
+        : this(ui, inputTiming, hook, text, debug, log, new DefaultVoicepeakProcessApi())
     {
     }
 
     internal VoicepeakUiController(UiConfig ui, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
-        : this(ui, new InputTimingConfig(), new HookConfig(), debug, log, processApi)
+        : this(ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), debug, log, processApi)
     {
     }
 
-    internal VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, HookConfig hook, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
+    internal VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
     {
         IVoicepeakProcessApi resolvedProcessApi = processApi ?? new DefaultVoicepeakProcessApi();
         _ui = ui ?? new UiConfig();
         _inputTiming = inputTiming ?? new InputTimingConfig();
         _hook = hook ?? new HookConfig();
+        _text = text ?? new TextConfig();
         _debug = debug ?? new DebugConfig();
         _log = log;
         _targetResolver = new VoicepeakTargetResolver(resolvedProcessApi);
@@ -350,14 +352,14 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         _modifierIsolationSessionProcessId = _modifierIsolationCoordinator.SessionProcessId;
     }
 
-    // WM_CHARとEnter送信で入力
+    // WM_CHARと改行キー送信で入力
     private bool TryTypeTextByWindowMessages(IntPtr targetHwnd, string send, int charDelayMs)
     {
         for (int i = 0; i < send.Length; i++)
         {
             char current = send[i];
             bool sent = current == '\n' || current == '\r'
-                ? SendKey(targetHwnd, VirtualKey.Return)
+                ? SendNewline(targetHwnd)
                 : SendChar(targetHwnd, current);
             if (!sent)
             {
@@ -370,6 +372,23 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             }
         }
         return true;
+    }
+
+    // 改行送信方式を設定に応じて切替
+    private bool SendNewline(IntPtr targetHwnd)
+    {
+        if (_text.SplitInputBlockOnNewline)
+        {
+            return SendKey(targetHwnd, VirtualKey.Return);
+        }
+
+        return SendShortcutWithOptionalModifier(
+            targetHwnd,
+            "type_text_newline_enter",
+            VirtualKey.Return,
+            ModifierOverrideMode.Shift,
+            useModifier: true,
+            "type_text_newline_override_reset_failed");
     }
 
     // 再生ショートカットを送信
