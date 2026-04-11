@@ -73,23 +73,23 @@ namespace BouyomiVoicepeakBridge.Shared
     public sealed class AppConfigData
     {
         public ValidationConfigData Validation { get; set; }
-        public HookConfigData Hook { get; set; }
         public UiConfigData Ui { get; set; }
         public InputTimingConfigData InputTiming { get; set; }
-        public AudioConfigData Audio { get; set; }
         public TextConfigData Text { get; set; }
+        public AudioConfigData Audio { get; set; }
         public RuntimeConfigData Runtime { get; set; }
+        public HookConfigData Hook { get; set; }
         public DebugConfigData Debug { get; set; }
 
         public AppConfigData()
         {
             Validation = new ValidationConfigData();
-            Hook = new HookConfigData();
             Ui = new UiConfigData();
             InputTiming = new InputTimingConfigData();
-            Audio = new AudioConfigData();
             Text = new TextConfigData();
+            Audio = new AudioConfigData();
             Runtime = new RuntimeConfigData();
+            Hook = new HookConfigData();
             Debug = new DebugConfigData();
         }
 
@@ -99,11 +99,6 @@ namespace BouyomiVoicepeakBridge.Shared
             if (Validation == null)
             {
                 Validation = new ValidationConfigData();
-            }
-
-            if (Hook == null)
-            {
-                Hook = new HookConfigData();
             }
 
             if (Ui == null)
@@ -129,6 +124,11 @@ namespace BouyomiVoicepeakBridge.Shared
             if (Runtime == null)
             {
                 Runtime = new RuntimeConfigData();
+            }
+
+            if (Hook == null)
+            {
+                Hook = new HookConfigData();
             }
 
             if (Debug == null)

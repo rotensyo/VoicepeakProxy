@@ -53,4 +53,29 @@
     <Copy SourceFiles="@(WorkerDependencyFiles)" DestinationFolder="$(CoreDepsDir)" Condition="'@(WorkerDependencyFiles)' != ''" />
     <Delete Files="@(WorkerDependencyFiles)" Condition="'@(WorkerDependencyFiles)' != ''" />
   </Target>
+
+  <Target Name="BundleWorkerOutputs" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <WorkerBundleDir>$(OutputPath)VoicepeakProxyWorker\</WorkerBundleDir>
+      <CoreDepsDir>$(OutputPath)VoicepeakProxyCore.deps\</CoreDepsDir>
+      <BundledDepsDir>$(WorkerBundleDir)VoicepeakProxyCore.deps\</BundledDepsDir>
+    </PropertyGroup>
+
+    <MakeDir Directories="$(WorkerBundleDir)" />
+    <RemoveDir Directories="$(BundledDepsDir)" Condition="Exists('$(BundledDepsDir)')" />
+
+    <ItemGroup>
+      <WorkerPrimaryFiles Include="$(OutputPath)VoicepeakProxyWorker.exe" />
+      <WorkerPrimaryFiles Include="$(OutputPath)VoicepeakProxyCore.dll" />
+      <CoreDepsFiles Include="$(CoreDepsDir)**\*.*" Condition="Exists('$(CoreDepsDir)')" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(WorkerPrimaryFiles)" DestinationFolder="$(WorkerBundleDir)" Condition="'@(WorkerPrimaryFiles)' != ''" />
+    <Delete Files="@(WorkerPrimaryFiles)" Condition="'@(WorkerPrimaryFiles)' != ''" />
+
+    <Copy SourceFiles="@(CoreDepsFiles)"
+          DestinationFiles="@(CoreDepsFiles->'$(BundledDepsDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          Condition="'@(CoreDepsFiles)' != ''" />
+    <RemoveDir Directories="$(CoreDepsDir)" Condition="Exists('$(CoreDepsDir)')" />
+  </Target>
 </Project>

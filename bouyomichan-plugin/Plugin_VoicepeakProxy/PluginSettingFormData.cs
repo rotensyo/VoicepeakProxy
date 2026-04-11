@@ -107,28 +107,24 @@ namespace Plugin_VoicepeakProxy
 
         public GeneralTab P01General;
         public ValidationTab P02Validation;
-        public UiTab P04Ui;
-        public InputTimingTab P05InputTiming;
+        public UiTab P03Ui;
+        public InputTimingTab P04InputTiming;
+        public TextTab P05Text;
         public AudioTab P06Audio;
-        public TextTab P07Text;
-        // public QueueTab P08Queue;
-        // public ValidationTab P09Validation;
-        public HookTab P03Hook;
-        public DebugTab P10Debug;
+        public HookTab P07Hook;
+        public DebugTab P08Debug;
 
         public PluginSettingFormData(PluginSettingsState state)
         {
             _state = state;
             P01General = new GeneralTab(_state);
             P02Validation = new ValidationTab(_state);
-            P03Hook = new HookTab(_state);
-            P04Ui = new UiTab(_state);
-            P05InputTiming = new InputTimingTab(_state);
+            P03Ui = new UiTab(_state);
+            P04InputTiming = new InputTimingTab(_state);
+            P05Text = new TextTab(_state);
             P06Audio = new AudioTab(_state);
-            P07Text = new TextTab(_state);
-            // P08Queue = new QueueTab(_state);
-            // P09Validation = new ValidationTab(_state);
-            P10Debug = new DebugTab(_state);
+            P07Hook = new HookTab(_state);
+            P08Debug = new DebugTab(_state);
         }
     }
 

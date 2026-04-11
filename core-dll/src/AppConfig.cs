@@ -7,12 +7,12 @@ namespace VoicepeakProxyCore;
 public sealed class AppConfig
 {
     public ValidationConfig Validation { get; set; } = new ValidationConfig();
-    public HookConfig Hook { get; set; } = new HookConfig();
     public UiConfig Ui { get; set; } = new UiConfig();
     public InputTimingConfig InputTiming { get; set; } = new InputTimingConfig();
-    public AudioConfig Audio { get; set; } = new AudioConfig();
     public TextConfig Text { get; set; } = new TextConfig();
+    public AudioConfig Audio { get; set; } = new AudioConfig();
     public RuntimeConfig Runtime { get; set; } = new RuntimeConfig();
+    public HookConfig Hook { get; set; } = new HookConfig();
     public DebugConfig Debug { get; set; } = new DebugConfig();
 }
 
@@ -106,22 +106,18 @@ internal static class AppConfigValidator
     {
         EnsureNotNull(config, "config は null にできません");
         EnsureNotNull(config.Validation, "validation は null にできません");
-        EnsureNotNull(config.Hook, "hook は null にできません");
         EnsureNotNull(config.Ui, "ui は null にできません");
         EnsureNotNull(config.InputTiming, "inputTiming は null にできません");
-        EnsureNotNull(config.Audio, "audio は null にできません");
         EnsureNotNull(config.Text, "text は null にできません");
+        EnsureNotNull(config.Audio, "audio は null にできません");
         EnsureNotNull(config.Runtime, "runtime は null にできません");
+        EnsureNotNull(config.Hook, "hook は null にできません");
         EnsureNotNull(config.Debug, "debug は null にできません");
         EnsureNotNull(config.Debug.LogMinimumLevel, "debug.logMinimumLevel は null にできません");
 
         EnsureNotNull(config.Validation.ValidationText, "validation.validationText は null にできません");
         EnsureNonNegative(config.Validation.ValidationMaxRetries, "validation.validationMaxRetries は 0 以上で指定してください");
         EnsureNonNegative(config.Validation.ValidationRetryIntervalMs, "validation.validationRetryIntervalMs は 0 以上で指定してください");
-
-        EnsurePositive(config.Hook.HookCommandTimeoutMs, "hook.hookCommandTimeoutMs は 1 以上で指定してください");
-        EnsurePositive(config.Hook.HookConnectTimeoutMs, "hook.hookConnectTimeoutMs は 1 以上で指定してください");
-        EnsurePositive(config.Hook.HookConnectTotalWaitMs, "hook.hookConnectTotalWaitMs は 1 以上で指定してください");
 
         EnsureNonNegative(config.Ui.DelayBeforePlayShortcutMs, "ui.delayBeforePlayShortcutMs は 0 以上で指定してください");
 
@@ -169,6 +165,10 @@ internal static class AppConfigValidator
         EnsurePositive(config.Audio.StartConfirmTimeoutMs, "audio.startConfirmTimeoutMs は 1 以上で指定してください");
         EnsureNonNegative(config.Audio.StartConfirmMaxRetries, "audio.startConfirmMaxRetries は 0 以上で指定してください");
         EnsurePositive(config.Audio.StopConfirmMs, "audio.stopConfirmMs は 1 以上で指定してください");
+
+        EnsurePositive(config.Hook.HookCommandTimeoutMs, "hook.hookCommandTimeoutMs は 1 以上で指定してください");
+        EnsurePositive(config.Hook.HookConnectTimeoutMs, "hook.hookConnectTimeoutMs は 1 以上で指定してください");
+        EnsurePositive(config.Hook.HookConnectTotalWaitMs, "hook.hookConnectTotalWaitMs は 1 以上で指定してください");
 
         if (config.Text.ReplaceRules == null)
         {
