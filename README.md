@@ -1,28 +1,64 @@
-# VoicepeakProxyCore
+# VoicepeakProxy
 
-`VoicepeakProxyCore`は、VOICEPEAKをUI自動操作で制御するWindows環境向けDLLです。
+VoicepeakProxy は、[VOICEPEAK](https://www.ah-soft.com/voice/)のUIを直接操作して低遅延での読み上げを実現するWindows環境向けライブラリです。
 
-- 常駐ランタイムを起動し、複数の発話要求をキュー処理できます
-- 常駐ランタイムを起動せず、1回だけ同期実行する単発APIを実行できます
-- 初期化以外でウィンドウフォーカスを奪わず、VOICEPEAKが他のウィンドウの背面にあっても実行可能です
+本リポジトリは、VOICEPEAKの操作を行う本体ライブラリの `VoicepeakProxyCore.dll` と、このライブラリを棒読みちゃんプラグインとして運用する `VoicepeakProxy for 棒読みちゃん` で構成されています。
 
-## 前提条件
+## できること
+### コンセプト
+- VOICEPEAKの起動済みウィンドウを直接操作し、CLIより低遅延での読み上げを行います。
+- ウィンドウフォーカスを奪わず、PC上の他の作業を阻害しないようにします。
+- VOICEPEAKが他のウィンドウの背面に隠れていても読み上げできる実装にします。
+
+### VoicepeakProxyCore.dll
+- 常駐ランタイムを起動し、複数の読み上げ要求をキュー処理できます。
+- 常駐ランタイムを起動せず、単体で読み上げを行う単発APIを実行できます。
+
+### VoicepeakProxy for 棒読みちゃん
+- 棒読みちゃんに入力された文字列を `VoicepeakProxyCore.dll` 経由でVOICEPEAKに転送し、読み上げを実行できます。
+
+## できないこと
+- 音声ファイルの出力・保存はできません。
+- パラメータ調整やナレーター切り替えの自動操作はできません。
+- ウィンドウを最小化した状態での読み上げはできません。
+
+## 実行環境
 - Windows環境であること
-- `.NET Framework 4.8`実行環境があること
-- `voicepeak.exe`が起動していること
-- config内のショートカット設定がVOICEPEAK側と一致していること
-- VOICEPEAKが1プロセスだけ起動していること
+- `.NET Framework 4.8` 実行環境があること
+- `voicepeak.exe` が1プロセスだけ起動していること
+- config内のショートカット設定(再生/停止、先頭に移動、すべてを選択)がVOICEPEAK側と一致していること
 
 ## 注意点
-- 本DLLはVOICEPEAKのUI構造に依存し、UI仕様やショートカット設定が変わると動作しなくなる可能性があります
-- 先頭移動ショートカットがF1-F12以外の場合、**発話時点で最後にクリックされたウィンドウ内要素が文字入力欄**である必要があります。
-  - 通常は初期化時にクリック操作を行いますが、**起動中にウィンドウをクリックしてしまった場合**などは、**手動で文字入力欄を一度クリック**してから発話を再実行してください。
-  - 先頭移動ショートカットをF1-F12にした場合はこの操作が不要になります。
+- `VOICEPEAK 1.2.21` を前提に作成されており、バージョンが異なると動作しない可能性があります。
+- 実行時、操作対象のVOICEPEAKプロセスに対してDLL注入とAPIフックを行います。
+  - VOICEPEAKでの文字入力時の保護と、ショートカット実行時のWindows警告音を除去するため、プロセス側にフックを注入する実装になっています。
+  - VOICEPEAKを再起動すればプレーンな状態に戻ります。
+- 本プロジェクトはVOICEPEAKおよび棒読みちゃんの公式プロジェクトではありません。
 
 
-## 最短利用例
+## VoicepeakProxy for 棒読みちゃん: マニュアル
+### 初期設定
+1. Release で配布されている最新のプラグインをダウンロード・解凍してください。
+1. `Plugin_VoicepeakProxy.dll` と `VoicepeakProxyWorker` ディレクトリを、棒読みちゃんの本体(BouyomiChan.exe)があるディレクトリにそれぞれ配置してください。
+1. VOICEPEAKを起動してください。
+1. 棒読みちゃんを起動し、その他タブからプラグインタブを開いて `VoicepeakProxy for 棒読みちゃん` のチェックボックスを有効化してください。
+   - 起動失敗ダイアログが出た場合は無視してください。
+1. `VoicepeakProxy for 棒読みちゃん` を選択した状態で右下の設定ボタンから設定を開き、 `UI操作・ショートカット` の各ショートカット設定(先頭に移動、すべてを選択、再生/停止)にVOICEPEAKのショートカットキー設定を写してください。
+   - VOICEPEAK側のショートカットキー設定をデフォルトのまま変更していない場合、棒読みちゃん側も変更せずそのままで問題ありません。
+1. 必要に応じて、棒読みちゃん側設定画面 `プラグイン` 内の自動起動設定にVOICEPEAK本体へのパスを指定してください。
+1. 設定が終わったらOKを押して設定画面を閉じ、棒読みちゃんを再起動してください。
+1. "初期化完了"の音声が流れれば初期設定は完了です。
+   - "初期化完了"の冒頭が途切れる場合がありますが、それ以降の読み上げは問題ありません。
 
-### 単発実行
+### 使用方法
+- 上記初期設定の完了後は、VOICEPEAK起動後に棒読みちゃんを起動すれば読み上げ準備が完了します。
+- 自動起動設定にVOICEPEAKの.exeパスを指定していれば、棒読みちゃん起動時にVOICEPEAKも自動で起動されます。
+
+## VoicepeakProxyCore.dll: マニュアル
+### 使用方法
+Release で配布されている最新のライブラリをダウンロード・解凍し、下記を参考に任意の環境で実装を行ってください。
+
+### 単発実行API使用例
 
 ```csharp
 using VoicepeakProxyCore;
@@ -36,7 +72,7 @@ SpeakOnceResult result = VoicepeakOneShot.SpeakOnce(
 Console.WriteLine($"status={result.Status} ok={result.Succeeded} segments={result.SegmentsExecuted}");
 ```
 
-### 常駐ランタイム
+### 常駐ランタイムAPI使用例
 
 ```csharp
 using VoicepeakProxyCore;
@@ -54,45 +90,10 @@ EnqueueResult result = runtime.Enqueue(new SpeakRequest
 Console.WriteLine($"status={result.Status} jobId={result.JobId} error={result.ErrorMessage}");
 ```
 
-## 公開API概要
-### 常駐実行用
-- `VoicepeakRuntime.Start(AppConfig config, IAppLogger logger = null)`
-  - 常駐ランタイムを起動します
-  - 設定検証と起動時バリデーションを行います
-- `VoicepeakRuntime.Enqueue(SpeakRequest request)`
-  - 発話要求を非同期受理します
-  - 戻り値は`EnqueueResult`です
-- `VoicepeakRuntime.Stop()`
-  - 新規受理を停止します
-- `VoicepeakRuntime.Dispose()`
-  - ランタイムを破棄します
+### 詳細ドキュメント
+- [APIエンドポイント詳細](docs/api-reference.md)
+- [ビルド方法](docs/build-from-source.md)
+- [設定値詳細](docs/configuration.md)
 
-### 単発実行用
-- `VoicepeakOneShot.SpeakOnce(AppConfig config, SpeakOnceRequest request, IAppLogger logger = null)`
-  - 発話を1回だけ実行し、発話の開始を確認したら即完了とします。
-  - 戻り値は`SpeakOnceResult`です
-- `VoicepeakOneShot.SpeakOnceWait(AppConfig config, SpeakOnceRequest request, IAppLogger logger = null)`
-  - 発話を1回だけ実行し、発話終了まで待機してから完了します。
-  - 戻り値は`SpeakOnceResult`です
-- `VoicepeakOneShot.ValidateInputOnce(AppConfig config, IAppLogger logger = null)`
-  - 入力検証と発話確認を1回実行します。
-  - `config.Prepare.BootValidationText`を検証文言として使用します。
-  - 戻り値は`ValidateInputOnceResult`です
-- `VoicepeakOneShot.ClearInputOnce(AppConfig config, IAppLogger logger = null)`
-  - 入力欄のクリアを1回実行します。
-  - 戻り値は`ClearInputOnceResult`です
-
-### 例外
-- `config == null`は`ArgumentNullException`
-- 常駐ランタイムの`request == null`は`ArgumentNullException`
-- `Stop()`後の`Enqueue(...)`は`InvalidOperationException`
-- `Dispose()`後の`Enqueue(...)`は`ObjectDisposedException`
-- 入力内容不正は`EnqueueResult.Status`または`SpeakOnceResult.Status`で返す場合があります
-
-## 詳細ドキュメント
-
-- API詳細:`docs/usage/api-reference.md`
-- 設定詳細:`docs/usage/configuration.md`
-- トラブルシューティング:`docs/usage/troubleshooting.md`
-- 実行モデルと状態遷移:`docs/dev/runtime-model.md`
-- ソースからのビルド:`docs/dev/build-from-source.md`
+## License
+[MIT License](LICENSE)

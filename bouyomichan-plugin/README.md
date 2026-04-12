@@ -1,62 +1,56 @@
-# bouyomichan-plugin
+# VoicepeakProxy for 棒読みちゃん
 
-棒読みちゃんから受け取った文字列を`VoicepeakProxyCore.dll`経由でVOICEPEAKへ読み上げる連携実装です。
+棒読みちゃんから受け取った文字列を `VoicepeakProxyCore.dll` 経由でVOICEPEAKへ転送し、読み上げを行うプラグインです。
 
 ## 構成
 
 - `Plugin_VoicepeakProxy/`
   - 棒読みちゃんプラグイン本体です。
-  - `TalkTaskStarted`を受けて文字列をWorkerへ同期送信します。
-  - 棒読みちゃん既定音声は常に抑止します。
 - `VoicepeakProxyWorker/`
-  - 補助プロセスです。
-  - `VoicepeakOneShot.SpeakOnceWait`でVOICEPEAK読み上げを同期実行します。
+  - `VoicepeakProxyCore.dll` を動かすための補助プロセスです。
+  - `VoicepeakOneShot.SpeakOnceWait` 経由でVOICEPEAK読み上げを実行します。
 - `Shared/`
   - PluginとWorkerの共通モデルです。
 
-## ビルド
+## ビルド手順
 
-### 1) Worker(.NET Framework 4.8)
+### 1. Worker(.NET Framework 4.8)
 
 ```powershell
 dotnet build "bouyomichan-plugin/VoicepeakProxyWorker/VoicepeakProxyWorker.csproj" -c Release
 ```
 
-### 2) Plugin(.NET Framework 3.5)
+### 2. Plugin(.NET Framework 3.5)
 
 棒読みちゃん本体への参照が必要です。
 
 ```powershell
-msbuild "bouyomichan-plugin/Plugin_VoicepeakProxy/Plugin_VoicepeakProxy.csproj" /p:Configuration=Release /p:Platform=x86 /p:BouyomiChanExePath="D:\Program Files\BouyomiChan_0_1_11_0_Beta21\BouyomiChan.exe"
+msbuild "bouyomichan-plugin/Plugin_VoicepeakProxy/Plugin_VoicepeakProxy.csproj" /p:Configuration=Release /p:Platform=x86 /p:BouyomiChanExePath="{棒読みちゃん本体ディレクトリへのパス}\BouyomiChan.exe"
 ```
 
 ## 配置
 
-棒読みちゃんフォルダへ以下を配置します。
+棒読みちゃんフォルダへビルド生成物を配置します。
 
 - `Plugin_VoicepeakProxy.dll`
 - `VoicepeakProxyWorker/VoicepeakProxyWorker.exe`
 - `VoicepeakProxyWorker/VoicepeakProxyCore.dll`
-- `VoicepeakProxyWorker/NAudio.Core.dll`
-- `VoicepeakProxyWorker/NAudio.Wasapi.dll`
-
-## 設定
-
-- 初回起動時に`Plugin_VoicepeakProxy_setting.json`を自動生成します。
-- 設定画面は棒読みちゃんのプラグイン設定ボタンから開きます。
-- `AppConfig`の各項目はタブ分割で編集できます。
-- 既定のPipe名は`voicepeak_proxy_bridge`です。
-- Worker実行ファイルは`VoicepeakProxyWorker/VoicepeakProxyWorker.exe`固定で解決します。
-- Plugin起動時にWorkerは必ず起動し、起動時検証が成功した場合のみ受信を開始します。
-- Plugin起動時は既存Workerを再利用せず、新規Workerを起動します。
-- Workerは親プロセスPIDを監視し、棒読みちゃん終了時は自動終了します。
-- Plugin側ではJob ObjectでWorkerを管理し、親プロセス異常終了時もWorkerを残しません。
-- Worker起動待機は最大30秒で、500ms間隔で受信準備完了を確認します。
-- PluginとWorkerは独自キューを持たず、棒読みちゃんのキュー順で1件ずつ処理します。
-- ログは棒読みちゃんフォルダ直下の`Plugin_VoicepeakProxy_plugin.log`と`Plugin_VoicepeakProxy_worker.log`へ出力します。
+- `VoicepeakProxyWorker/VoicepeakProxyCore.deps/`
+  - `EasyHook*`
+  - `EasyLoad*`
+  - `NAudio*`
 
 ## 仕様
 
-- テキストは`ReplaceWord`優先で取得し、空の場合のみ`SourceText`を使用します。
-- 棒読みちゃん既定音声は常に抑止します。
-- Worker未接続時は例外を送出して処理を停止します。
+- 初回起動時に設定ファイル `Plugin_VoicepeakProxy_setting.json` を自動生成します。
+  - 設定は棒読みちゃんのプラグイン設定から修正できます。
+- `プラグイン > VOICEPEAK自動起動用本体パス`を設定している場合、起動時に`voicepeak`プロセスが0件の場合のみVOICEPEAKを自動起動します。
+  - 既に`voicepeak`プロセスが存在する場合や2つ以上起動している場合は自動起動を行いません。
+- `プラグイン > VOICEPEAK自動起動用.vppファイルパス`を設定すると、VOICEPEAK自動起動時に指定した`.vpp`を開きます。
+- 自動起動待機は最大30秒で、VOICEPEAKメインウィンドウの生成完了を待機してからWorker起動へ進みます。
+- Worker実行ファイルは `VoicepeakProxyWorker/VoicepeakProxyWorker.exe` 固定で解決するため、ディレクトリ名は変更しないでください。
+- PluginとWorkerは独自キューを持たず、棒読みちゃんのキュー順で1件ずつ処理します。
+- ログは棒読みちゃんフォルダ直下の `Plugin_VoicepeakProxy_plugin.log` と `Plugin_VoicepeakProxy_worker.log` へそれぞれ出力します。
+  - 容量削減のため、ログファイルの内容は起動ごとにクリアされます。
+  - `Debug.logMinimumLevel`は`debug`/`info`/`warn`/`error`を指定でき、指定レベル未満のログは出力されません。
+
