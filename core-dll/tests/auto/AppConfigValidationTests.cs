@@ -79,9 +79,13 @@ public class AppConfigValidationTests
         // 数値境界を検証
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Runtime.MaxQueuedJobs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.PollIntervalMs = 0));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.PeakThreshold = 0f));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.PeakThreshold = -0.1f));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.StartConfirmTimeoutMs = 0));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.StartConfirmMaxRetries = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.StopConfirmMs = 0));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.MaxSpeakingDurationSec = 0));
+        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Audio.MaxSpeakingDurationSec = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.ActionDelayMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Validation.ValidationMaxRetries = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Validation.ValidationRetryIntervalMs = -1));
@@ -247,9 +251,11 @@ public class AppConfigValidationTests
         {
             config.Runtime.MaxQueuedJobs = 0;
             config.Audio.PollIntervalMs = 1;
+            config.Audio.PeakThreshold = float.Epsilon;
             config.Audio.StartConfirmTimeoutMs = 1;
             config.Audio.StartConfirmMaxRetries = 0;
             config.Audio.StopConfirmMs = 1;
+            config.Audio.MaxSpeakingDurationSec = 1;
             config.InputTiming.ActionDelayMs = 0;
             config.Validation.ValidationMaxRetries = 0;
             config.Validation.ValidationRetryIntervalMs = 0;

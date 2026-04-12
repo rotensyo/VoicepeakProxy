@@ -162,9 +162,11 @@ internal static class AppConfigValidator
         EnsurePositive(config.InputTiming.ClearInputMaxPasses, "inputTiming.clearInputMaxPasses は 1 以上で指定してください");
 
         EnsurePositive(config.Audio.PollIntervalMs, "audio.pollIntervalMs は 1 以上で指定してください");
+        EnsurePositiveFloat(config.Audio.PeakThreshold, "audio.peakThreshold は 0 より大きい値を指定してください");
         EnsurePositive(config.Audio.StartConfirmTimeoutMs, "audio.startConfirmTimeoutMs は 1 以上で指定してください");
         EnsureNonNegative(config.Audio.StartConfirmMaxRetries, "audio.startConfirmMaxRetries は 0 以上で指定してください");
         EnsurePositive(config.Audio.StopConfirmMs, "audio.stopConfirmMs は 1 以上で指定してください");
+        EnsurePositive(config.Audio.MaxSpeakingDurationSec, "audio.maxSpeakingDurationSec は 1 以上で指定してください");
 
         EnsurePositive(config.Hook.HookCommandTimeoutMs, "hook.hookCommandTimeoutMs は 1 以上で指定してください");
         EnsurePositive(config.Hook.HookConnectTimeoutMs, "hook.hookConnectTimeoutMs は 1 以上で指定してください");
@@ -205,6 +207,15 @@ internal static class AppConfigValidator
     private static void EnsurePositive(int value, string message)
     {
         if (value <= 0)
+        {
+            throw new InvalidOperationException(message);
+        }
+    }
+
+    // 0より大きい浮動小数を検証
+    private static void EnsurePositiveFloat(float value, string message)
+    {
+        if (value <= 0f)
         {
             throw new InvalidOperationException(message);
         }

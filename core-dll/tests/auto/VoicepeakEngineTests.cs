@@ -265,10 +265,7 @@ public class VoicepeakEngineTests
             IsAliveHandler = _ => false
         };
 
-        using CancellationTokenSource cts = new CancellationTokenSource();
-        VoicepeakEngine engine = CreateEngine(ui: ui, appCts: cts);
-
-        object result = ReflectionTestHelper.InvokeCoreInstance(engine, "RunInputValidate", Process.GetCurrentProcess(), IntPtr.Zero, "abc", 0, false);
+        object result = InvokeInputValidateCore(ui, "abc", 0, false);
 
         AssertInputValidate(result, false, "process_not_alive", "voicepeak_process_exited_or_unavailable");
     }
@@ -282,10 +279,7 @@ public class VoicepeakEngineTests
             ClearInputHandler = () => false
         };
 
-        using CancellationTokenSource cts = new CancellationTokenSource();
-        VoicepeakEngine engine = CreateEngine(ui: ui, appCts: cts);
-
-        object result = ReflectionTestHelper.InvokeCoreInstance(engine, "RunInputValidate", Process.GetCurrentProcess(), IntPtr.Zero, "abc", 0, false);
+        object result = InvokeInputValidateCore(ui, "abc", 0, false);
 
         AssertInputValidate(result, false, "clear_input_failed", "move_to_start_or_delete_not_applied");
     }
@@ -299,10 +293,7 @@ public class VoicepeakEngineTests
             TypeTextHandler = (_, _, _) => false
         };
 
-        using CancellationTokenSource cts = new CancellationTokenSource();
-        VoicepeakEngine engine = CreateEngine(ui: ui, appCts: cts);
-
-        object result = ReflectionTestHelper.InvokeCoreInstance(engine, "RunInputValidate", Process.GetCurrentProcess(), IntPtr.Zero, "abc", 0, false);
+        object result = InvokeInputValidateCore(ui, "abc", 0, false);
 
         AssertInputValidate(result, false, "type_text_failed", "wm_char_input_failed");
     }
@@ -330,10 +321,7 @@ public class VoicepeakEngineTests
         FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
         ui.ReadInputHandler = _ => ReadInputResult.Fail(ReadInputSource.Exception, string.Empty, 0);
 
-        using CancellationTokenSource cts = new CancellationTokenSource();
-        VoicepeakEngine engine = CreateEngine(ui: ui, appCts: cts);
-
-        object result = ReflectionTestHelper.InvokeCoreInstance(engine, "RunInputValidate", Process.GetCurrentProcess(), IntPtr.Zero, "abc", 0, false);
+        object result = InvokeInputValidateCore(ui, "abc", 0, false);
 
         AssertInputValidate(result, false, "read_input_failed", "read_input_source_Exception");
     }
@@ -345,10 +333,7 @@ public class VoicepeakEngineTests
         FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
         ui.ReadInputHandler = _ => ReadInputResult.Ok("AabcX", 5, ReadInputSource.PrimaryUiA);
 
-        using CancellationTokenSource cts = new CancellationTokenSource();
-        VoicepeakEngine engine = CreateEngine(ui: ui, appCts: cts);
-
-        object result = ReflectionTestHelper.InvokeCoreInstance(engine, "RunInputValidate", Process.GetCurrentProcess(), IntPtr.Zero, "abc", 0, true);
+        object result = InvokeInputValidateCore(ui, "abc", 0, true);
 
         AssertInputValidate(result, false, "text_mismatch", "leading_guard_remaining_move_to_start_or_delete_issue");
         Assert.AreEqual("AabcX", ReflectionTestHelper.GetProperty(result, "ActualText"));
@@ -360,10 +345,7 @@ public class VoicepeakEngineTests
         // 入力検証成功を返却
         FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
 
-        using CancellationTokenSource cts = new CancellationTokenSource();
-        VoicepeakEngine engine = CreateEngine(ui: ui, appCts: cts);
-
-        object result = ReflectionTestHelper.InvokeCoreInstance(engine, "RunInputValidate", Process.GetCurrentProcess(), IntPtr.Zero, "abc", 0, true);
+        object result = InvokeInputValidateCore(ui, "abc", 0, true);
 
         AssertInputValidate(result, true, string.Empty, string.Empty);
         CollectionAssert.AreEqual(new[] { "Aabc" }, ui.TypedTexts);
@@ -375,10 +357,7 @@ public class VoicepeakEngineTests
         // 入力欄準備を前後で実施
         FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
 
-        using CancellationTokenSource cts = new CancellationTokenSource();
-        VoicepeakEngine engine = CreateEngine(ui: ui, appCts: cts);
-
-        object result = ReflectionTestHelper.InvokeCoreInstance(engine, "RunInputValidate", Process.GetCurrentProcess(), IntPtr.Zero, "abc", 0, true);
+        object result = InvokeInputValidateCore(ui, "abc", 0, true);
 
         AssertInputValidate(result, true, string.Empty, string.Empty);
         CollectionAssert.AreEqual(
@@ -491,9 +470,23 @@ public class VoicepeakEngineTests
     {
         FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
         configure(ui);
-        using CancellationTokenSource cts = new CancellationTokenSource();
-        VoicepeakEngine engine = CreateEngine(ui: ui, appCts: cts);
-        return ReflectionTestHelper.InvokeCoreInstance(engine, "RunInputValidate", Process.GetCurrentProcess(), IntPtr.Zero, "abc", 0, true);
+        return InvokeInputValidateCore(ui, "abc", 0, true);
+    }
+
+    // 入力検証コアを直接呼び出し
+    private static object InvokeInputValidateCore(FakeVoicepeakUiController ui, string text, int charDelay, bool useProbeGuardChars)
+    {
+        AppConfig config = CreateEngineConfig();
+        return ReflectionTestHelper.InvokeCoreStatic(
+            "JobExecutionCore",
+            "ValidateInputText",
+            config,
+            ui,
+            Process.GetCurrentProcess(),
+            IntPtr.Zero,
+            text,
+            charDelay,
+            useProbeGuardChars);
     }
 
     private static void AssertInputValidate(object result, bool success, string reason, string cause)

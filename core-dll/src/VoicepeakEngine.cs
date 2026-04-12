@@ -415,13 +415,6 @@ internal sealed class VoicepeakEngine : IDisposable
             }
         }
     }
-
-
-    private InputValidateResult RunInputValidate(Process process, IntPtr hwnd, string text, int charDelay, bool useProbeGuardChars)
-    {
-        return JobExecutionCore.ValidateInputText(_config, _ui, process, hwnd, text, charDelay, useProbeGuardChars);
-    }
-
     internal static int ComputePostTypeWaitMs(string text, int perCharMs, int minMs)
     {
         return JobExecutionCore.ComputePostTypeWaitMs(text, perCharMs, minMs);
@@ -499,11 +492,6 @@ internal sealed class VoicepeakEngine : IDisposable
                 ? ResolveTargetFailureReason.MultipleProcesses
                 : ResolveTargetFailureReason.TargetNotFound;
         ResolveTargetFailureMapper.LogFailure(_log, reason, processCount);
-    }
-
-    private static string EscapeForJson(string s)
-    {
-        return (s ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
     }
 
 }
