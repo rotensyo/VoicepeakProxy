@@ -147,6 +147,7 @@ public class RuntimeAndOneShotTests
         AppConfig config = new AppConfig();
         config.Runtime.BootValidation = BootValidationMode.Disabled;
         config.Runtime.MaxQueuedJobs = 10;
+        config.Debug.LogMinimumLevel = "info";
         return config;
     }
 }

@@ -100,13 +100,7 @@ public static class VoicepeakOneShot
         AppConfig config,
         IAppLogger logger = null)
     {
-        if (config == null)
-        {
-            throw new ArgumentNullException(nameof(config));
-        }
-
-        AppConfigValidator.Validate(config);
-        AppLogger log = new AppLogger(logger ?? new ConsoleAppLogger());
+        AppLogger log = InitializeApiCall(config, logger);
 
         return ValidateInputOnceCore(
             config,
@@ -243,13 +237,7 @@ public static class VoicepeakOneShot
         AppConfig config,
         IAppLogger logger = null)
     {
-        if (config == null)
-        {
-            throw new ArgumentNullException(nameof(config));
-        }
-
-        AppConfigValidator.Validate(config);
-        AppLogger log = new AppLogger(logger ?? new ConsoleAppLogger());
+        AppLogger log = InitializeApiCall(config, logger);
 
         return ClearInputOnceCore(
             config,
@@ -325,13 +313,7 @@ public static class VoicepeakOneShot
         SpeakOnceRequest request,
         IAppLogger logger = null)
     {
-        if (config == null)
-        {
-            throw new ArgumentNullException(nameof(config));
-        }
-
-        AppConfigValidator.Validate(config);
-        AppLogger log = new AppLogger(logger ?? new ConsoleAppLogger());
+        AppLogger log = InitializeApiCall(config, logger);
 
         return SpeakOnceCore(
             config,
@@ -366,13 +348,7 @@ public static class VoicepeakOneShot
         SpeakOnceRequest request,
         IAppLogger logger = null)
     {
-        if (config == null)
-        {
-            throw new ArgumentNullException(nameof(config));
-        }
-
-        AppConfigValidator.Validate(config);
-        AppLogger log = new AppLogger(logger ?? new ConsoleAppLogger());
+        AppLogger log = InitializeApiCall(config, logger);
 
         return SpeakOnceWaitCore(
             config,
@@ -399,6 +375,18 @@ public static class VoicepeakOneShot
             waitForCompletion: true,
             stripPauseTokens: false,
             operationName: "oneshot_speak_wait");
+    }
+
+    // 公開API呼び出しの共通初期化
+    private static AppLogger InitializeApiCall(AppConfig config, IAppLogger logger)
+    {
+        if (config == null)
+        {
+            throw new ArgumentNullException(nameof(config));
+        }
+
+        AppConfigValidator.Validate(config);
+        return new AppLogger(logger ?? new ConsoleAppLogger(), config.Debug.LogMinimumLevel);
     }
 
     // 単発実行の共通本体

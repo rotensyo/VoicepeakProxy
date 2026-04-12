@@ -644,7 +644,7 @@ namespace Plugin_VoicepeakProxy
 
         [Category("Debug")]
         [DisplayName("03)logMinimumLevel")]
-        [Description("ログレベルを変更します。info/warnで指定できます。")]
+        [Description("ログレベルをdebug/info/warn/errorで指定します。")]
         public string LogMinimumLevel
         {
             get { return State.Settings.AppConfig.Debug.LogMinimumLevel; }

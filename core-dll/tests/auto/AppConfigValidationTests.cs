@@ -37,8 +37,8 @@ public class AppConfigValidationTests
         Assert.AreEqual(string.Empty, config.Ui.PlayShortcutModifier);
         Assert.AreEqual("spacebar", config.Ui.PlayShortcutKey);
         Assert.IsFalse(config.Text.SplitInputBlockOnNewline);
-        Assert.AreEqual(BootValidationMode.Required, config.Runtime.BootValidation);
         Assert.AreEqual("warn", config.Debug.LogMinimumLevel);
+        Assert.AreEqual(BootValidationMode.Required, config.Runtime.BootValidation);
     }
 
     [TestMethod]
@@ -97,7 +97,6 @@ public class AppConfigValidationTests
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Hook.HookConnectTimeoutMs = 0));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Hook.HookConnectTotalWaitMs = 0));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Ui.DelayBeforePlayShortcutMs = -1));
-        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Debug.LogMinimumLevel = "error"));
     }
 
     [TestMethod]
@@ -200,6 +199,37 @@ public class AppConfigValidationTests
     }
 
     [TestMethod]
+    public void Validate_LogMinimumLevel_AllowedValues_AreAccepted()
+    {
+        // ログ最小レベルの許容値を検証
+        ValidateWith(config => config.Debug.LogMinimumLevel = "debug");
+        ValidateWith(config => config.Debug.LogMinimumLevel = "info");
+        ValidateWith(config => config.Debug.LogMinimumLevel = "warn");
+        ValidateWith(config => config.Debug.LogMinimumLevel = "error");
+        ValidateWith(config => config.Debug.LogMinimumLevel = "  WARN  ");
+    }
+
+    [TestMethod]
+    public void Validate_LogMinimumLevel_InvalidValue_Throws()
+    {
+        // ログ最小レベル不正値を拒否
+        InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
+            ValidateWith(config => config.Debug.LogMinimumLevel = "trace"));
+
+        StringAssert.Contains(ex.Message, "debug.logMinimumLevel");
+    }
+
+    [TestMethod]
+    public void Validate_LogMinimumLevel_Null_Throws()
+    {
+        // ログ最小レベルnullを拒否
+        InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
+            ValidateWith(config => config.Debug.LogMinimumLevel = null));
+
+        StringAssert.Contains(ex.Message, "debug.logMinimumLevel");
+    }
+
+    [TestMethod]
     public void Validate_ReplaceRulesNull_Throws()
     {
         // 置換ルールnullを拒否
@@ -235,7 +265,6 @@ public class AppConfigValidationTests
             config.Hook.HookConnectTimeoutMs = 1;
             config.Hook.HookConnectTotalWaitMs = 1;
             config.Ui.DelayBeforePlayShortcutMs = 0;
-            config.Debug.LogMinimumLevel = "info";
         });
     }
 

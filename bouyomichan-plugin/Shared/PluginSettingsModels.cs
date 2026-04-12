@@ -270,13 +270,16 @@ public sealed class UiConfigData
         {
             string raw = LogMinimumLevel ?? string.Empty;
             string normalized = raw.Trim().ToLowerInvariant();
-            if (string.IsNullOrEmpty(normalized))
+            if (normalized == "debug"
+                || normalized == "info"
+                || normalized == "warn"
+                || normalized == "error")
             {
-                LogMinimumLevel = "warn";
+                LogMinimumLevel = normalized;
                 return;
             }
 
-            LogMinimumLevel = normalized;
+            LogMinimumLevel = "warn";
         }
     }
 

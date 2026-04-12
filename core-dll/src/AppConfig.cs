@@ -177,22 +177,10 @@ internal static class AppConfigValidator
 
         if (!IsValidLogMinimumLevel(config.Debug.LogMinimumLevel))
         {
-            throw new InvalidOperationException("debug.logMinimumLevel は info/warn のいずれかを指定してください");
+            throw new InvalidOperationException("debug.logMinimumLevel は debug/info/warn/error のいずれかを指定してください");
         }
 
         EnsureNonNegative(config.Runtime.MaxQueuedJobs, "runtime.maxQueuedJobs は 0 以上で指定してください");
-    }
-
-    // ログ最小レベル文字列を検証
-    private static bool IsValidLogMinimumLevel(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return false;
-        }
-
-        string normalized = value.Trim().ToLowerInvariant();
-        return normalized == "info" || normalized == "warn";
     }
 
     // null禁止を検証
@@ -220,5 +208,15 @@ internal static class AppConfigValidator
         {
             throw new InvalidOperationException(message);
         }
+    }
+
+    // ログ最小レベルの許容値を検証
+    private static bool IsValidLogMinimumLevel(string value)
+    {
+        string normalized = value.Trim().ToLowerInvariant();
+        return normalized == "debug"
+            || normalized == "info"
+            || normalized == "warn"
+            || normalized == "error";
     }
 }

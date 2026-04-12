@@ -340,8 +340,10 @@ internal sealed class WorkerFileLogger : IAppLogger, IDisposable
 {
     private enum LogMinimumLevel
     {
-        Info,
-        Warn
+        Debug = 10,
+        Info = 20,
+        Warn = 30,
+        Error = 40
     }
 
     private readonly object _sync = new object();
@@ -366,6 +368,11 @@ internal sealed class WorkerFileLogger : IAppLogger, IDisposable
 
     public void Debug(string message)
     {
+        if (!ShouldWriteDebug())
+        {
+            return;
+        }
+
         Write("DEBUG", message);
     }
 
@@ -381,12 +388,31 @@ internal sealed class WorkerFileLogger : IAppLogger, IDisposable
 
     public void Warn(string message)
     {
+        if (!ShouldWriteWarn())
+        {
+            return;
+        }
+
         Write("WARN", message);
     }
 
     public void Error(string message)
     {
+        if (!ShouldWriteError())
+        {
+            return;
+        }
+
         Write("ERROR", message);
+    }
+
+    // DEBUG出力可否を判定
+    private bool ShouldWriteDebug()
+    {
+        lock (_sync)
+        {
+            return _minimumLevel <= LogMinimumLevel.Debug;
+        }
     }
 
     // ログ1行を書き込む
@@ -404,7 +430,25 @@ internal sealed class WorkerFileLogger : IAppLogger, IDisposable
     {
         lock (_sync)
         {
-            return _minimumLevel == LogMinimumLevel.Info;
+            return _minimumLevel <= LogMinimumLevel.Info;
+        }
+    }
+
+    // WARN出力可否を判定
+    private bool ShouldWriteWarn()
+    {
+        lock (_sync)
+        {
+            return _minimumLevel <= LogMinimumLevel.Warn;
+        }
+    }
+
+    // ERROR出力可否を判定
+    private bool ShouldWriteError()
+    {
+        lock (_sync)
+        {
+            return _minimumLevel <= LogMinimumLevel.Error;
         }
     }
 
@@ -415,6 +459,16 @@ internal sealed class WorkerFileLogger : IAppLogger, IDisposable
         if (normalized == "info")
         {
             return LogMinimumLevel.Info;
+        }
+
+        if (normalized == "warn")
+        {
+            return LogMinimumLevel.Warn;
+        }
+
+        if (normalized == "error")
+        {
+            return LogMinimumLevel.Error;
         }
 
         return LogMinimumLevel.Warn;

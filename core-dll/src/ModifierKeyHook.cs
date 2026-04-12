@@ -68,7 +68,7 @@ internal sealed class ModifierKeyHookController
         {
             if (_pid == pid && IsConnected() && TryPing())
             {
-                log.Info($"modifier_hook_reused pid={pid}");
+                log.Debug($"modifier_hook_reused pid={pid}");
                 return true;
             }
 
@@ -77,7 +77,7 @@ internal sealed class ModifierKeyHookController
             if (TryConnectExisting(pid, log, _hookConnectTimeoutMs))
             {
                 _pid = pid;
-                log.Info($"modifier_hook_reused pid={pid}");
+                log.Debug($"modifier_hook_reused pid={pid}");
                 return true;
             }
 
@@ -85,7 +85,7 @@ internal sealed class ModifierKeyHookController
             if (!injected && TryConnectExisting(pid, log, _hookConnectTimeoutMs))
             {
                 _pid = pid;
-                log.Info($"modifier_hook_reused pid={pid}");
+                log.Debug($"modifier_hook_reused pid={pid}");
                 return true;
             }
 
@@ -96,7 +96,14 @@ internal sealed class ModifierKeyHookController
             }
 
             _pid = pid;
-            log.Info(injected ? $"modifier_hook_injected pid={pid}" : $"modifier_hook_reused pid={pid}");
+            if (injected)
+            {
+                log.Info($"modifier_hook_injected pid={pid}");
+            }
+            else
+            {
+                log.Debug($"modifier_hook_reused pid={pid}");
+            }
             return true;
         }
     }
@@ -185,7 +192,7 @@ internal sealed class ModifierKeyHookController
             return false;
         }
 
-        log.Info($"modifier_hook_override mode={mode}");
+        log.Debug($"modifier_hook_override mode={mode}");
         return true;
     }
 

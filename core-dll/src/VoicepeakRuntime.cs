@@ -46,7 +46,7 @@ public sealed class VoicepeakRuntime : IDisposable
         }
 
         AppConfigValidator.Validate(config);
-        AppLogger appLogger = new AppLogger(logger ?? new ConsoleAppLogger());
+        AppLogger appLogger = new AppLogger(logger ?? new ConsoleAppLogger(), config.Debug.LogMinimumLevel);
         appLogger.Info("boot_start");
 
         CancellationTokenSource cts = new CancellationTokenSource();

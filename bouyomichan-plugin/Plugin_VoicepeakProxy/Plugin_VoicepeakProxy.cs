@@ -1033,8 +1033,10 @@ namespace Plugin_VoicepeakProxy
     {
         private enum LogMinimumLevel
         {
-            Info,
-            Warn
+            Debug = 10,
+            Info = 20,
+            Warn = 30,
+            Error = 40
         }
 
         private readonly object _sync = new object();
@@ -1069,11 +1071,21 @@ namespace Plugin_VoicepeakProxy
 
         public void Warn(string message)
         {
+            if (!ShouldWriteWarn())
+            {
+                return;
+            }
+
             Write("WARN", message);
         }
 
         public void Error(string message, string detail)
         {
+            if (!ShouldWriteError())
+            {
+                return;
+            }
+
             Write("ERROR", message + " detail=" + detail);
         }
 
@@ -1092,7 +1104,25 @@ namespace Plugin_VoicepeakProxy
         {
             lock (_sync)
             {
-                return _minimumLevel == LogMinimumLevel.Info;
+                return _minimumLevel <= LogMinimumLevel.Info;
+            }
+        }
+
+        // WARN出力可否を判定
+        private bool ShouldWriteWarn()
+        {
+            lock (_sync)
+            {
+                return _minimumLevel <= LogMinimumLevel.Warn;
+            }
+        }
+
+        // ERROR出力可否を判定
+        private bool ShouldWriteError()
+        {
+            lock (_sync)
+            {
+                return _minimumLevel <= LogMinimumLevel.Error;
             }
         }
 
@@ -1103,6 +1133,16 @@ namespace Plugin_VoicepeakProxy
             if (normalized == "info")
             {
                 return LogMinimumLevel.Info;
+            }
+
+            if (normalized == "warn")
+            {
+                return LogMinimumLevel.Warn;
+            }
+
+            if (normalized == "error")
+            {
+                return LogMinimumLevel.Error;
             }
 
             return LogMinimumLevel.Warn;
