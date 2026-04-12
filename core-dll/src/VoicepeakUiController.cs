@@ -116,12 +116,12 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     {
         return ExecuteWithModifierIsolation(mainHwnd, "clear_input", action: () =>
         {
-            if (!TryParseClearInputSelectAllKey(_ui.ClearInputSelectAllKey, out VirtualKey selectAllKey))
+            if (!ShortcutParser.TryParseClearInputSelectAllKey(_ui.ClearInputSelectAllKey, out VirtualKey selectAllKey))
             {
                 return false;
             }
 
-            if (!TryParseClearInputSelectAllModifier(_ui.ClearInputSelectAllModifier, out ModifierOverrideMode selectAllMode, out bool useSelectAllModifier))
+            if (!ShortcutParser.TryParseClearInputSelectAllModifier(_ui.ClearInputSelectAllModifier, out ModifierOverrideMode selectAllMode, out bool useSelectAllModifier))
             {
                 return false;
             }
@@ -396,12 +396,12 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     {
         return ExecuteWithModifierIsolation(mainHwnd, "press_play", action: () =>
         {
-            if (!TryParsePlayShortcutKey(_ui.PlayShortcutKey, out VirtualKey key))
+            if (!ShortcutParser.TryParsePlayShortcutKey(_ui.PlayShortcutKey, out VirtualKey key))
             {
                 return false;
             }
 
-            if (!TryParsePlayShortcutModifier(_ui.PlayShortcutModifier, out ModifierOverrideMode mode, out bool useModifier))
+            if (!ShortcutParser.TryParsePlayShortcutModifier(_ui.PlayShortcutModifier, out ModifierOverrideMode mode, out bool useModifier))
             {
                 return false;
             }
@@ -432,12 +432,12 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     // 先頭移動ショートカットを送信
     private bool SendMoveToStartShortcut(IntPtr mainHwnd)
     {
-        if (!TryParseMoveToStartKey(_ui.MoveToStartKey, out VirtualKey key))
+        if (!ShortcutParser.TryParseMoveToStartKey(_ui.MoveToStartKey, out VirtualKey key))
         {
             return false;
         }
 
-        if (!TryParseMoveToStartModifier(_ui.MoveToStartModifier, out ModifierOverrideMode mode, out bool useModifier))
+        if (!ShortcutParser.TryParseMoveToStartModifier(_ui.MoveToStartModifier, out ModifierOverrideMode mode, out bool useModifier))
         {
             return false;
         }
@@ -511,206 +511,246 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     // 再生ショートカット修飾子の妥当性を判定
     internal static bool IsValidPlayShortcutModifier(string raw)
     {
-        return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAltShift, out _, out _);
+        return ShortcutParser.IsValidPlayShortcutModifier(raw);
     }
 
     // 再生ショートカットキーの妥当性を判定
     internal static bool IsValidPlayShortcutKey(string raw)
     {
-        return TryParseShortcutKey(raw, out _);
+        return ShortcutParser.IsValidPlayShortcutKey(raw);
     }
 
     internal static bool IsValidMoveToStartModifier(string raw)
     {
-        return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAlt, out _, out _);
+        return ShortcutParser.IsValidMoveToStartModifier(raw);
     }
 
     internal static bool IsValidMoveToStartKey(string raw)
     {
-        return TryParseShortcutKey(raw, out _);
+        return ShortcutParser.IsValidMoveToStartKey(raw);
     }
 
     internal static bool IsValidClearInputSelectAllModifier(string raw)
     {
-        return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAlt, out _, out _);
+        return ShortcutParser.IsValidClearInputSelectAllModifier(raw);
     }
 
     internal static bool IsValidClearInputSelectAllKey(string raw)
     {
-        return TryParseShortcutKey(raw, out _);
+        return ShortcutParser.IsValidClearInputSelectAllKey(raw);
     }
 
-    // 再生ショートカット修飾子を解析
-    private static bool TryParsePlayShortcutModifier(string raw, out ModifierOverrideMode mode, out bool useModifier)
+    // ショートカット解析を集約
+    private static class ShortcutParser
     {
-        return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAltShift, out mode, out useModifier);
-    }
-
-    // 再生ショートカットキーを解析
-    private static bool TryParsePlayShortcutKey(string raw, out VirtualKey key)
-    {
-        return TryParseShortcutKey(raw, out key);
-    }
-
-    // 先頭移動の修飾子設定を解析
-    private static bool TryParseMoveToStartModifier(string raw, out ModifierOverrideMode mode, out bool useModifier)
-    {
-        return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAlt, out mode, out useModifier);
-    }
-
-    // 先頭移動キー設定を解析
-    private static bool TryParseMoveToStartKey(string raw, out VirtualKey key)
-    {
-        return TryParseShortcutKey(raw, out key);
-    }
-
-    // 全選択の修飾子設定を解析
-    private static bool TryParseClearInputSelectAllModifier(string raw, out ModifierOverrideMode mode, out bool useModifier)
-    {
-        return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAlt, out mode, out useModifier);
-    }
-
-    // 全選択キー設定を解析
-    private static bool TryParseClearInputSelectAllKey(string raw, out VirtualKey key)
-    {
-        return TryParseShortcutKey(raw, out key);
-    }
-
-    // 共通ショートカット修飾子を解析
-    private static bool TryParseShortcutModifier(string raw, ModifierAllowance allowance, out ModifierOverrideMode mode, out bool useModifier)
-    {
-        mode = ModifierOverrideMode.Neutralize;
-        useModifier = false;
-        if (raw == null)
+        // 再生ショートカット修飾子の妥当性を判定
+        public static bool IsValidPlayShortcutModifier(string raw)
         {
+            return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAltShift, out _, out _);
+        }
+
+        // 再生ショートカットキーの妥当性を判定
+        public static bool IsValidPlayShortcutKey(string raw)
+        {
+            return TryParseShortcutKey(raw, out _);
+        }
+
+        // 先頭移動修飾子の妥当性を判定
+        public static bool IsValidMoveToStartModifier(string raw)
+        {
+            return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAlt, out _, out _);
+        }
+
+        // 先頭移動キーの妥当性を判定
+        public static bool IsValidMoveToStartKey(string raw)
+        {
+            return TryParseShortcutKey(raw, out _);
+        }
+
+        // 全選択修飾子の妥当性を判定
+        public static bool IsValidClearInputSelectAllModifier(string raw)
+        {
+            return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAlt, out _, out _);
+        }
+
+        // 全選択キーの妥当性を判定
+        public static bool IsValidClearInputSelectAllKey(string raw)
+        {
+            return TryParseShortcutKey(raw, out _);
+        }
+
+        // 再生ショートカット修飾子を解析
+        public static bool TryParsePlayShortcutModifier(string raw, out ModifierOverrideMode mode, out bool useModifier)
+        {
+            return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAltShift, out mode, out useModifier);
+        }
+
+        // 再生ショートカットキーを解析
+        public static bool TryParsePlayShortcutKey(string raw, out VirtualKey key)
+        {
+            return TryParseShortcutKey(raw, out key);
+        }
+
+        // 先頭移動修飾子を解析
+        public static bool TryParseMoveToStartModifier(string raw, out ModifierOverrideMode mode, out bool useModifier)
+        {
+            return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAlt, out mode, out useModifier);
+        }
+
+        // 先頭移動キーを解析
+        public static bool TryParseMoveToStartKey(string raw, out VirtualKey key)
+        {
+            return TryParseShortcutKey(raw, out key);
+        }
+
+        // 全選択修飾子を解析
+        public static bool TryParseClearInputSelectAllModifier(string raw, out ModifierOverrideMode mode, out bool useModifier)
+        {
+            return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAlt, out mode, out useModifier);
+        }
+
+        // 全選択キーを解析
+        public static bool TryParseClearInputSelectAllKey(string raw, out VirtualKey key)
+        {
+            return TryParseShortcutKey(raw, out key);
+        }
+
+        // 共通ショートカット修飾子を解析
+        private static bool TryParseShortcutModifier(string raw, ModifierAllowance allowance, out ModifierOverrideMode mode, out bool useModifier)
+        {
+            mode = ModifierOverrideMode.Neutralize;
+            useModifier = false;
+            if (raw == null)
+            {
+                return false;
+            }
+
+            string normalized = raw.Trim().ToLowerInvariant();
+            if (string.IsNullOrEmpty(normalized))
+            {
+                return true;
+            }
+
+            if (normalized == "ctrl" && (allowance & ModifierAllowance.Ctrl) != 0)
+            {
+                mode = ModifierOverrideMode.Ctrl;
+                useModifier = true;
+                return true;
+            }
+
+            if (normalized == "alt" && (allowance & ModifierAllowance.Alt) != 0)
+            {
+                mode = ModifierOverrideMode.Alt;
+                useModifier = true;
+                return true;
+            }
+
+            if (normalized == "shift" && (allowance & ModifierAllowance.Shift) != 0)
+            {
+                mode = ModifierOverrideMode.Shift;
+                useModifier = true;
+                return true;
+            }
+
             return false;
         }
 
-        string normalized = raw.Trim().ToLowerInvariant();
-        if (string.IsNullOrEmpty(normalized))
+        // 共通ショートカットキーを解析
+        private static bool TryParseShortcutKey(string raw, out VirtualKey key)
         {
-            return true;
-        }
+            key = 0;
+            string normalized = NormalizeShortcutKey(raw);
+            if (string.IsNullOrEmpty(normalized))
+            {
+                return false;
+            }
 
-        if (normalized == "ctrl" && (allowance & ModifierAllowance.Ctrl) != 0)
-        {
-            mode = ModifierOverrideMode.Ctrl;
-            useModifier = true;
-            return true;
-        }
+            switch (normalized)
+            {
+                case "spacebar":
+                    key = VirtualKey.Space;
+                    return true;
+                case "home":
+                    key = VirtualKey.Home;
+                    return true;
+                case "end":
+                    key = VirtualKey.End;
+                    return true;
+                case "cursor up":
+                    key = VirtualKey.Up;
+                    return true;
+                case "cursor down":
+                    key = VirtualKey.Down;
+                    return true;
+                case "cursor left":
+                    key = VirtualKey.Left;
+                    return true;
+                case "cursor right":
+                    key = VirtualKey.Right;
+                    return true;
+            }
 
-        if (normalized == "alt" && (allowance & ModifierAllowance.Alt) != 0)
-        {
-            mode = ModifierOverrideMode.Alt;
-            useModifier = true;
-            return true;
-        }
+            if (normalized.Length <= 3 && normalized.StartsWith("f", StringComparison.Ordinal))
+            {
+                if (int.TryParse(normalized.Substring(1), out int fn) && fn >= 1 && fn <= 12)
+                {
+                    key = (VirtualKey)((int)VirtualKey.F1 + (fn - 1));
+                    return true;
+                }
+            }
 
-        if (normalized == "shift" && (allowance & ModifierAllowance.Shift) != 0)
-        {
-            mode = ModifierOverrideMode.Shift;
-            useModifier = true;
-            return true;
-        }
+            if (normalized.Length == 1)
+            {
+                char c = normalized[0];
+                if (c >= 'a' && c <= 'z')
+                {
+                    key = (VirtualKey)((int)'A' + (c - 'a'));
+                    return true;
+                }
 
-        return false;
-    }
+                if (c >= '0' && c <= '9')
+                {
+                    key = (VirtualKey)c;
+                    return true;
+                }
 
-    // 共通ショートカットキーを解析
-    private static bool TryParseShortcutKey(string raw, out VirtualKey key)
-    {
-        key = 0;
-        string normalized = NormalizeShortcutKey(raw);
-        if (string.IsNullOrEmpty(normalized))
-        {
+                short vkScan = VkKeyScan(c);
+                if (vkScan != -1)
+                {
+                    key = (VirtualKey)(vkScan & 0xFF);
+                    return true;
+                }
+            }
+
             return false;
         }
 
-        switch (normalized)
+        // ショートカットキー文字列を正規化
+        private static string NormalizeShortcutKey(string raw)
         {
-            case "spacebar":
-                key = VirtualKey.Space;
-                return true;
-            case "home":
-                key = VirtualKey.Home;
-                return true;
-            case "end":
-                key = VirtualKey.End;
-                return true;
-            case "cursor up":
-                key = VirtualKey.Up;
-                return true;
-            case "cursor down":
-                key = VirtualKey.Down;
-                return true;
-            case "cursor left":
-                key = VirtualKey.Left;
-                return true;
-            case "cursor right":
-                key = VirtualKey.Right;
-                return true;
-        }
-
-        if (normalized.Length <= 3 && normalized.StartsWith("f", StringComparison.Ordinal))
-        {
-            if (int.TryParse(normalized.Substring(1), out int fn) && fn >= 1 && fn <= 12)
+            if (string.IsNullOrWhiteSpace(raw))
             {
-                key = (VirtualKey)((int)VirtualKey.F1 + (fn - 1));
-                return true;
-            }
-        }
-
-        if (normalized.Length == 1)
-        {
-            char c = normalized[0];
-            if (c >= 'a' && c <= 'z')
-            {
-                key = (VirtualKey)((int)'A' + (c - 'a'));
-                return true;
+                return string.Empty;
             }
 
-            if (c >= '0' && c <= '9')
+            string[] parts = raw.Trim().ToLowerInvariant().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0)
             {
-                key = (VirtualKey)c;
-                return true;
+                return string.Empty;
             }
 
-            short vkScan = VkKeyScan(c);
-            if (vkScan != -1)
-            {
-                key = (VirtualKey)(vkScan & 0xFF);
-                return true;
-            }
+            return string.Join(" ", parts);
         }
 
-        return false;
-    }
-
-    // ショートカットキー文字列を正規化
-    private static string NormalizeShortcutKey(string raw)
-    {
-        if (string.IsNullOrWhiteSpace(raw))
+        [Flags]
+        private enum ModifierAllowance
         {
-            return string.Empty;
+            Ctrl = 1,
+            Alt = 2,
+            Shift = 4,
+            CtrlAlt = Ctrl | Alt,
+            CtrlAltShift = Ctrl | Alt | Shift
         }
-
-        string[] parts = raw.Trim().ToLowerInvariant().Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length == 0)
-        {
-            return string.Empty;
-        }
-
-        return string.Join(" ", parts);
-    }
-
-    [Flags]
-    private enum ModifierAllowance
-    {
-        Ctrl = 1,
-        Alt = 2,
-        Shift = 4,
-        CtrlAlt = Ctrl | Alt,
-        CtrlAltShift = Ctrl | Alt | Shift
     }
 
     public ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd)

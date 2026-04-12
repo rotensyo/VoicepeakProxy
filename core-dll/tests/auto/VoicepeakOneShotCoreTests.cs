@@ -74,6 +74,32 @@ public class VoicepeakOneShotCoreTests
     }
 
     [TestMethod]
+    public void SpeakOnceCore_TargetResolveFailure_MultipleProcesses_MapsStatus()
+    {
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ResolveTargetDetailedHandler = () => new ResolveTargetResult
+            {
+                Success = false,
+                FailureReason = ResolveTargetFailureReason.MultipleProcesses,
+                ProcessCount = 2
+            },
+            ProcessCountHandler = () => 99
+        };
+
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceCore(
+            CreateConfig(),
+            new SpeakOnceRequest { Text = "A" },
+            new AppLogger(new TestLogger()),
+            ui,
+            new FakeAudioSessionReader());
+
+        Assert.AreEqual(SpeakOnceStatus.MultipleProcesses, result.Status);
+        Assert.AreEqual(0, ui.GetVoicepeakProcessCountCalls);
+        Assert.AreEqual(1, ui.TryResolveTargetDetailedCalls);
+    }
+
+    [TestMethod]
     public void SpeakOnceWaitCore_TargetResolveFailure_DoesNotRecountProcess()
     {
         FakeVoicepeakUiController ui = new FakeVoicepeakUiController

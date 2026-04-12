@@ -66,6 +66,52 @@ internal readonly struct StartConfirmLoopResult
     public static StartConfirmLoopResult ProcessLost() => new StartConfirmLoopResult(StartConfirmLoopKind.ProcessLost, 0);
 }
 
+// 開始確認失敗結果の種類
+internal enum StartConfirmFailureKind
+{
+    None,
+    MoveToStartFailed,
+    PlayFailed,
+    StartConfirmTimeout,
+    MaxDuration,
+    ProcessLost
+}
+
+// 開始確認失敗時のハンドリング情報
+internal readonly struct StartConfirmFailureDetail
+{
+    public StartConfirmFailureKind Kind { get; }
+    public string DropReason { get; }
+    public string MonitorTimeoutReason { get; }
+    public bool RequiresFinalizeInput { get; }
+
+    private StartConfirmFailureDetail(StartConfirmFailureKind kind, string dropReason, string monitorTimeoutReason, bool requiresFinalizeInput)
+    {
+        Kind = kind;
+        DropReason = dropReason ?? string.Empty;
+        MonitorTimeoutReason = monitorTimeoutReason ?? string.Empty;
+        RequiresFinalizeInput = requiresFinalizeInput;
+    }
+
+    public static StartConfirmFailureDetail None()
+        => new StartConfirmFailureDetail(StartConfirmFailureKind.None, string.Empty, string.Empty, false);
+
+    public static StartConfirmFailureDetail MoveToStartFailed()
+        => new StartConfirmFailureDetail(StartConfirmFailureKind.MoveToStartFailed, "move_to_start_failed", string.Empty, true);
+
+    public static StartConfirmFailureDetail PlayFailed()
+        => new StartConfirmFailureDetail(StartConfirmFailureKind.PlayFailed, "play_failed", string.Empty, true);
+
+    public static StartConfirmFailureDetail StartConfirmTimeout()
+        => new StartConfirmFailureDetail(StartConfirmFailureKind.StartConfirmTimeout, "start_confirm_failed", "start_confirm", true);
+
+    public static StartConfirmFailureDetail MaxDuration()
+        => new StartConfirmFailureDetail(StartConfirmFailureKind.MaxDuration, "max_speaking_duration", "max_duration", true);
+
+    public static StartConfirmFailureDetail ProcessLost()
+        => new StartConfirmFailureDetail(StartConfirmFailureKind.ProcessLost, "process_lost", string.Empty, false);
+}
+
 // 入力検証結果を保持
 internal readonly struct InputValidateResult
 {
@@ -459,6 +505,20 @@ internal static class JobExecutionCore
         }
 
         return StartConfirmLoopResult.StartConfirmTimeout();
+    }
+
+    // 開始確認失敗時の共通判定
+    public static StartConfirmFailureDetail ClassifyStartConfirmFailure(StartConfirmLoopResult loopResult)
+    {
+        return loopResult.Kind switch
+        {
+            StartConfirmLoopKind.MoveToStartFailed => StartConfirmFailureDetail.MoveToStartFailed(),
+            StartConfirmLoopKind.PlayFailed => StartConfirmFailureDetail.PlayFailed(),
+            StartConfirmLoopKind.StartConfirmTimeout => StartConfirmFailureDetail.StartConfirmTimeout(),
+            StartConfirmLoopKind.MaxDuration => StartConfirmFailureDetail.MaxDuration(),
+            StartConfirmLoopKind.ProcessLost => StartConfirmFailureDetail.ProcessLost(),
+            _ => StartConfirmFailureDetail.None()
+        };
     }
 
     // 起動時検証相当の入力と発話確認を実行

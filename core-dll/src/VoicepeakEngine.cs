@@ -369,38 +369,31 @@ internal sealed class VoicepeakEngine : IDisposable
                 return;
             }
 
-            if (loopResult.Kind == StartConfirmLoopKind.MoveToStartFailed)
+            StartConfirmFailureDetail failure = JobExecutionCore.ClassifyStartConfirmFailure(loopResult);
+            if (failure.Kind == StartConfirmFailureKind.None)
             {
-                DropJob(job, "move_to_start_failed");
-                JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, killFocusAfterClear: false);
+                OnProcessLost();
+                DropJob(job, "process_lost");
                 return;
             }
 
-            if (loopResult.Kind == StartConfirmLoopKind.PlayFailed)
+            if (!string.IsNullOrEmpty(failure.MonitorTimeoutReason))
             {
-                DropJob(job, "play_failed");
-                JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, killFocusAfterClear: false);
+                _log.Error($"monitor_timeout reason={failure.MonitorTimeoutReason}");
+            }
+
+            if (failure.Kind == StartConfirmFailureKind.ProcessLost)
+            {
+                OnProcessLost();
+                DropJob(job, failure.DropReason);
                 return;
             }
 
-            if (loopResult.Kind == StartConfirmLoopKind.StartConfirmTimeout)
+            DropJob(job, failure.DropReason);
+            if (failure.RequiresFinalizeInput)
             {
-                _log.Error("monitor_timeout reason=start_confirm");
-                DropJob(job, "start_confirm_failed");
                 JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, killFocusAfterClear: false);
-                return;
             }
-
-            if (loopResult.Kind == StartConfirmLoopKind.MaxDuration)
-            {
-                _log.Error("monitor_timeout reason=max_duration");
-                DropJob(job, "max_speaking_duration");
-                JobExecutionCore.FinalizeJobInput(_config, _ui, process, hwnd, killFocusAfterClear: false);
-                return;
-            }
-
-            OnProcessLost();
-            DropJob(job, "process_lost");
             return;
             }
 

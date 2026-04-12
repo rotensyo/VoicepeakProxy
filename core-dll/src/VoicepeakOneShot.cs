@@ -148,71 +148,7 @@ public static class VoicepeakOneShot
                 hwnd,
                 log,
                 targetText);
-            if (run.Kind == BootValidationRunKind.Completed)
-            {
-                result = new ValidateInputOnceResult
-                {
-                    Status = ValidateInputOnceStatus.Completed,
-                    ActualText = run.InputValidate.ActualText
-                };
-            }
-            else if (run.Kind == BootValidationRunKind.InputValidationFailed)
-            {
-                result = new ValidateInputOnceResult
-                {
-                    Status = MapValidateInputOnceStatus(run.InputValidate.Reason),
-                    ErrorMessage = $"reason={run.InputValidate.Reason} cause={run.InputValidate.Cause}",
-                    ActualText = run.InputValidate.ActualText
-                };
-            }
-            else if (run.Kind == BootValidationRunKind.MoveToStartFailed)
-            {
-                result = new ValidateInputOnceResult
-                {
-                    Status = ValidateInputOnceStatus.MoveToStartFailed,
-                    ErrorMessage = "reason=move_to_start_failed"
-                };
-            }
-            else if (run.Kind == BootValidationRunKind.PlayFailed)
-            {
-                result = new ValidateInputOnceResult
-                {
-                    Status = ValidateInputOnceStatus.PlayFailed,
-                    ErrorMessage = "reason=play_failed"
-                };
-            }
-            else if (run.Kind == BootValidationRunKind.StartConfirmTimeout)
-            {
-                result = new ValidateInputOnceResult
-                {
-                    Status = ValidateInputOnceStatus.StartConfirmTimeout,
-                    ErrorMessage = "reason=start_confirm_failed"
-                };
-            }
-            else if (run.Kind == BootValidationRunKind.MaxDuration)
-            {
-                result = new ValidateInputOnceResult
-                {
-                    Status = ValidateInputOnceStatus.MaxSpeakingDurationExceeded,
-                    ErrorMessage = "reason=max_speaking_duration"
-                };
-            }
-            else if (run.Kind == BootValidationRunKind.ProcessLost)
-            {
-                result = new ValidateInputOnceResult
-                {
-                    Status = ValidateInputOnceStatus.ProcessLost,
-                    ErrorMessage = "reason=process_lost"
-                };
-            }
-            else
-            {
-                result = new ValidateInputOnceResult
-                {
-                    Status = ValidateInputOnceStatus.InvalidRequest,
-                    ErrorMessage = "reason=unknown"
-                };
-            }
+            result = BuildValidateInputResult(run);
         }
         finally
         {
@@ -641,38 +577,31 @@ public static class VoicepeakOneShot
         string jobId,
         AppLogger log)
     {
-        if (loopResult.Kind == StartConfirmLoopKind.MoveToStartFailed)
+        StartConfirmFailureDetail failure = JobExecutionCore.ClassifyStartConfirmFailure(loopResult);
+        if (failure.Kind == StartConfirmFailureKind.None)
         {
-            log.Warn($"job_dropped jobId={jobId} reason=move_to_start_failed");
-            JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, killFocusAfterClear: false);
-            return new SpeakOnceResult { Status = SpeakOnceStatus.MoveToStartFailed, SegmentsExecuted = executed };
+            return new SpeakOnceResult { Status = SpeakOnceStatus.ProcessLost, SegmentsExecuted = executed };
         }
 
-        if (loopResult.Kind == StartConfirmLoopKind.PlayFailed)
+        if (!string.IsNullOrEmpty(failure.MonitorTimeoutReason))
         {
-            log.Warn($"job_dropped jobId={jobId} reason=play_failed");
-            JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, killFocusAfterClear: false);
-            return new SpeakOnceResult { Status = SpeakOnceStatus.PlayFailed, SegmentsExecuted = executed };
+            log.Error($"monitor_timeout reason={failure.MonitorTimeoutReason}");
         }
 
-        if (loopResult.Kind == StartConfirmLoopKind.StartConfirmTimeout)
+        log.Warn($"job_dropped jobId={jobId} reason={failure.DropReason}");
+        if (failure.RequiresFinalizeInput)
         {
-            log.Error("monitor_timeout reason=start_confirm");
-            log.Warn($"job_dropped jobId={jobId} reason=start_confirm_failed");
             JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, killFocusAfterClear: false);
-            return new SpeakOnceResult { Status = SpeakOnceStatus.StartConfirmTimeout, SegmentsExecuted = executed };
         }
 
-        if (loopResult.Kind == StartConfirmLoopKind.MaxDuration)
+        return failure.Kind switch
         {
-            log.Error("monitor_timeout reason=max_duration");
-            log.Warn($"job_dropped jobId={jobId} reason=max_speaking_duration");
-            JobExecutionCore.FinalizeJobInput(config, ui, process, hwnd, killFocusAfterClear: false);
-            return new SpeakOnceResult { Status = SpeakOnceStatus.MaxSpeakingDurationExceeded, SegmentsExecuted = executed };
-        }
-
-        log.Warn($"job_dropped jobId={jobId} reason=process_lost");
-        return new SpeakOnceResult { Status = SpeakOnceStatus.ProcessLost, SegmentsExecuted = executed };
+            StartConfirmFailureKind.MoveToStartFailed => new SpeakOnceResult { Status = SpeakOnceStatus.MoveToStartFailed, SegmentsExecuted = executed },
+            StartConfirmFailureKind.PlayFailed => new SpeakOnceResult { Status = SpeakOnceStatus.PlayFailed, SegmentsExecuted = executed },
+            StartConfirmFailureKind.StartConfirmTimeout => new SpeakOnceResult { Status = SpeakOnceStatus.StartConfirmTimeout, SegmentsExecuted = executed },
+            StartConfirmFailureKind.MaxDuration => new SpeakOnceResult { Status = SpeakOnceStatus.MaxSpeakingDurationExceeded, SegmentsExecuted = executed },
+            _ => new SpeakOnceResult { Status = SpeakOnceStatus.ProcessLost, SegmentsExecuted = executed }
+        };
     }
 
     // 修飾キー中立化セッションを開始
@@ -735,8 +664,7 @@ public static class VoicepeakOneShot
     // 対象解決失敗をSpeakOnce結果へ変換
     private static SpeakOnceResult BuildSpeakResolveTargetFailedResult(ResolveTargetResult resolved, AppLogger log)
     {
-        ResolveTargetFailureReason reason = ResolveTargetFailureMapper.NormalizeReason(resolved);
-        ResolveTargetFailureMapper.LogFailure(log, reason, resolved?.ProcessCount ?? 0);
+        ResolveTargetFailureReason reason = NormalizeAndLogResolveTargetFailure(resolved, log);
         return new SpeakOnceResult
         {
             Status = MapSpeakResolveTargetFailureStatus(reason),
@@ -747,8 +675,7 @@ public static class VoicepeakOneShot
     // 対象解決失敗をValidate結果へ変換
     private static ValidateInputOnceResult BuildValidateInputResolveTargetFailedResult(ResolveTargetResult resolved, AppLogger log)
     {
-        ResolveTargetFailureReason reason = ResolveTargetFailureMapper.NormalizeReason(resolved);
-        ResolveTargetFailureMapper.LogFailure(log, reason, resolved?.ProcessCount ?? 0);
+        ResolveTargetFailureReason reason = NormalizeAndLogResolveTargetFailure(resolved, log);
         return new ValidateInputOnceResult
         {
             Status = MapValidateResolveTargetFailureStatus(reason)
@@ -758,8 +685,7 @@ public static class VoicepeakOneShot
     // 対象解決失敗をClearInput結果へ変換
     private static ClearInputOnceResult BuildClearInputResolveTargetFailedResult(ResolveTargetResult resolved, AppLogger log)
     {
-        ResolveTargetFailureReason reason = ResolveTargetFailureMapper.NormalizeReason(resolved);
-        ResolveTargetFailureMapper.LogFailure(log, reason, resolved?.ProcessCount ?? 0);
+        ResolveTargetFailureReason reason = NormalizeAndLogResolveTargetFailure(resolved, log);
         return new ClearInputOnceResult
         {
             Status = MapClearResolveTargetFailureStatus(reason)
@@ -769,33 +695,87 @@ public static class VoicepeakOneShot
     // 対象解決失敗理由をSpeak結果へ変換
     private static SpeakOnceStatus MapSpeakResolveTargetFailureStatus(ResolveTargetFailureReason reason)
     {
-        return reason switch
-        {
-            ResolveTargetFailureReason.ProcessNotFound => SpeakOnceStatus.ProcessNotFound,
-            ResolveTargetFailureReason.MultipleProcesses => SpeakOnceStatus.MultipleProcesses,
-            _ => SpeakOnceStatus.TargetNotFound
-        };
+        return MapResolveTargetFailureStatus(reason, SpeakOnceStatus.ProcessNotFound, SpeakOnceStatus.MultipleProcesses, SpeakOnceStatus.TargetNotFound);
     }
 
     // 対象解決失敗理由をValidate結果へ変換
     private static ValidateInputOnceStatus MapValidateResolveTargetFailureStatus(ResolveTargetFailureReason reason)
     {
-        return reason switch
-        {
-            ResolveTargetFailureReason.ProcessNotFound => ValidateInputOnceStatus.ProcessNotFound,
-            ResolveTargetFailureReason.MultipleProcesses => ValidateInputOnceStatus.MultipleProcesses,
-            _ => ValidateInputOnceStatus.TargetNotFound
-        };
+        return MapResolveTargetFailureStatus(reason, ValidateInputOnceStatus.ProcessNotFound, ValidateInputOnceStatus.MultipleProcesses, ValidateInputOnceStatus.TargetNotFound);
     }
 
     // 対象解決失敗理由をClear結果へ変換
     private static ClearInputOnceStatus MapClearResolveTargetFailureStatus(ResolveTargetFailureReason reason)
     {
+        return MapResolveTargetFailureStatus(reason, ClearInputOnceStatus.ProcessNotFound, ClearInputOnceStatus.MultipleProcesses, ClearInputOnceStatus.TargetNotFound);
+    }
+
+    // 起動時検証結果を単発入力検証結果へ変換
+    private static ValidateInputOnceResult BuildValidateInputResult(BootValidationRunResult run)
+    {
+        return run.Kind switch
+        {
+            BootValidationRunKind.Completed => new ValidateInputOnceResult
+            {
+                Status = ValidateInputOnceStatus.Completed,
+                ActualText = run.InputValidate.ActualText
+            },
+            BootValidationRunKind.InputValidationFailed => new ValidateInputOnceResult
+            {
+                Status = MapValidateInputOnceStatus(run.InputValidate.Reason),
+                ErrorMessage = $"reason={run.InputValidate.Reason} cause={run.InputValidate.Cause}",
+                ActualText = run.InputValidate.ActualText
+            },
+            BootValidationRunKind.MoveToStartFailed => new ValidateInputOnceResult
+            {
+                Status = ValidateInputOnceStatus.MoveToStartFailed,
+                ErrorMessage = "reason=move_to_start_failed"
+            },
+            BootValidationRunKind.PlayFailed => new ValidateInputOnceResult
+            {
+                Status = ValidateInputOnceStatus.PlayFailed,
+                ErrorMessage = "reason=play_failed"
+            },
+            BootValidationRunKind.StartConfirmTimeout => new ValidateInputOnceResult
+            {
+                Status = ValidateInputOnceStatus.StartConfirmTimeout,
+                ErrorMessage = "reason=start_confirm_failed"
+            },
+            BootValidationRunKind.MaxDuration => new ValidateInputOnceResult
+            {
+                Status = ValidateInputOnceStatus.MaxSpeakingDurationExceeded,
+                ErrorMessage = "reason=max_speaking_duration"
+            },
+            BootValidationRunKind.ProcessLost => new ValidateInputOnceResult
+            {
+                Status = ValidateInputOnceStatus.ProcessLost,
+                ErrorMessage = "reason=process_lost"
+            },
+            _ => new ValidateInputOnceResult
+            {
+                Status = ValidateInputOnceStatus.InvalidRequest,
+                ErrorMessage = "reason=unknown"
+            }
+        };
+    }
+
+    // 対象解決失敗の理由を統一的に正規化して記録
+    private static ResolveTargetFailureReason NormalizeAndLogResolveTargetFailure(ResolveTargetResult resolved, AppLogger log)
+    {
+        ResolveTargetFailureReason reason = ResolveTargetFailureMapper.NormalizeReason(resolved);
+        ResolveTargetFailureMapper.LogFailure(log, reason, resolved?.ProcessCount ?? 0);
+        return reason;
+    }
+
+    // 対象解決失敗理由を各結果ステータスへ共通変換
+    private static TStatus MapResolveTargetFailureStatus<TStatus>(ResolveTargetFailureReason reason, TStatus processNotFound, TStatus multipleProcesses, TStatus targetNotFound)
+        where TStatus : struct
+    {
         return reason switch
         {
-            ResolveTargetFailureReason.ProcessNotFound => ClearInputOnceStatus.ProcessNotFound,
-            ResolveTargetFailureReason.MultipleProcesses => ClearInputOnceStatus.MultipleProcesses,
-            _ => ClearInputOnceStatus.TargetNotFound
+            ResolveTargetFailureReason.ProcessNotFound => processNotFound,
+            ResolveTargetFailureReason.MultipleProcesses => multipleProcesses,
+            _ => targetNotFound
         };
     }
 
