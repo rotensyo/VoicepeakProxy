@@ -175,7 +175,7 @@ public class ExecutionLogicTests
         // 文字入力失敗で中断
         FakeVoicepeakUiController ui = new FakeVoicepeakUiController
         {
-            TypeTextHandler = (_, _, _) => false
+            TypeTextHandler = (_, _) => false
         };
         TestLogger logger = new TestLogger();
 
@@ -301,7 +301,6 @@ public class ExecutionLogicTests
             Process.GetCurrentProcess(),
             IntPtr.Zero,
             "  A\r\n B  ",
-            0,
             false);
 
         Assert.IsTrue((bool)ReflectionTestHelper.GetProperty(result, "Success"));

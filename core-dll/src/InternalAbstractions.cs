@@ -70,7 +70,7 @@ internal interface IVoicepeakUiController
     bool PrepareForTextInput(Process process, IntPtr mainHwnd, int actionDelayMs);
     bool PrepareForPlayback(Process process, IntPtr mainHwnd, int actionDelayMs);
     bool ClearInput(Process process, IntPtr mainHwnd, int actionDelayMs);
-    bool TypeText(IntPtr mainHwnd, string text, int charDelayMs);
+    bool TypeText(IntPtr mainHwnd, string text);
     int GetVisibleInputBlockCount(IntPtr mainHwnd);
     bool PressPlay(IntPtr mainHwnd);
     bool MoveToStart(IntPtr mainHwnd, int actionDelayMs);

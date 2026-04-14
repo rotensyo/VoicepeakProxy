@@ -422,7 +422,7 @@ public class VoicepeakOneShotCoreTests
         {
             ProcessCountHandler = () => 1,
             ResolveTargetHandler = () => (true, Process.GetCurrentProcess(), new IntPtr(123)),
-            TypeTextHandler = (_, _, _) => true,
+            TypeTextHandler = (_, _) => true,
             ClearInputHandler = () => true,
             MoveToStartHandler = (_, _) => true,
             PressDeleteHandler = _ => true,

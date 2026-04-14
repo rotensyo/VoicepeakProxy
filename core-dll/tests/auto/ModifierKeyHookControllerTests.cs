@@ -110,6 +110,91 @@ public class ModifierKeyHookControllerTests
     }
 
     [TestMethod]
+    public void SetVirtualClipboardText_WhenConnected_SendsClipSetCommand()
+    {
+        string lastCommand = null;
+        FakeModifierHookConnection connection = new FakeModifierHookConnection
+        {
+            SendHandler = (string command, int timeoutMs, out string response) =>
+            {
+                lastCommand = command;
+                response = command == "PING" ? "PONG" : "OK";
+                return true;
+            }
+        };
+        FakeModifierHookPlatform platform = new FakeModifierHookPlatform
+        {
+            ConnectResults = new Queue<bool>(new[] { true }),
+            ConnectionToReturn = connection
+        };
+        ModifierKeyHookController controller = new ModifierKeyHookController(100, 100, 500, platform);
+        AppLogger log = new AppLogger(new TestLogger());
+
+        Assert.IsTrue(controller.EnsureInjected(123, log));
+        bool ok = controller.SetVirtualClipboardText("あいうえお", log);
+
+        Assert.IsTrue(ok);
+        string expectedPayload = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("あいうえお"));
+        Assert.AreEqual($"CLIP_SET|{expectedPayload}", lastCommand);
+    }
+
+    [TestMethod]
+    public void ClearVirtualClipboard_WhenConnected_SendsClipClearCommand()
+    {
+        string lastCommand = null;
+        FakeModifierHookConnection connection = new FakeModifierHookConnection
+        {
+            SendHandler = (string command, int timeoutMs, out string response) =>
+            {
+                lastCommand = command;
+                response = command == "PING" ? "PONG" : "OK";
+                return true;
+            }
+        };
+        FakeModifierHookPlatform platform = new FakeModifierHookPlatform
+        {
+            ConnectResults = new Queue<bool>(new[] { true }),
+            ConnectionToReturn = connection
+        };
+        ModifierKeyHookController controller = new ModifierKeyHookController(100, 100, 500, platform);
+        AppLogger log = new AppLogger(new TestLogger());
+
+        Assert.IsTrue(controller.EnsureInjected(123, log));
+        bool ok = controller.ClearVirtualClipboard(log);
+
+        Assert.IsTrue(ok);
+        Assert.AreEqual("CLIP_CLEAR", lastCommand);
+    }
+
+    [TestMethod]
+    public void SetVirtualClipboardText_WhenFirstSendFails_ReconnectsAndRetries()
+    {
+        int sendAttempt = 0;
+        FakeModifierHookPlatform platform = new FakeModifierHookPlatform
+        {
+            ConnectResults = new Queue<bool>(new[] { true, true }),
+            CreateConnection = () => new FakeModifierHookConnection
+            {
+                SendHandler = (string command, int timeoutMs, out string response) =>
+                {
+                    sendAttempt++;
+                    response = sendAttempt == 1 ? string.Empty : "OK";
+                    return sendAttempt > 1;
+                }
+            }
+        };
+        ModifierKeyHookController controller = new ModifierKeyHookController(100, 100, 500, platform);
+        AppLogger log = new AppLogger(new TestLogger());
+
+        Assert.IsTrue(controller.EnsureInjected(123, log));
+        bool ok = controller.SetVirtualClipboardText("text", log);
+
+        Assert.IsTrue(ok);
+        Assert.AreEqual(2, sendAttempt);
+        Assert.AreEqual(2, platform.ConnectCalls);
+    }
+
+    [TestMethod]
     public void SetModifierOverride_WhenFailed_ThenRetryReconnects()
     {
         int sendAttempt = 0;

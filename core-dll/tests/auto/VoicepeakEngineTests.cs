@@ -265,7 +265,7 @@ public class VoicepeakEngineTests
             IsAliveHandler = _ => false
         };
 
-        object result = InvokeInputValidateCore(ui, "abc", 0, false);
+        object result = InvokeInputValidateCore(ui, "abc", false);
 
         AssertInputValidate(result, false, "process_not_alive", "voicepeak_process_exited_or_unavailable");
     }
@@ -279,7 +279,7 @@ public class VoicepeakEngineTests
             ClearInputHandler = () => false
         };
 
-        object result = InvokeInputValidateCore(ui, "abc", 0, false);
+        object result = InvokeInputValidateCore(ui, "abc", false);
 
         AssertInputValidate(result, false, "clear_input_failed", "move_to_start_or_delete_not_applied");
     }
@@ -290,12 +290,12 @@ public class VoicepeakEngineTests
         // 入力失敗を返却
         FakeVoicepeakUiController ui = new FakeVoicepeakUiController
         {
-            TypeTextHandler = (_, _, _) => false
+            TypeTextHandler = (_, _) => false
         };
 
-        object result = InvokeInputValidateCore(ui, "abc", 0, false);
+        object result = InvokeInputValidateCore(ui, "abc", false);
 
-        AssertInputValidate(result, false, "type_text_failed", "wm_char_input_failed");
+        AssertInputValidate(result, false, "type_text_failed", "paste_apply_failed");
     }
 
     [TestMethod]
@@ -321,7 +321,7 @@ public class VoicepeakEngineTests
         FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
         ui.ReadInputHandler = _ => ReadInputResult.Fail(ReadInputSource.Exception, string.Empty, 0);
 
-        object result = InvokeInputValidateCore(ui, "abc", 0, false);
+        object result = InvokeInputValidateCore(ui, "abc", false);
 
         AssertInputValidate(result, false, "read_input_failed", "read_input_source_Exception");
     }
@@ -333,7 +333,7 @@ public class VoicepeakEngineTests
         FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
         ui.ReadInputHandler = _ => ReadInputResult.Ok("AabcX", 5, ReadInputSource.PrimaryUiA);
 
-        object result = InvokeInputValidateCore(ui, "abc", 0, true);
+        object result = InvokeInputValidateCore(ui, "abc", true);
 
         AssertInputValidate(result, false, "text_mismatch", "leading_guard_remaining_move_to_start_or_delete_issue");
         Assert.AreEqual("AabcX", ReflectionTestHelper.GetProperty(result, "ActualText"));
@@ -345,7 +345,7 @@ public class VoicepeakEngineTests
         // 入力検証成功を返却
         FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
 
-        object result = InvokeInputValidateCore(ui, "abc", 0, true);
+        object result = InvokeInputValidateCore(ui, "abc", true);
 
         AssertInputValidate(result, true, string.Empty, string.Empty);
         CollectionAssert.AreEqual(new[] { "Aabc" }, ui.TypedTexts);
@@ -357,7 +357,7 @@ public class VoicepeakEngineTests
         // 入力欄準備を前後で実施
         FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
 
-        object result = InvokeInputValidateCore(ui, "abc", 0, true);
+        object result = InvokeInputValidateCore(ui, "abc", true);
 
         AssertInputValidate(result, true, string.Empty, string.Empty);
         CollectionAssert.AreEqual(
@@ -470,11 +470,11 @@ public class VoicepeakEngineTests
     {
         FakeVoicepeakUiController ui = CreateSuccessfulBootUi();
         configure(ui);
-        return InvokeInputValidateCore(ui, "abc", 0, true);
+        return InvokeInputValidateCore(ui, "abc", true);
     }
 
     // 入力検証コアを直接呼び出し
-    private static object InvokeInputValidateCore(FakeVoicepeakUiController ui, string text, int charDelay, bool useProbeGuardChars)
+    private static object InvokeInputValidateCore(FakeVoicepeakUiController ui, string text, bool useProbeGuardChars)
     {
         AppConfig config = CreateEngineConfig();
         return ReflectionTestHelper.InvokeCoreStatic(
@@ -485,7 +485,6 @@ public class VoicepeakEngineTests
             Process.GetCurrentProcess(),
             IntPtr.Zero,
             text,
-            charDelay,
             useProbeGuardChars);
     }
 

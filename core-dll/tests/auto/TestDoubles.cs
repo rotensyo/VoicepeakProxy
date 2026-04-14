@@ -10,7 +10,7 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
     public Func<Process, IntPtr, int, bool> PrepareForTextInputHandler { get; set; } = (_, _, _) => true;
     public Func<Process, IntPtr, int, bool> PrepareForPlaybackHandler { get; set; } = (_, _, _) => true;
     public Func<bool> ClearInputHandler { get; set; } = () => true;
-    public Func<IntPtr, string, int, bool> TypeTextHandler { get; set; } = (_, _, _) => true;
+    public Func<IntPtr, string, bool> TypeTextHandler { get; set; } = (_, _) => true;
     public Func<IntPtr, bool> PressPlayHandler { get; set; } = _ => true;
     public Func<IntPtr, int, bool> MoveToStartHandler { get; set; } = (_, _) => true;
     public Func<IntPtr, bool> PressDeleteHandler { get; set; } = _ => true;
@@ -124,11 +124,11 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
         return ClearInputHandler();
     }
 
-    public bool TypeText(IntPtr mainHwnd, string text, int charDelayMs)
+    public bool TypeText(IntPtr mainHwnd, string text)
     {
         TypedTexts.Add(text ?? string.Empty);
         CallLog.Add("type_text");
-        return TypeTextHandler(mainHwnd, text, charDelayMs);
+        return TypeTextHandler(mainHwnd, text);
     }
 
     public bool PressPlay(IntPtr mainHwnd)

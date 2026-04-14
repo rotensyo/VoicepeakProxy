@@ -396,7 +396,7 @@ public class VoicepeakOneShotUtilityTests
             IsAliveHandler = _ => true,
             PrepareForTextInputHandler = (_, _, _) => true,
             ClearInputHandler = () => true,
-            TypeTextHandler = (_, _, _) => true
+            TypeTextHandler = (_, _) => true
         };
     }
 }

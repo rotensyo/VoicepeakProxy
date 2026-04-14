@@ -14,7 +14,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private const uint SmtoAbortIfHung = 0x0002;
     private const uint WmKeyDown = 0x0100;
     private const uint WmKeyUp = 0x0101;
-    private const uint WmChar = 0x0102;
+    private const uint WmPaste = 0x0302;
     private const uint WmGetText = 0x000D;
     private const uint WmGetTextLength = 0x000E;
     private const uint WmKillFocus = 0x0008;
@@ -227,8 +227,8 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
     }
 
-    // 文字列を1文字ずつ送信
-    public bool TypeText(IntPtr mainHwnd, string text, int charDelayMs)
+    // 仮想クリップボード経由で文字列を貼り付け
+    public bool TypeText(IntPtr mainHwnd, string text)
     {
         string send = text ?? string.Empty;
         if (mainHwnd == IntPtr.Zero)
@@ -240,6 +240,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         bool modifierIsolationEnabled = false;
         bool statsProbeEnabled = _debug.LogModifierHookStats;
         bool statsProbeStarted = false;
+        bool virtualClipboardSet = false;
         try
         {
             modifierIsolationEnabled = TryEnableModifierKeyIsolation(mainHwnd, "type_text");
@@ -255,17 +256,36 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 statsProbeStarted = true;
             }
 
-            if (!TryTypeTextByWindowMessages(mainHwnd, send, charDelayMs))
+            if (!_modifierIsolationCoordinator.SetVirtualClipboardText(send, "type_text"))
             {
-                _log.Warn($"type_text_target_send_failed reason=wm_char_failed hwnd=0x{mainHwnd.ToInt64():X}");
+                _log.Warn($"type_text_target_send_failed reason=clip_set_failed hwnd=0x{mainHwnd.ToInt64():X}");
                 return false;
             }
 
-            _log.Info("type_text_route_selected route=wm_char_only");
+            virtualClipboardSet = true;
+
+            if (!SendShortcutWithOptionalModifier(
+                    mainHwnd,
+                    "type_text_paste",
+                    (VirtualKey)'V',
+                    ModifierOverrideMode.Ctrl,
+                    useModifier: true,
+                    "type_text_paste_override_reset_failed"))
+            {
+                _log.Warn($"type_text_target_send_failed reason=paste_failed hwnd=0x{mainHwnd.ToInt64():X}");
+                return false;
+            }
+
+            _log.Info("type_text_route_selected route=ctrl_v_virtualized");
             return true;
         }
         finally
         {
+            if (virtualClipboardSet)
+            {
+                _modifierIsolationCoordinator.ClearVirtualClipboard("type_text");
+            }
+
             if (statsProbeEnabled && statsProbeStarted)
             {
                 _modifierIsolationCoordinator.EndStatsProbeAndLog(statsProbeEnabled);
@@ -350,45 +370,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     {
         _modifierIsolationSessionActive = _modifierIsolationCoordinator.SessionActive;
         _modifierIsolationSessionProcessId = _modifierIsolationCoordinator.SessionProcessId;
-    }
-
-    // WM_CHARと改行キー送信で入力
-    private bool TryTypeTextByWindowMessages(IntPtr targetHwnd, string send, int charDelayMs)
-    {
-        for (int i = 0; i < send.Length; i++)
-        {
-            char current = send[i];
-            bool sent = current == '\n' || current == '\r'
-                ? SendNewline(targetHwnd)
-                : SendChar(targetHwnd, current);
-            if (!sent)
-            {
-                return false;
-            }
-
-            if (charDelayMs > 0)
-            {
-                Thread.Sleep(charDelayMs);
-            }
-        }
-        return true;
-    }
-
-    // 改行送信方式を設定に応じて切替
-    private bool SendNewline(IntPtr targetHwnd)
-    {
-        if (_text.SplitInputBlockOnNewline)
-        {
-            return SendKey(targetHwnd, VirtualKey.Return);
-        }
-
-        return SendShortcutWithOptionalModifier(
-            targetHwnd,
-            "type_text_newline_enter",
-            VirtualKey.Return,
-            ModifierOverrideMode.Shift,
-            useModifier: true,
-            "type_text_newline_override_reset_failed");
     }
 
     // 再生ショートカットを送信
@@ -799,11 +780,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private bool SendKeyUp(IntPtr hwnd, VirtualKey key)
     {
         return SendWindowMessage(hwnd, WmKeyUp, (IntPtr)(int)key, IntPtr.Zero);
-    }
-
-    private bool SendChar(IntPtr hwnd, char c)
-    {
-        return SendWindowMessage(hwnd, WmChar, (IntPtr)c, IntPtr.Zero);
     }
 
     private static bool SendWindowMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)

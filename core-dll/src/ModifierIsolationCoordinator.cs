@@ -115,6 +115,30 @@ internal sealed class ModifierIsolationCoordinator
         return TrySetModifierOverride(targetHwnd, operationName, mode);
     }
 
+    // 仮想クリップボード文字列を設定
+    public bool SetVirtualClipboardText(string text, string operationName)
+    {
+        if (!_modifierKeyHookController.SetVirtualClipboardText(text, _log))
+        {
+            _log.Warn($"modifier_clip_set_failed op={SanitizeForLog(operationName)}");
+            return false;
+        }
+
+        return true;
+    }
+
+    // 仮想クリップボード文字列をクリア
+    public bool ClearVirtualClipboard(string operationName)
+    {
+        if (!_modifierKeyHookController.ClearVirtualClipboard(_log))
+        {
+            _log.Warn($"modifier_clip_clear_failed op={SanitizeForLog(operationName)}");
+            return false;
+        }
+
+        return true;
+    }
+
     // 修飾キー中立化セッションを開始
     public bool BeginModifierIsolationSession(int voicepeakProcessId, string operationName)
     {

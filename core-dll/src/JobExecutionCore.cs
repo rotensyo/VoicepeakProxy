@@ -211,8 +211,7 @@ internal static class JobExecutionCore
         }
 
         string expected = InputTextNormalizer.NormalizeForTyping(text);
-        int keyStrokeIntervalMs = config.InputTiming.KeyStrokeIntervalMs;
-        if (!TryTypeTextWithRetry(config, ui, process, hwnd, expected, keyStrokeIntervalMs, log, "prepare"))
+        if (!TryTypeTextWithRetry(config, ui, process, hwnd, expected, log, "prepare"))
         {
             return false;
         }
@@ -233,7 +232,6 @@ internal static class JobExecutionCore
         Process process,
         IntPtr hwnd,
         string expected,
-        int keyStrokeIntervalMs,
         AppLogger log,
         string context)
     {
@@ -253,20 +251,20 @@ internal static class JobExecutionCore
                 }
             }
 
-            if (!ui.TypeText(hwnd, expected, keyStrokeIntervalMs))
+            if (!ui.TypeText(hwnd, expected))
             {
                 if (attempt >= maxRetries)
                 {
                     string textDetail = BuildTypeTextLogDetail(expected);
                     Warn(log, isRetry
-                        ? $"{context}_failed_detail reason=type_text_failed_on_retry cause=wm_char_input_failed attempt={attempt}{textDetail}"
-                        : $"{context}_failed_detail reason=type_text_failed cause=wm_char_input_failed{textDetail}");
+                        ? $"{context}_failed_detail reason=type_text_failed_on_retry cause=paste_apply_failed attempt={attempt}{textDetail}"
+                        : $"{context}_failed_detail reason=type_text_failed cause=paste_apply_failed{textDetail}");
                     return false;
                 }
 
                 Warn(log, isRetry
-                    ? $"{context}_retry_detail reason=type_text_failed_before_retry cause=wm_char_input_failed attempt={attempt}"
-                    : $"{context}_retry_detail reason=type_text_failed_before_retry cause=wm_char_input_failed attempt=0");
+                    ? $"{context}_retry_detail reason=type_text_failed_before_retry cause=paste_apply_failed attempt={attempt}"
+                    : $"{context}_retry_detail reason=type_text_failed_before_retry cause=paste_apply_failed attempt=0");
                 continue;
             }
 
@@ -534,11 +532,9 @@ internal static class JobExecutionCore
         string target = targetText ?? string.Empty;
         InputValidateResult bootValidate = InputValidateResult.Fail("unknown", "unknown", string.Empty);
         bool bootInputOk = false;
-        int keyStrokeIntervalMs = config.InputTiming.KeyStrokeIntervalMs;
-
         for (int attempt = 0; attempt <= config.Validation.ValidationMaxRetries; attempt++)
         {
-            bootValidate = ValidateInputText(config, ui, process, hwnd, target, keyStrokeIntervalMs, useProbeGuardChars: true);
+            bootValidate = ValidateInputText(config, ui, process, hwnd, target, useProbeGuardChars: true);
             if (bootValidate.Success)
             {
                 bootInputOk = true;
@@ -625,7 +621,6 @@ internal static class JobExecutionCore
         Process process,
         IntPtr hwnd,
         string text,
-        int keyStrokeIntervalMs,
         bool useProbeGuardChars)
     {
         if (!ui.IsAlive(process))
@@ -645,9 +640,9 @@ internal static class JobExecutionCore
 
         string expected = InputTextNormalizer.NormalizeForValidation(text);
         string toType = useProbeGuardChars ? ("A" + expected) : expected;
-        if (!ui.TypeText(hwnd, toType, keyStrokeIntervalMs))
+        if (!ui.TypeText(hwnd, toType))
         {
-            return InputValidateResult.Fail("type_text_failed", "wm_char_input_failed", string.Empty);
+            return InputValidateResult.Fail("type_text_failed", "paste_apply_failed", string.Empty);
         }
 
         int postTypeWaitMs = ComputePostTypeWaitMs(expected, config.InputTiming.PostTypeWaitPerCharMs, config.InputTiming.PostTypeWaitMinMs);
