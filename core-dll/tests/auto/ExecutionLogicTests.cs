@@ -55,44 +55,42 @@ public class ExecutionLogicTests
     }
 
     [TestMethod]
-    public void AdjustPauseByStopConfirmAndPlayDelay_SubtractsCompensationAndWarns()
+    public void AdjustPauseByStopConfirmAndPlayDelay_PreFirst_UsesDelayBeforePlayOnly()
     {
-        // 補正後下限と警告を検証
+        // 先頭は再生前待機のみを補正
         AppConfig config = new AppConfig();
         config.Audio.StopConfirmMs = 300;
         config.Ui.DelayBeforePlayShortcutMs = 60;
-        config.InputTiming.PostTypeWaitPerCharMs = 4;
-        config.InputTiming.PostTypeWaitMinMs = 100;
-        TestLogger logger = new TestLogger();
 
-        int actual = (int)ReflectionTestHelper.InvokeCoreStatic(
-            "JobExecutionCore",
-            "AdjustPauseByStopConfirmAndPlayDelay",
-            config,
-            200,
-            "pre",
-            "job-1",
-            0,
-            "hello",
-            ReflectionTestHelper.CreateAppLogger(logger));
+        int actual = JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(config, 200, "pre", 0);
 
-        Assert.AreEqual(0, actual);
-        Assert.IsTrue(logger.WarnMessages.Exists(m => m.Contains("pause_too_short")));
+        Assert.AreEqual(140, actual);
     }
 
     [TestMethod]
-    public void AdjustPauseByStopConfirmAndPlayDelay_TrailingPhase_DoesNotAddTypingCost()
+    public void AdjustPauseByStopConfirmAndPlayDelay_PreMiddle_UsesStopConfirmAndDelay()
     {
-        // trailingは入力待機を加算しない
+        // 中間は停止検知と再生前待機を補正
+        AppConfig config = new AppConfig();
+        config.Audio.StopConfirmMs = 300;
+        config.Ui.DelayBeforePlayShortcutMs = 60;
+
+        int actual = JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(config, 500, "pre", 1);
+
+        Assert.AreEqual(140, actual);
+    }
+
+    [TestMethod]
+    public void AdjustPauseByStopConfirmAndPlayDelay_TrailingPhase_UsesStopConfirmOnly()
+    {
+        // 末尾は停止検知のみを補正
         AppConfig config = new AppConfig();
         config.Audio.StopConfirmMs = 30;
         config.Ui.DelayBeforePlayShortcutMs = 20;
-        TestLogger logger = new TestLogger();
 
-        int actual = JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(config, 120, "trailing", "job-1", 0, null, new AppLogger(logger));
+        int actual = JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(config, 120, "trailing", 0);
 
-        Assert.AreEqual(70, actual);
-        Assert.AreEqual(0, logger.WarnMessages.Count);
+        Assert.AreEqual(90, actual);
     }
 
     [TestMethod]

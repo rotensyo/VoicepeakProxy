@@ -422,7 +422,7 @@ public static class VoicepeakOneShot
                         executed++;
 
                         int trailing = isLast
-                            ? JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(config, job.TrailingPauseMs, "trailing", job.JobId, i, null, log)
+                            ? JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(config, job.TrailingPauseMs, "trailing", i)
                             : 0;
                         if (trailing > 0)
                         {
@@ -559,8 +559,13 @@ public static class VoicepeakOneShot
             return false;
         }
 
-        int adjustedPausePreMs = JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(config, segment.PausePreMs, "pre", jobId, segmentIndex, segment.Text, log);
+        int adjustedPausePreMs = JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(config, segment.PausePreMs, "pre", segmentIndex);
         long scheduledAt = segmentStartAt + adjustedPausePreMs;
+        if (segment.PausePreMs > 0 && readyAt > scheduledAt)
+        {
+            long lagMs = readyAt - scheduledAt;
+            log.Warn($"pause_overridden_by_ready_at jobId={jobId} index={segmentIndex} scheduledAt={scheduledAt} readyAt={readyAt} lagMs={lagMs}");
+        }
         long playAt = Math.Max(scheduledAt, readyAt);
         MonoClock.SleepUntil(playAt, () => false);
         return true;

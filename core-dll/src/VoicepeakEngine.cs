@@ -296,8 +296,13 @@ internal sealed class VoicepeakEngine : IDisposable
                 _state = WorkerState.ExecutingPrePlayWait;
             }
 
-            int adjustedPausePreMs = JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(_config, seg.PausePreMs, "pre", job.JobId, i, seg.Text, _log);
+            int adjustedPausePreMs = JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(_config, seg.PausePreMs, "pre", i);
             long scheduledAt = segmentStartAt + adjustedPausePreMs;
+            if (seg.PausePreMs > 0 && readyAt > scheduledAt)
+            {
+                long lagMs = readyAt - scheduledAt;
+                _log.Warn($"pause_overridden_by_ready_at jobId={job.JobId} index={i} scheduledAt={scheduledAt} readyAt={readyAt} lagMs={lagMs}");
+            }
             long playAt = Math.Max(scheduledAt, readyAt);
             MonoClock.SleepUntil(playAt, () => _stopping || _appCts.IsCancellationRequested || _interruptRequested);
             if (_interruptRequested)
@@ -343,7 +348,7 @@ internal sealed class VoicepeakEngine : IDisposable
                 }
 
                 int trailing = isLast
-                    ? JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(_config, job.TrailingPauseMs, "trailing", job.JobId, i, null, _log)
+                    ? JobExecutionCore.AdjustPauseByStopConfirmAndPlayDelay(_config, job.TrailingPauseMs, "trailing", i)
                     : 0;
                 if (trailing > 0)
                 {

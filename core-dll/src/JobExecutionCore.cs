@@ -770,20 +770,23 @@ internal static class JobExecutionCore
     }
 
     // pause値から補正時間を差し引き
-    public static int AdjustPauseByStopConfirmAndPlayDelay(AppConfig config, int pauseMs, string phase, string jobId, int segmentIndex, string nextText, AppLogger log)
+    public static int AdjustPauseByStopConfirmAndPlayDelay(AppConfig config, int pauseMs, string phase, int segmentIndex)
     {
-        int compensation = config.Audio.StopConfirmMs + config.Ui.DelayBeforePlayShortcutMs;
-        int requiredByFormulaMs = compensation;
+        int compensation;
         if (string.Equals(phase, "pre", StringComparison.Ordinal))
         {
-            string normalized = InputTextNormalizer.NormalizeForTyping(nextText);
-            int postTypeWaitMs = ComputePostTypeWaitMs(normalized, config.InputTiming.PostTypeWaitPerCharMs, config.InputTiming.PostTypeWaitMinMs);
-            requiredByFormulaMs += postTypeWaitMs;
+            // 先頭は再生押下待機のみを補正
+            compensation = config.Ui.DelayBeforePlayShortcutMs;
+            // 中間以降は停止検知待機も補正
+            if (segmentIndex > 0)
+            {
+                compensation += config.Audio.StopConfirmMs;
+            }
         }
-
-        if (pauseMs > 0 && pauseMs < requiredByFormulaMs)
+        else
         {
-            log.Warn($"pause_too_short jobId={jobId} index={segmentIndex} phase={phase} pauseMs={pauseMs} requiredMs={requiredByFormulaMs}");
+            // 末尾は停止検知待機のみを補正
+            compensation = config.Audio.StopConfirmMs;
         }
 
         int adjusted = pauseMs - compensation;
