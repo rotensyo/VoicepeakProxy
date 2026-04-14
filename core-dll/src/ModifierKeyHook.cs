@@ -1273,9 +1273,10 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
     {
         try
         {
-            if (_state.IsEnabled() && format == CfUnicodeText && _state.HasVirtualClipboardText())
+            if (_state.IsEnabled() && _state.HasVirtualClipboardText())
             {
-                return true;
+                // 仮想クリップボード有効中はUnicodeTextのみ公開
+                return format == CfUnicodeText;
             }
 
             return _isClipboardFormatAvailableOriginal(format);
