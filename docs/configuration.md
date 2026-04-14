@@ -50,9 +50,6 @@
   - 再生ショートカットを実行する前の待機時間(ミリ秒)です
 
 ## InputTimingConfig
-- `KeyStrokeIntervalMs` (default: `0`)
-  - 文字入力時・クリア時のキー操作ごとの待機時間(ミリ秒)です
-  - `0` の場合は待機せずに次のキー操作へ進みます
 - `ActionDelayMs` (default: `5`)
   - 文字入力欄フォーカスなどのUIアクション時の待機時間(ミリ秒)です
 - `PostTypeWaitPerCharMs` (default: `5`)

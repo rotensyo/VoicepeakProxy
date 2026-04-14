@@ -167,8 +167,7 @@ public class UiControllerTests
             };
             InputTimingConfig inputTiming = new InputTimingConfig
             {
-                ClearInputMaxPasses = 2,
-                KeyStrokeIntervalMs = 0
+                ClearInputMaxPasses = 2
             };
             VoicepeakUiController controller = new VoicepeakUiController(
                 ui,
@@ -206,8 +205,7 @@ public class UiControllerTests
             };
             InputTimingConfig inputTiming = new InputTimingConfig
             {
-                ClearInputMaxPasses = 1,
-                KeyStrokeIntervalMs = 0
+                ClearInputMaxPasses = 1
             };
             VoicepeakUiController controller = new VoicepeakUiController(
                 ui,

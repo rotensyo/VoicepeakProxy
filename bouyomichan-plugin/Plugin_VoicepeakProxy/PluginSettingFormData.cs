@@ -451,17 +451,8 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("01)文字入力ディレイ設定")]
-        [DisplayName("01)文字入力間隔(ms)")]
-        [Description("キー操作ごとの待機時間をミリ秒で指定します。0の場合は待機しません。")]
-        public int KeyStrokeIntervalMs
-        {
-            get { return State.Settings.AppConfig.InputTiming.KeyStrokeIntervalMs; }
-            set { State.Settings.AppConfig.InputTiming.KeyStrokeIntervalMs = value; }
-        }
-
-        [Category("01)文字入力ディレイ設定")]
-        [DisplayName("02)文字入力系操作遅延時間(ms)")]
-        [Description("文字入力欄フォーカスなどのUIアクション時の待機時間をミリ秒で指定します。")]
+        [DisplayName("01)文字入力系操作遅延時間(ms)")]
+        [Description("文字入力操作関連アクション毎の待機時間をミリ秒で指定します。")]
         public int ActionDelayMs
         {
             get { return State.Settings.AppConfig.InputTiming.ActionDelayMs; }
@@ -469,7 +460,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("02)文字入力後待機時間設定")]
-        [DisplayName("03)入力後待機時間(1文字あたり、ms)")]
+        [DisplayName("02)入力後待機時間(1文字あたり、ms)")]
         [Description("文字入力後の待機時間算出に使用する倍率です。文字入力完了後に再生失敗する場合は、値を増やして再生前の待機時間を伸ばしてみてください。")]
         public int PostTypeWaitPerCharMs
         {
@@ -478,7 +469,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("02)文字入力後待機時間設定")]
-        [DisplayName("04)入力後最低待機時間(ms)")]
+        [DisplayName("03)入力後最低待機時間(ms)")]
         [Description("文字入力後待機時間の最小値です。文字入力完了後に再生失敗する場合は、値を増やして再生前の待機時間を伸ばしてみてください。")]
         public int PostTypeWaitMinMs
         {
@@ -487,7 +478,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("03)文字入力失敗時リトライ設定")]
-        [DisplayName("05)入力失敗時リトライ遅延時間(ms)")]
+        [DisplayName("04)入力失敗時リトライ遅延時間(ms)")]
         [Description("入力失敗時のリトライ前待機時間をミリ秒で指定します。0の場合は待機しません。")]
         public int TypeTextRetryWaitMs
         {
@@ -496,7 +487,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("03)文字入力失敗時リトライ設定")]
-        [DisplayName("06)入力失敗時リトライ回数")]
+        [DisplayName("05)入力失敗時リトライ回数")]
         [Description("入力失敗時のリトライ回数です。0の場合はリトライしません。")]
         public int TypeTextRetryMaxRetries
         {
@@ -506,7 +497,7 @@ namespace Plugin_VoicepeakProxy
 
 
         [Category("04)入力クリア設定")]
-        [DisplayName("07)入力クリア処理最大試行回数")]
+        [DisplayName("06)入力クリア処理最大試行回数")]
         [Description("入力クリア処理の最大繰り返し回数です。入力文字が削除しきれない場合は増やしてみてください。")]
         public int ClearInputMaxPasses
         {
@@ -515,7 +506,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("05)入力クリア失敗時リトライ設定")]
-        [DisplayName("08)入力クリア失敗時リトライ遅延時間(ms)")]
+        [DisplayName("07)入力クリア失敗時リトライ遅延時間(ms)")]
         [Description("入力クリア失敗時のリトライ前待機時間をミリ秒で指定します。0の場合は待機しません。")]
         public int ClearInputRetryWaitMs
         {
@@ -524,7 +515,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("05)入力クリア失敗時リトライ設定")]
-        [DisplayName("09)入力クリア失敗時リトライ回数")]
+        [DisplayName("08)入力クリア失敗時リトライ回数")]
         [Description("入力クリア失敗時のリトライ回数です。0の場合はリトライしません。")]
         public int ClearInputRetryMaxRetries
         {

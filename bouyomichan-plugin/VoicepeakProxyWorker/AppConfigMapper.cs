@@ -40,7 +40,6 @@ internal static class AppConfigMapper
         config.Ui.PlayShortcutKey = data.Ui.PlayShortcutKey ?? uiDefaults.PlayShortcutKey;
         config.Ui.DelayBeforePlayShortcutMs = data.Ui.DelayBeforePlayShortcutMs;
 
-        config.InputTiming.KeyStrokeIntervalMs = data.InputTiming.KeyStrokeIntervalMs;
         config.InputTiming.TypeTextRetryWaitMs = data.InputTiming.TypeTextRetryWaitMs;
         config.InputTiming.TypeTextRetryMaxRetries = data.InputTiming.TypeTextRetryMaxRetries;
         config.InputTiming.ClearInputRetryWaitMs = data.InputTiming.ClearInputRetryWaitMs;
@@ -101,7 +100,6 @@ internal static class AppConfigMapper
         data.Ui.PlayShortcutKey = config.Ui.PlayShortcutKey ?? string.Empty;
         data.Ui.DelayBeforePlayShortcutMs = config.Ui.DelayBeforePlayShortcutMs;
 
-        data.InputTiming.KeyStrokeIntervalMs = config.InputTiming.KeyStrokeIntervalMs;
         data.InputTiming.TypeTextRetryWaitMs = config.InputTiming.TypeTextRetryWaitMs;
         data.InputTiming.TypeTextRetryMaxRetries = config.InputTiming.TypeTextRetryMaxRetries;
         data.InputTiming.ClearInputRetryWaitMs = config.InputTiming.ClearInputRetryWaitMs;

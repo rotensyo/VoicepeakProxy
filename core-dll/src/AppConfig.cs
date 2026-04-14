@@ -47,7 +47,6 @@ public sealed class UiConfig
 // 入力タイミング関連設定
 public sealed class InputTimingConfig
 {
-    public int KeyStrokeIntervalMs { get; set; } = 0;
     public int TypeTextRetryWaitMs { get; set; } = 1000;
     public int TypeTextRetryMaxRetries { get; set; } = 2;
     public int ClearInputRetryWaitMs { get; set; } = 1000;
@@ -152,7 +151,6 @@ internal static class AppConfigValidator
         }
 
         EnsureNonNegative(config.InputTiming.ActionDelayMs, "inputTiming.actionDelayMs は 0 以上で指定してください");
-        EnsureNonNegative(config.InputTiming.KeyStrokeIntervalMs, "inputTiming.keyStrokeIntervalMs は 0 以上で指定してください");
         EnsureNonNegative(config.InputTiming.TypeTextRetryWaitMs, "inputTiming.typeTextRetryWaitMs は 0 以上で指定してください");
         EnsureNonNegative(config.InputTiming.TypeTextRetryMaxRetries, "inputTiming.typeTextRetryMaxRetries は 0 以上で指定してください");
         EnsureNonNegative(config.InputTiming.ClearInputRetryWaitMs, "inputTiming.clearInputRetryWaitMs は 0 以上で指定してください");

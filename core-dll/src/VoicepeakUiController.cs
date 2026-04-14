@@ -132,8 +132,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 return false;
             }
 
-            SleepKeyStrokeInterval();
-
             int clearInputMaxPasses = Math.Max(1, _inputTiming.ClearInputMaxPasses);
             for (int pass = 0; pass < clearInputMaxPasses; pass++)
             {
@@ -144,7 +142,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 }
 
                 int visibleBlockCount = Math.Max(1, before.VisibleBlockCount);
-                if (!RunSelectAllDeleteCycle(mainHwnd, selectAllKey, selectAllMode, useSelectAllModifier, visibleBlockCount))
+                if (!RunSelectAllDeleteCycle(mainHwnd, selectAllKey, selectAllMode, useSelectAllModifier, visibleBlockCount, actionDelayMs))
                 {
                     return false;
                 }
@@ -155,22 +153,25 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     }
 
     // 全選択後にDeleteを二回送信するサイクル
-    private bool RunSelectAllDeleteCycle(IntPtr mainHwnd, VirtualKey selectAllKey, ModifierOverrideMode selectAllMode, bool useSelectAllModifier, int visibleBlockCount)
+    private bool RunSelectAllDeleteCycle(IntPtr mainHwnd, VirtualKey selectAllKey, ModifierOverrideMode selectAllMode, bool useSelectAllModifier, int visibleBlockCount, int actionDelayMs)
     {
         int cycleCount = Math.Max(1, visibleBlockCount);
         for (int i = 0; i < cycleCount; i++)
         {
+            SleepActionDelay(actionDelayMs);
             if (!SendShortcutWithOptionalModifier(mainHwnd, "clear_input_select_all", selectAllKey, selectAllMode, useSelectAllModifier, "clear_input_select_all_override_reset_failed"))
             {
                 return false;
             }
 
-            SleepKeyStrokeInterval();
+            SleepActionDelay(actionDelayMs);
 
             if (!PressDeleteCore(mainHwnd))
             {
                 return false;
             }
+
+            SleepActionDelay(actionDelayMs);
 
             if (!PressDeleteCore(mainHwnd))
             {
@@ -460,21 +461,16 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     public bool PressDelete(IntPtr mainHwnd)
     {
         return ExecuteWithModifierIsolation(mainHwnd, "press_delete", action: () =>
-            PressDeleteCore(mainHwnd));
+        {
+            SleepActionDelay(_inputTiming.ActionDelayMs);
+            return PressDeleteCore(mainHwnd);
+        });
     }
 
     // Deleteキー送信の共通実体
     private bool PressDeleteCore(IntPtr mainHwnd)
     {
-        bool sent = SendKey(mainHwnd, VirtualKey.Delete);
-        if (!sent)
-        {
-            return false;
-        }
-
-        SleepKeyStrokeInterval();
-
-        return true;
+        return SendKey(mainHwnd, VirtualKey.Delete);
     }
 
     public bool KillFocus(IntPtr mainHwnd)
@@ -1070,15 +1066,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         if (actionDelayMs > 0)
         {
             Thread.Sleep(actionDelayMs);
-        }
-    }
-
-    // キー操作間隔を待機
-    private void SleepKeyStrokeInterval()
-    {
-        if (_inputTiming.KeyStrokeIntervalMs > 0)
-        {
-            Thread.Sleep(_inputTiming.KeyStrokeIntervalMs);
         }
     }
 

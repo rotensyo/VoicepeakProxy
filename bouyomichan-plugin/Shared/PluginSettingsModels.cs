@@ -197,7 +197,6 @@ public sealed class UiConfigData
     // 入力タイミング関連設定
     public sealed class InputTimingConfigData
     {
-        public int KeyStrokeIntervalMs { get; set; }
         public int TypeTextRetryWaitMs { get; set; }
         public int TypeTextRetryMaxRetries { get; set; }
         public int ClearInputRetryWaitMs { get; set; }

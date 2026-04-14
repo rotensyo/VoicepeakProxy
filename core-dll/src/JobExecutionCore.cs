@@ -777,9 +777,8 @@ internal static class JobExecutionCore
         if (string.Equals(phase, "pre", StringComparison.Ordinal))
         {
             string normalized = InputTextNormalizer.NormalizeForTyping(nextText);
-            int typingMs = normalized.Length * config.InputTiming.KeyStrokeIntervalMs;
             int postTypeWaitMs = ComputePostTypeWaitMs(normalized, config.InputTiming.PostTypeWaitPerCharMs, config.InputTiming.PostTypeWaitMinMs);
-            requiredByFormulaMs += typingMs + postTypeWaitMs;
+            requiredByFormulaMs += postTypeWaitMs;
         }
 
         if (pauseMs > 0 && pauseMs < requiredByFormulaMs)

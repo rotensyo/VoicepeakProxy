@@ -19,7 +19,6 @@ public class AppConfigValidationTests
         Assert.AreEqual(0, config.Audio.StartConfirmMaxRetries);
         Assert.AreEqual(300, config.Audio.StopConfirmMs);
         Assert.AreEqual("初期化完了", config.Validation.ValidationText);
-        Assert.AreEqual(0, config.InputTiming.KeyStrokeIntervalMs);
         Assert.AreEqual(1000, config.InputTiming.TypeTextRetryWaitMs);
         Assert.AreEqual(2, config.InputTiming.TypeTextRetryMaxRetries);
         Assert.AreEqual(1000, config.InputTiming.ClearInputRetryWaitMs);
@@ -91,7 +90,6 @@ public class AppConfigValidationTests
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.Validation.ValidationRetryIntervalMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.PostTypeWaitPerCharMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.PostTypeWaitMinMs = -1));
-        Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.KeyStrokeIntervalMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.TypeTextRetryWaitMs = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.TypeTextRetryMaxRetries = -1));
         Assert.ThrowsException<InvalidOperationException>(() => ValidateWith(config => config.InputTiming.ClearInputRetryWaitMs = -1));
@@ -261,7 +259,6 @@ public class AppConfigValidationTests
             config.Validation.ValidationRetryIntervalMs = 0;
             config.InputTiming.PostTypeWaitPerCharMs = 0;
             config.InputTiming.PostTypeWaitMinMs = 0;
-            config.InputTiming.KeyStrokeIntervalMs = 0;
             config.InputTiming.TypeTextRetryWaitMs = 0;
             config.InputTiming.TypeTextRetryMaxRetries = 0;
             config.InputTiming.ClearInputRetryWaitMs = 0;
