@@ -189,6 +189,8 @@ public sealed class UiConfigData
     public string MoveToStartKey { get; set; }
     public string ClearInputSelectAllModifier { get; set; }
     public string ClearInputSelectAllKey { get; set; }
+    public string PasteShortcutModifier { get; set; }
+    public string PasteShortcutKey { get; set; }
     public string PlayShortcutModifier { get; set; }
     public string PlayShortcutKey { get; set; }
     public int DelayBeforePlayShortcutMs { get; set; }
@@ -221,7 +223,6 @@ public sealed class UiConfigData
     // テキスト処理設定
     public sealed class TextConfigData
     {
-        public bool SplitInputBlockOnNewline { get; set; }
         public List<ReplaceRuleData> ReplaceRules { get; set; }
 
         public TextConfigData()

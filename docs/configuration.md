@@ -23,26 +23,34 @@
 
 ## UiConfig
 - `MoveToStartModifier` (default: `ctrl`)
-  - 先頭移動ショートカットの修飾子キーです
+  - 「先頭に移動」ショートカットの修飾子キーです
   - 空文字または `ctrl` または `alt` を指定してください
   - `shift` は入力欄内で文字入力と誤認されるため指定できません
 - `MoveToStartKey` (default: `cursor up`)
-  - 先頭移動ショートカットのキーです
+  - 「先頭に移動」ショートカットのキーです
   - VOICEPEAKの設定値と同じものを指定してください
   - 主な指定値は `cursor up`, `cursor down`, `cursor left`, `cursor right`, `F1-F12`, `spacebar`, `home`, `end`, `a-z`, `0-9`, 記号キー(`@`, `-`, `[`, `]`など)です
 - `ClearInputSelectAllModifier` (default: `ctrl`)
-  - 入力欄全選択ショートカットの修飾子キーです
+  - 「すべてを選択」ショートカットの修飾子キーです
   - 空文字または `ctrl` または `alt` を指定してください
   - `shift` は入力欄内で文字入力と誤認されるため指定できません
 - `ClearInputSelectAllKey` (default: `a`)
-  - 入力欄全選択ショートカットのキーです
+  - 「すべてを選択」ショートカットのキーです
+  - VOICEPEAKの設定値と同じものを指定してください
+  - 主な指定値は`a-z`, `0-9`, 記号キーです
+- `PasteShortcutModifier` (default: `ctrl`)
+  - 「ペースト」ショートカットの修飾子キーです
+  - 空文字または `ctrl` または `alt` を指定してください
+  - `shift` は入力欄内で文字入力と誤認されるため指定できません
+- `PasteShortcutKey` (default: `v`)
+  - 「ペースト」ショートカットのキーです
   - VOICEPEAKの設定値と同じものを指定してください
   - 主な指定値は`a-z`, `0-9`, 記号キーです
 - `PlayShortcutModifier` (default: `""`)
-  - 再生/停止ショートカットの修飾子キーです
+  - 「再生/停止」ショートカットの修飾子キーです
   - 空文字または `ctrl` または `alt` または `shift` を指定してください
 - `PlayShortcutKey` (default: `spacebar`)
-  - 再生/停止ショートカットのキーです
+  - 「再生/停止」ショートカットのキーです
   - VOICEPEAKの設定値と同じものを指定してください
   - 主な指定値は `cursor up`, `cursor down`, `cursor left`, `cursor right`, `F1-F12`, `spacebar`, `home`, `end`, `a-z`, `0-9`, 記号キー(`@`, `-`, `[`, `]`など)です
   - `Delete` や `Enter` は文字入力操作と誤認されるため指定できません。
@@ -74,9 +82,6 @@
   - 文字列が消しきれない場合はこの数を増やしてみてください。
 
 ## TextConfig
-- `SplitInputBlockOnNewline` (default: `false`)
-  - `true` の場合、改行入力時に `Enter` を送信して入力ブロックを分割します
-  - `false` の場合、改行入力時に `Shift+Enter` を送信して通常の改行を行います
 - `ReplaceRules`
   - 上から順に1回ずつ適用します
   - `[[pause:NNN]]` には適用しません
@@ -112,11 +117,11 @@ AppConfig config = new AppConfig
   - 音声監視を行う間隔(ミリ秒)です
 - `StartConfirmTimeoutMs` (default: `1000`)
   - 再生押下後、この時間(ミリ秒)内に発話開始を検知できないと失敗とし、`StartConfirmTimeout`扱いにします
-- `StartConfirmMaxRetries` (default: `0`)
+- `StartConfirmMaxRetries` (default: `2`)
   - `StartConfirmTimeoutMs` 超過時の再試行回数です
   - 再試行時は `MoveToStart` → `PressPlay` → 開始確認 をやり直します
   - `VoicepeakOneShot.SpeakOnce` では再試行せず、超過で即 `StartConfirmTimeout` になります
-- `StopConfirmMs` (default: `300`)
+- `StopConfirmMs` (default: `200`)
   - 発話開始後、この時間(ミリ秒)だけ閾値未満が続いたら終了と判定します
 - `MaxSpeakingDurationSec` (default: `300`)
   - 発話開始後、この秒数を超えても終了しない場合はエラーとします

@@ -204,6 +204,7 @@ public class VoicepeakEngineTests
         audio.Fallback = new AudioSessionSnapshot { Found = true, Peak = 0f, StateLabel = "AudioSessionStateInactive" };
         AppConfig config = CreateEngineConfig();
         config.Audio.StartConfirmTimeoutMs = 1100;
+        config.Audio.StartConfirmMaxRetries = 0;
         config.Audio.MaxSpeakingDurationSec = 1;
 
         using CancellationTokenSource cts = new CancellationTokenSource();

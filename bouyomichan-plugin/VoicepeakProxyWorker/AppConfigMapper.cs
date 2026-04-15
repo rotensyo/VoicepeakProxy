@@ -36,6 +36,8 @@ internal static class AppConfigMapper
         config.Ui.MoveToStartKey = data.Ui.MoveToStartKey ?? uiDefaults.MoveToStartKey;
         config.Ui.ClearInputSelectAllModifier = data.Ui.ClearInputSelectAllModifier ?? uiDefaults.ClearInputSelectAllModifier;
         config.Ui.ClearInputSelectAllKey = data.Ui.ClearInputSelectAllKey ?? uiDefaults.ClearInputSelectAllKey;
+        config.Ui.PasteShortcutModifier = data.Ui.PasteShortcutModifier ?? uiDefaults.PasteShortcutModifier;
+        config.Ui.PasteShortcutKey = data.Ui.PasteShortcutKey ?? uiDefaults.PasteShortcutKey;
         config.Ui.PlayShortcutModifier = data.Ui.PlayShortcutModifier ?? uiDefaults.PlayShortcutModifier;
         config.Ui.PlayShortcutKey = data.Ui.PlayShortcutKey ?? uiDefaults.PlayShortcutKey;
         config.Ui.DelayBeforePlayShortcutMs = data.Ui.DelayBeforePlayShortcutMs;
@@ -57,7 +59,6 @@ internal static class AppConfigMapper
         config.Audio.MaxSpeakingDurationSec = data.Audio.MaxSpeakingDurationSec;
 
         config.Text.ReplaceRules = new List<ReplaceRule>();
-        config.Text.SplitInputBlockOnNewline = data.Text.SplitInputBlockOnNewline;
         for (int i = 0; i < data.Text.ReplaceRules.Count; i++)
         {
             ReplaceRuleData rule = data.Text.ReplaceRules[i] ?? new ReplaceRuleData();
@@ -96,6 +97,8 @@ internal static class AppConfigMapper
         data.Ui.MoveToStartKey = config.Ui.MoveToStartKey ?? string.Empty;
         data.Ui.ClearInputSelectAllModifier = config.Ui.ClearInputSelectAllModifier ?? string.Empty;
         data.Ui.ClearInputSelectAllKey = config.Ui.ClearInputSelectAllKey ?? string.Empty;
+        data.Ui.PasteShortcutModifier = config.Ui.PasteShortcutModifier ?? string.Empty;
+        data.Ui.PasteShortcutKey = config.Ui.PasteShortcutKey ?? string.Empty;
         data.Ui.PlayShortcutModifier = config.Ui.PlayShortcutModifier ?? string.Empty;
         data.Ui.PlayShortcutKey = config.Ui.PlayShortcutKey ?? string.Empty;
         data.Ui.DelayBeforePlayShortcutMs = config.Ui.DelayBeforePlayShortcutMs;
@@ -117,7 +120,6 @@ internal static class AppConfigMapper
         data.Audio.MaxSpeakingDurationSec = config.Audio.MaxSpeakingDurationSec;
 
         data.Text.ReplaceRules = new List<ReplaceRuleData>();
-        data.Text.SplitInputBlockOnNewline = config.Text.SplitInputBlockOnNewline;
         for (int i = 0; i < config.Text.ReplaceRules.Count; i++)
         {
             ReplaceRule rule = config.Text.ReplaceRules[i] ?? new ReplaceRule();

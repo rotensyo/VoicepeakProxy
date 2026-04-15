@@ -228,7 +228,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         }
     }
 
-    // 仮想クリップボード経由で文字列を貼り付け
+    // 仮想クリップボード経由で文字列をペースト
     public bool TypeText(IntPtr mainHwnd, string text)
     {
         string send = text ?? string.Empty;
@@ -265,12 +265,22 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
             virtualClipboardSet = true;
 
+            if (!ShortcutParser.TryParsePasteShortcutKey(_ui.PasteShortcutKey, out VirtualKey pasteKey))
+            {
+                return false;
+            }
+
+            if (!ShortcutParser.TryParsePasteShortcutModifier(_ui.PasteShortcutModifier, out ModifierOverrideMode pasteMode, out bool usePasteModifier))
+            {
+                return false;
+            }
+
             if (!SendShortcutWithOptionalModifier(
                     mainHwnd,
                     "type_text_paste",
-                    (VirtualKey)'V',
-                    ModifierOverrideMode.Ctrl,
-                    useModifier: true,
+                    pasteKey,
+                    pasteMode,
+                    useModifier: usePasteModifier,
                     "type_text_paste_override_reset_failed"))
             {
                 _log.Warn($"type_text_target_send_failed reason=paste_failed hwnd=0x{mainHwnd.ToInt64():X}");
@@ -517,6 +527,16 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return ShortcutParser.IsValidClearInputSelectAllKey(raw);
     }
 
+    internal static bool IsValidPasteShortcutModifier(string raw)
+    {
+        return ShortcutParser.IsValidPasteShortcutModifier(raw);
+    }
+
+    internal static bool IsValidPasteShortcutKey(string raw)
+    {
+        return ShortcutParser.IsValidPasteShortcutKey(raw);
+    }
+
     // ショートカット解析を集約
     private static class ShortcutParser
     {
@@ -556,6 +576,18 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             return TryParseShortcutKey(raw, out _);
         }
 
+        // ペースト修飾子の妥当性を判定
+        public static bool IsValidPasteShortcutModifier(string raw)
+        {
+            return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAlt, out _, out _);
+        }
+
+        // ペーストキーの妥当性を判定
+        public static bool IsValidPasteShortcutKey(string raw)
+        {
+            return TryParseShortcutKey(raw, out _);
+        }
+
         // 再生ショートカット修飾子を解析
         public static bool TryParsePlayShortcutModifier(string raw, out ModifierOverrideMode mode, out bool useModifier)
         {
@@ -588,6 +620,18 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
         // 全選択キーを解析
         public static bool TryParseClearInputSelectAllKey(string raw, out VirtualKey key)
+        {
+            return TryParseShortcutKey(raw, out key);
+        }
+
+        // ペースト修飾子を解析
+        public static bool TryParsePasteShortcutModifier(string raw, out ModifierOverrideMode mode, out bool useModifier)
+        {
+            return TryParseShortcutModifier(raw, ModifierAllowance.CtrlAlt, out mode, out useModifier);
+        }
+
+        // ペーストキーを解析
+        public static bool TryParsePasteShortcutKey(string raw, out VirtualKey key)
         {
             return TryParseShortcutKey(raw, out key);
         }

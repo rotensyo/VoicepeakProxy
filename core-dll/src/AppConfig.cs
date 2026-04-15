@@ -39,6 +39,8 @@ public sealed class UiConfig
     public string MoveToStartKey { get; set; } = "cursor up";
     public string ClearInputSelectAllModifier { get; set; } = "ctrl";
     public string ClearInputSelectAllKey { get; set; } = "a";
+    public string PasteShortcutModifier { get; set; } = "ctrl";
+    public string PasteShortcutKey { get; set; } = "v";
     public string PlayShortcutModifier { get; set; } = string.Empty;
     public string PlayShortcutKey { get; set; } = "spacebar";
     public int DelayBeforePlayShortcutMs { get; set; } = 60;
@@ -63,15 +65,14 @@ public sealed class AudioConfig
     public float PeakThreshold { get; set; } = 0.000000001f;
     public int PollIntervalMs { get; set; } = 50;
     public int StartConfirmTimeoutMs { get; set; } = 1000;
-    public int StartConfirmMaxRetries { get; set; } = 0;
-    public int StopConfirmMs { get; set; } = 300;
+    public int StartConfirmMaxRetries { get; set; } = 2;
+    public int StopConfirmMs { get; set; } = 200;
     public int MaxSpeakingDurationSec { get; set; } = 300;
 }
 
 // テキスト処理設定
 public sealed class TextConfig
 {
-    public bool SplitInputBlockOnNewline { get; set; } = false;
     public List<ReplaceRule> ReplaceRules { get; set; } = new List<ReplaceRule>();
 }
 
@@ -138,6 +139,16 @@ internal static class AppConfigValidator
         if (!VoicepeakUiController.IsValidClearInputSelectAllKey(config.Ui.ClearInputSelectAllKey))
         {
             throw new InvalidOperationException("ui.clearInputSelectAllKey は有効なキーを指定してください（例: a, @, home）");
+        }
+
+        if (!VoicepeakUiController.IsValidPasteShortcutModifier(config.Ui.PasteShortcutModifier))
+        {
+            throw new InvalidOperationException("ui.pasteShortcutModifier は空文字/ctrl/alt のいずれかを指定してください");
+        }
+
+        if (!VoicepeakUiController.IsValidPasteShortcutKey(config.Ui.PasteShortcutKey))
+        {
+            throw new InvalidOperationException("ui.pasteShortcutKey は有効なキーを指定してください（例: v, @, home）");
         }
 
         if (!VoicepeakUiController.IsValidPlayShortcutModifier(config.Ui.PlayShortcutModifier))

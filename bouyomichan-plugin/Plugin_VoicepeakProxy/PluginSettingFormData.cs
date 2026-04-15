@@ -409,8 +409,26 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Ui.ClearInputSelectAllKey = value ?? string.Empty; }
         }
 
-        [Category("03)「再生/停止」ショートカット設定")]
-        [DisplayName("05)「再生/停止」ショートカット修飾子")]
+        [Category("03)「ペースト」ショートカット設定")]
+        [DisplayName("05)「ペースト」ショートカット修飾子")]
+        [Description("「ペースト」ショートカットの修飾子キーです。VOICEPEAKの設定値に応じて、空文字/ctrl/altのいずれかを指定してください。")]
+        public string PasteShortcutModifier
+        {
+            get { return State.Settings.AppConfig.Ui.PasteShortcutModifier; }
+            set { State.Settings.AppConfig.Ui.PasteShortcutModifier = value ?? string.Empty; }
+        }
+
+        [Category("03)「ペースト」ショートカット設定")]
+        [DisplayName("06)「ペースト」ショートカット")]
+        [Description("「ペースト」ショートカットのキーです。VOICEPEAKの設定値と同じものを指定してください。例: v")]
+        public string PasteShortcutKey
+        {
+            get { return State.Settings.AppConfig.Ui.PasteShortcutKey; }
+            set { State.Settings.AppConfig.Ui.PasteShortcutKey = value ?? string.Empty; }
+        }
+
+        [Category("04)「再生/停止」ショートカット設定")]
+        [DisplayName("07)「再生/停止」ショートカット修飾子")]
         [Description("「再生/停止」ショートカットの修飾子キーです。VOICEPEAKの設定値に応じて、空文字/ctrl/alt/shiftのいずれかを指定してください。")]
         public string PlayShortcutModifier
         {
@@ -418,8 +436,8 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Ui.PlayShortcutModifier = value ?? string.Empty; }
         }
 
-        [Category("03)「再生/停止」ショートカット設定")]
-        [DisplayName("06)「再生/停止」ショートカット")]
+        [Category("04)「再生/停止」ショートカット設定")]
+        [DisplayName("08)「再生/停止」ショートカット")]
         [Description("「再生/停止」ショートカットのキーです。VOICEPEAKの設定値と同じものを指定してください。例: spacebar, F3, home")]
         public string PlayShortcutKey
         {
@@ -427,8 +445,8 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Ui.PlayShortcutKey = value ?? string.Empty; }
         }
 
-        [Category("04)再生実行ディレイ設定")]
-        [DisplayName("07)再生実行前遅延時間(ms)")]
+        [Category("05)再生実行ディレイ設定")]
+        [DisplayName("09)再生実行前遅延時間(ms)")]
         [Description("再生アクション実行前の待機時間をミリ秒で指定します。")]
         public int DelayBeforePlayShortcutMs
         {
@@ -591,15 +609,6 @@ namespace Plugin_VoicepeakProxy
 
                 State.Settings.AppConfig.Text.ReplaceRules = rules;
             }
-        }
-
-        [Category("01)置換設定")]
-        [DisplayName("02)改行時入力ブロック分割設定")]
-        [Description("改行時に入力ブロックを分割するかの設定です。trueの場合は分割します。棒読みちゃんは基本的に改行を送らないので、効果は無いかもしれません。")]
-        public bool SplitInputBlockOnNewline
-        {
-            get { return State.Settings.AppConfig.Text.SplitInputBlockOnNewline; }
-            set { State.Settings.AppConfig.Text.SplitInputBlockOnNewline = value; }
         }
     }
 

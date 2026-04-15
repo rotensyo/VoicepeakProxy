@@ -16,8 +16,8 @@ public class AppConfigValidationTests
         Assert.AreEqual(500, config.Runtime.MaxQueuedJobs);
         Assert.AreEqual(50, config.Audio.PollIntervalMs);
         Assert.AreEqual(1000, config.Audio.StartConfirmTimeoutMs);
-        Assert.AreEqual(0, config.Audio.StartConfirmMaxRetries);
-        Assert.AreEqual(300, config.Audio.StopConfirmMs);
+        Assert.AreEqual(2, config.Audio.StartConfirmMaxRetries);
+        Assert.AreEqual(200, config.Audio.StopConfirmMs);
         Assert.AreEqual("初期化完了", config.Validation.ValidationText);
         Assert.AreEqual(1000, config.InputTiming.TypeTextRetryWaitMs);
         Assert.AreEqual(2, config.InputTiming.TypeTextRetryMaxRetries);
@@ -33,9 +33,10 @@ public class AppConfigValidationTests
         Assert.AreEqual("cursor up", config.Ui.MoveToStartKey);
         Assert.AreEqual("ctrl", config.Ui.ClearInputSelectAllModifier);
         Assert.AreEqual("a", config.Ui.ClearInputSelectAllKey);
+        Assert.AreEqual("ctrl", config.Ui.PasteShortcutModifier);
+        Assert.AreEqual("v", config.Ui.PasteShortcutKey);
         Assert.AreEqual(string.Empty, config.Ui.PlayShortcutModifier);
         Assert.AreEqual("spacebar", config.Ui.PlayShortcutKey);
-        Assert.IsFalse(config.Text.SplitInputBlockOnNewline);
         Assert.AreEqual("warn", config.Debug.LogMinimumLevel);
         Assert.AreEqual(BootValidationMode.Required, config.Runtime.BootValidation);
     }
@@ -198,6 +199,26 @@ public class AppConfigValidationTests
     {
         // 空文字は許可
         ValidateWith(config => config.Validation.ValidationText = string.Empty);
+    }
+
+    [TestMethod]
+    public void Validate_InvalidPasteShortcutModifier_Throws()
+    {
+        // ペースト修飾子不正を拒否
+        InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
+            ValidateWith(config => config.Ui.PasteShortcutModifier = "shift"));
+
+        StringAssert.Contains(ex.Message, "ui.pasteShortcutModifier");
+    }
+
+    [TestMethod]
+    public void Validate_InvalidPasteShortcutKey_Throws()
+    {
+        // ペーストキー不正を拒否
+        InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() =>
+            ValidateWith(config => config.Ui.PasteShortcutKey = ""));
+
+        StringAssert.Contains(ex.Message, "ui.pasteShortcutKey");
     }
 
     [TestMethod]
