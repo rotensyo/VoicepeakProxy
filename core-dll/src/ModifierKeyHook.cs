@@ -113,31 +113,11 @@ internal sealed class ModifierKeyHookController
     {
         lock (_gate)
         {
-            int targetPid = _pid;
-            if (TrySetEnabledOnce(enabled, log))
-            {
-                return true;
-            }
-
-            if (targetPid <= 0)
-            {
-                return false;
-            }
-
-            DisposeConnection(resetPid: false);
-            if (!TryConnectExisting(targetPid, log, _hookConnectTimeoutMs))
-            {
-                log.Warn($"modifier_hook_state_retry_failed enabled={enabled} reason=reconnect_failed");
-                return false;
-            }
-
-            if (!TrySetEnabledOnce(enabled, log))
-            {
-                log.Warn($"modifier_hook_state_retry_failed enabled={enabled} reason=retry_send_failed");
-                return false;
-            }
-
-            return true;
+            return SendWithReconnectRetry(
+                () => TrySetEnabledOnce(enabled, log),
+                $"modifier_hook_state_retry_failed enabled={enabled} reason=reconnect_failed",
+                $"modifier_hook_state_retry_failed enabled={enabled} reason=retry_send_failed",
+                log);
         }
     }
 
@@ -201,31 +181,11 @@ internal sealed class ModifierKeyHookController
     {
         lock (_gate)
         {
-            int targetPid = _pid;
-            if (TrySetModifierOverrideOnce(mode, log))
-            {
-                return true;
-            }
-
-            if (targetPid <= 0)
-            {
-                return false;
-            }
-
-            DisposeConnection(resetPid: false);
-            if (!TryConnectExisting(targetPid, log, _hookConnectTimeoutMs))
-            {
-                log.Warn($"modifier_hook_override_retry_failed mode={mode} reason=reconnect_failed");
-                return false;
-            }
-
-            if (!TrySetModifierOverrideOnce(mode, log))
-            {
-                log.Warn($"modifier_hook_override_retry_failed mode={mode} reason=retry_send_failed");
-                return false;
-            }
-
-            return true;
+            return SendWithReconnectRetry(
+                () => TrySetModifierOverrideOnce(mode, log),
+                $"modifier_hook_override_retry_failed mode={mode} reason=reconnect_failed",
+                $"modifier_hook_override_retry_failed mode={mode} reason=retry_send_failed",
+                log);
         }
     }
 
@@ -234,31 +194,11 @@ internal sealed class ModifierKeyHookController
     {
         lock (_gate)
         {
-            int targetPid = _pid;
-            if (TrySetVirtualClipboardTextOnce(text, log))
-            {
-                return true;
-            }
-
-            if (targetPid <= 0)
-            {
-                return false;
-            }
-
-            DisposeConnection(resetPid: false);
-            if (!TryConnectExisting(targetPid, log, _hookConnectTimeoutMs))
-            {
-                log.Warn("modifier_hook_clip_set_retry_failed reason=reconnect_failed");
-                return false;
-            }
-
-            if (!TrySetVirtualClipboardTextOnce(text, log))
-            {
-                log.Warn("modifier_hook_clip_set_retry_failed reason=retry_send_failed");
-                return false;
-            }
-
-            return true;
+            return SendWithReconnectRetry(
+                () => TrySetVirtualClipboardTextOnce(text, log),
+                "modifier_hook_clip_set_retry_failed reason=reconnect_failed",
+                "modifier_hook_clip_set_retry_failed reason=retry_send_failed",
+                log);
         }
     }
 
@@ -267,32 +207,42 @@ internal sealed class ModifierKeyHookController
     {
         lock (_gate)
         {
-            int targetPid = _pid;
-            if (TryClearVirtualClipboardOnce(log))
-            {
-                return true;
-            }
+            return SendWithReconnectRetry(
+                () => TryClearVirtualClipboardOnce(log),
+                "modifier_hook_clip_clear_retry_failed reason=reconnect_failed",
+                "modifier_hook_clip_clear_retry_failed reason=retry_send_failed",
+                log);
+        }
+    }
 
-            if (targetPid <= 0)
-            {
-                return false;
-            }
-
-            DisposeConnection(resetPid: false);
-            if (!TryConnectExisting(targetPid, log, _hookConnectTimeoutMs))
-            {
-                log.Warn("modifier_hook_clip_clear_retry_failed reason=reconnect_failed");
-                return false;
-            }
-
-            if (!TryClearVirtualClipboardOnce(log))
-            {
-                log.Warn("modifier_hook_clip_clear_retry_failed reason=retry_send_failed");
-                return false;
-            }
-
+    // 再接続を伴うコマンド再送を共通処理
+    private bool SendWithReconnectRetry(Func<bool> sendOnce, string reconnectFailedLog, string retryFailedLog, AppLogger log)
+    {
+        int targetPid = _pid;
+        if (sendOnce())
+        {
             return true;
         }
+
+        if (targetPid <= 0)
+        {
+            return false;
+        }
+
+        DisposeConnection(resetPid: false);
+        if (!TryConnectExisting(targetPid, log, _hookConnectTimeoutMs))
+        {
+            log.Warn(reconnectFailedLog);
+            return false;
+        }
+
+        if (!sendOnce())
+        {
+            log.Warn(retryFailedLog);
+            return false;
+        }
+
+        return true;
     }
 
     // CLIP_SETコマンドを1回送信
@@ -670,6 +620,242 @@ internal sealed class NamedPipeModifierHookConnection : IModifierHookConnection
     }
 }
 
+// 仮想クリップボードハンドル生成を抽象化
+internal interface IVirtualClipboardHandleStore
+{
+    IntPtr CreateHandle(string text);
+    void FreeHandle(IntPtr handle);
+}
+
+// 仮想クリップボード用メモリを管理
+internal sealed class VirtualClipboardHandleStore : IVirtualClipboardHandleStore
+{
+    private const uint GmemMoveable = 0x0002;
+    private const uint GmemZeroInit = 0x0040;
+
+    // Unicode文字列を保持するHGLOBALを確保
+    public IntPtr CreateHandle(string text)
+    {
+        byte[] bytes = Encoding.Unicode.GetBytes((text ?? string.Empty) + "\0");
+        IntPtr handle = GlobalAlloc(GmemMoveable | GmemZeroInit, new UIntPtr((uint)bytes.Length));
+        if (handle == IntPtr.Zero)
+        {
+            return IntPtr.Zero;
+        }
+
+        IntPtr locked = GlobalLock(handle);
+        if (locked == IntPtr.Zero)
+        {
+            GlobalFree(handle);
+            return IntPtr.Zero;
+        }
+
+        Marshal.Copy(bytes, 0, locked, bytes.Length);
+        GlobalUnlock(handle);
+        return handle;
+    }
+
+    // HGLOBALを解放
+    public void FreeHandle(IntPtr handle)
+    {
+        if (handle == IntPtr.Zero)
+        {
+            return;
+        }
+
+        GlobalFree(handle);
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr GlobalAlloc(uint uFlags, UIntPtr dwBytes);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr GlobalLock(IntPtr hMem);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GlobalUnlock(IntPtr hMem);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr GlobalFree(IntPtr hMem);
+}
+
+// 仮想クリップボード取得結果
+internal enum VirtualClipboardDataResult
+{
+    Unavailable,
+    AllocationFailed,
+    Provided
+}
+
+// 仮想クリップボードのセッション寿命を管理
+internal sealed class VirtualClipboardSessionState
+{
+    private sealed class ClipboardSession
+    {
+        public bool VirtualDataAllowed { get; set; } = true;
+        public List<IntPtr> IssuedHandles { get; } = new List<IntPtr>();
+    }
+
+    private readonly object _gate = new object();
+    private readonly IVirtualClipboardHandleStore _handleStore;
+    private readonly Dictionary<int, ClipboardSession> _sessions = new Dictionary<int, ClipboardSession>();
+    private string _publishedText = string.Empty;
+    private bool _hasPublishedText;
+
+    public VirtualClipboardSessionState()
+        : this(new VirtualClipboardHandleStore())
+    {
+    }
+
+    internal VirtualClipboardSessionState(IVirtualClipboardHandleStore handleStore)
+    {
+        _handleStore = handleStore ?? throw new ArgumentNullException(nameof(handleStore));
+    }
+
+    // 仮想クリップボード文字列を公開
+    public void SetPublishedText(string text)
+    {
+        lock (_gate)
+        {
+            _publishedText = text ?? string.Empty;
+            _hasPublishedText = true;
+        }
+    }
+
+    // 仮想クリップボード文字列の公開を止める
+    public void ClearPublishedText()
+    {
+        lock (_gate)
+        {
+            _publishedText = string.Empty;
+            _hasPublishedText = false;
+        }
+    }
+
+    // 現在スレッドで仮想クリップボード公開可否を返す
+    public bool CanAdvertiseFormat(int threadId)
+    {
+        lock (_gate)
+        {
+            if (!_hasPublishedText)
+            {
+                return false;
+            }
+
+            if (threadId > 0 && _sessions.TryGetValue(threadId, out ClipboardSession session) && !session.VirtualDataAllowed)
+            {
+                return false;
+            }
+
+            return true;
+        }
+    }
+
+    // クリップボード参照セッションを開始
+    public void BeginSession(int threadId)
+    {
+        if (threadId <= 0)
+        {
+            return;
+        }
+
+        lock (_gate)
+        {
+            ReleaseSessionHandlesLocked(threadId);
+            _sessions[threadId] = new ClipboardSession();
+        }
+    }
+
+    // クリップボード参照セッションを終了
+    public void EndSession(int threadId)
+    {
+        if (threadId <= 0)
+        {
+            return;
+        }
+
+        lock (_gate)
+        {
+            ReleaseSessionHandlesLocked(threadId);
+            _sessions.Remove(threadId);
+        }
+    }
+
+    // セッション中に返却済みハンドルを無効化
+    public void InvalidateSessionData(int threadId)
+    {
+        if (threadId <= 0)
+        {
+            return;
+        }
+
+        lock (_gate)
+        {
+            if (!_sessions.TryGetValue(threadId, out ClipboardSession session))
+            {
+                return;
+            }
+
+            FreeSessionHandlesLocked(session);
+            session.VirtualDataAllowed = false;
+        }
+    }
+
+    // 現在セッション用の仮想クリップボードハンドルを生成
+    public VirtualClipboardDataResult TryCreateHandleForSession(int threadId, out IntPtr handle)
+    {
+        handle = IntPtr.Zero;
+        if (threadId <= 0)
+        {
+            return VirtualClipboardDataResult.Unavailable;
+        }
+
+        lock (_gate)
+        {
+            if (!_hasPublishedText)
+            {
+                return VirtualClipboardDataResult.Unavailable;
+            }
+
+            if (!_sessions.TryGetValue(threadId, out ClipboardSession session) || !session.VirtualDataAllowed)
+            {
+                return VirtualClipboardDataResult.Unavailable;
+            }
+
+            handle = _handleStore.CreateHandle(_publishedText);
+            if (handle == IntPtr.Zero)
+            {
+                return VirtualClipboardDataResult.AllocationFailed;
+            }
+
+            session.IssuedHandles.Add(handle);
+            return VirtualClipboardDataResult.Provided;
+        }
+    }
+
+    // 指定スレッドのセッション内ハンドルを解放
+    private void ReleaseSessionHandlesLocked(int threadId)
+    {
+        if (!_sessions.TryGetValue(threadId, out ClipboardSession session))
+        {
+            return;
+        }
+
+        FreeSessionHandlesLocked(session);
+    }
+
+    // セッション内の返却済みハンドルを全解放
+    private void FreeSessionHandlesLocked(ClipboardSession session)
+    {
+        for (int i = 0; i < session.IssuedHandles.Count; i++)
+        {
+            _handleStore.FreeHandle(session.IssuedHandles[i]);
+        }
+
+        session.IssuedHandles.Clear();
+    }
+}
+
 // 注入先の状態管理
 internal sealed class ModifierHookRuntimeState
 {
@@ -678,16 +864,12 @@ internal sealed class ModifierHookRuntimeState
     private volatile bool _statsEnabled;
     private volatile ModifierOverrideMode _overrideMode = ModifierOverrideMode.Neutralize;
     private readonly object _statsGate = new object();
-    private readonly object _clipboardGate = new object();
     private long _getKeyStateCalls;
     private long _getAsyncKeyStateCalls;
     private long _getKeyboardStateCalls;
     private long _modifierQueries;
     private long _neutralizedCalls;
     private readonly Dictionary<int, int> _threadCalls = new Dictionary<int, int>();
-    private string _virtualClipboardText = string.Empty;
-    private bool _hasVirtualClipboardText;
-
     // 有効状態を取得
     public bool IsEnabled()
     {
@@ -702,54 +884,6 @@ internal sealed class ModifierHookRuntimeState
         if (!enabled)
         {
             _overrideMode = ModifierOverrideMode.Neutralize;
-            ClearVirtualClipboard();
-        }
-    }
-
-    // 仮想クリップボード文字列を設定
-    public void SetVirtualClipboardText(string text)
-    {
-        lock (_clipboardGate)
-        {
-            _virtualClipboardText = text ?? string.Empty;
-            _hasVirtualClipboardText = true;
-        }
-    }
-
-    // 仮想クリップボード文字列を1回消費
-    public bool TryConsumeVirtualClipboardText(out string text)
-    {
-        lock (_clipboardGate)
-        {
-            if (!_hasVirtualClipboardText)
-            {
-                text = string.Empty;
-                return false;
-            }
-
-            text = _virtualClipboardText ?? string.Empty;
-            _virtualClipboardText = string.Empty;
-            _hasVirtualClipboardText = false;
-            return true;
-        }
-    }
-
-    // 仮想クリップボード文字列を消去
-    public void ClearVirtualClipboard()
-    {
-        lock (_clipboardGate)
-        {
-            _virtualClipboardText = string.Empty;
-            _hasVirtualClipboardText = false;
-        }
-    }
-
-    // 仮想クリップボード文字列の保持有無を返す
-    public bool HasVirtualClipboardText()
-    {
-        lock (_clipboardGate)
-        {
-            return _hasVirtualClipboardText;
         }
     }
 
@@ -903,12 +1037,14 @@ internal sealed class ModifierHookPipeServer
     private static readonly Encoding Utf8NoBom = new UTF8Encoding(false);
     private readonly string _pipeName;
     private readonly ModifierHookRuntimeState _state;
+    private readonly VirtualClipboardSessionState _virtualClipboardState;
 
     // 制御パイプサーバーを初期化
-    public ModifierHookPipeServer(string pipeName, ModifierHookRuntimeState state)
+    public ModifierHookPipeServer(string pipeName, ModifierHookRuntimeState state, VirtualClipboardSessionState virtualClipboardState)
     {
         _pipeName = pipeName;
         _state = state;
+        _virtualClipboardState = virtualClipboardState;
     }
 
     // 制御コマンド受信ループ
@@ -1023,7 +1159,7 @@ internal sealed class ModifierHookPipeServer
                 {
                     byte[] raw = Convert.FromBase64String(parts[1]);
                     string text = Encoding.UTF8.GetString(raw);
-                    _state.SetVirtualClipboardText(text);
+                    _virtualClipboardState.SetPublishedText(text);
                     return "OK";
                 }
                 catch
@@ -1031,7 +1167,7 @@ internal sealed class ModifierHookPipeServer
                     return "ERR|clip_set_invalid_payload";
                 }
             case "CLIP_CLEAR":
-                _state.ClearVirtualClipboard();
+                _virtualClipboardState.ClearPublishedText();
                 return "OK";
             default:
                 return "ERR|unknown_command";
@@ -1042,6 +1178,51 @@ internal sealed class ModifierHookPipeServer
 // 注入先のフック本体
 public sealed class ModifierKeyHookEntryPoint : IEntryPoint
 {
+    private struct HookProcAddresses
+    {
+        public IntPtr GetKeyState;
+        public IntPtr GetAsyncKeyState;
+        public IntPtr GetKeyboardState;
+        public IntPtr MessageBeep;
+        public IntPtr Beep;
+        public IntPtr IsClipboardFormatAvailable;
+        public IntPtr GetClipboardData;
+        public IntPtr OpenClipboard;
+        public IntPtr CloseClipboard;
+        public IntPtr EmptyClipboard;
+        public IntPtr SetClipboardData;
+    }
+
+    private struct OriginalHookDelegates
+    {
+        public GetKeyStateDelegate GetKeyState;
+        public GetAsyncKeyStateDelegate GetAsyncKeyState;
+        public GetKeyboardStateDelegate GetKeyboardState;
+        public MessageBeepDelegate MessageBeep;
+        public BeepDelegate Beep;
+        public IsClipboardFormatAvailableDelegate IsClipboardFormatAvailable;
+        public GetClipboardDataDelegate GetClipboardData;
+        public OpenClipboardDelegate OpenClipboard;
+        public CloseClipboardDelegate CloseClipboard;
+        public EmptyClipboardDelegate EmptyClipboard;
+        public SetClipboardDataDelegate SetClipboardData;
+    }
+
+    private struct InstalledHooks
+    {
+        public LocalHook GetKeyState;
+        public LocalHook GetAsyncKeyState;
+        public LocalHook GetKeyboardState;
+        public LocalHook MessageBeep;
+        public LocalHook Beep;
+        public LocalHook IsClipboardFormatAvailable;
+        public LocalHook GetClipboardData;
+        public LocalHook OpenClipboard;
+        public LocalHook CloseClipboard;
+        public LocalHook EmptyClipboard;
+        public LocalHook SetClipboardData;
+    }
+
     internal const int VkShift = 0x10;
     internal const int VkControl = 0x11;
     internal const int VkMenu = 0x12;
@@ -1073,14 +1254,25 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
     [UnmanagedFunctionPointer(CallingConvention.StdCall, SetLastError = true)]
     private delegate IntPtr GetClipboardDataDelegate(uint format);
 
+    [UnmanagedFunctionPointer(CallingConvention.StdCall, SetLastError = true)]
+    private delegate bool OpenClipboardDelegate(IntPtr hWndNewOwner);
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall, SetLastError = true)]
+    private delegate bool CloseClipboardDelegate();
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall, SetLastError = true)]
+    private delegate bool EmptyClipboardDelegate();
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall, SetLastError = true)]
+    private delegate IntPtr SetClipboardDataDelegate(uint format, IntPtr hMem);
+
     private const uint CfUnicodeText = 13;
-    private const uint GmemMoveable = 0x0002;
-    private const uint GmemZeroInit = 0x0040;
 
     [DllImport("kernel32.dll")]
     private static extern int GetCurrentThreadId();
 
     private readonly ModifierHookRuntimeState _state = new ModifierHookRuntimeState();
+    private readonly VirtualClipboardSessionState _virtualClipboardState = new VirtualClipboardSessionState();
     private readonly ModifierHookPipeServer _pipeServer;
     private readonly GetKeyStateDelegate _getKeyStateOriginal;
     private readonly GetAsyncKeyStateDelegate _getAsyncKeyStateOriginal;
@@ -1089,6 +1281,10 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
     private readonly BeepDelegate _beepOriginal;
     private readonly IsClipboardFormatAvailableDelegate _isClipboardFormatAvailableOriginal;
     private readonly GetClipboardDataDelegate _getClipboardDataOriginal;
+    private readonly OpenClipboardDelegate _openClipboardOriginal;
+    private readonly CloseClipboardDelegate _closeClipboardOriginal;
+    private readonly EmptyClipboardDelegate _emptyClipboardOriginal;
+    private readonly SetClipboardDataDelegate _setClipboardDataOriginal;
     private readonly LocalHook _getKeyStateHook;
     private readonly LocalHook _getAsyncKeyStateHook;
     private readonly LocalHook _getKeyboardStateHook;
@@ -1096,45 +1292,119 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
     private readonly LocalHook _beepHook;
     private readonly LocalHook _isClipboardFormatAvailableHook;
     private readonly LocalHook _getClipboardDataHook;
+    private readonly LocalHook _openClipboardHook;
+    private readonly LocalHook _closeClipboardHook;
+    private readonly LocalHook _emptyClipboardHook;
+    private readonly LocalHook _setClipboardDataHook;
 
     // 注入先でフックを初期化
     public ModifierKeyHookEntryPoint(RemoteHooking.IContext context, string pipeName)
     {
-        _pipeServer = new ModifierHookPipeServer(pipeName, _state);
+        _pipeServer = new ModifierHookPipeServer(pipeName, _state, _virtualClipboardState);
+        HookProcAddresses addresses = ResolveHookProcAddresses();
+        OriginalHookDelegates originals = BindOriginalHookDelegates(addresses);
+        InstalledHooks hooks = CreateInstalledHooks(addresses);
 
-        IntPtr getKeyStateAddress = LocalHook.GetProcAddress("user32.dll", "GetKeyState");
-        IntPtr getAsyncKeyStateAddress = LocalHook.GetProcAddress("user32.dll", "GetAsyncKeyState");
-        IntPtr getKeyboardStateAddress = LocalHook.GetProcAddress("user32.dll", "GetKeyboardState");
-        IntPtr messageBeepAddress = LocalHook.GetProcAddress("user32.dll", "MessageBeep");
-        IntPtr beepAddress = LocalHook.GetProcAddress("kernel32.dll", "Beep");
-        IntPtr isClipboardFormatAvailableAddress = LocalHook.GetProcAddress("user32.dll", "IsClipboardFormatAvailable");
-        IntPtr getClipboardDataAddress = LocalHook.GetProcAddress("user32.dll", "GetClipboardData");
+        _getKeyStateOriginal = originals.GetKeyState;
+        _getAsyncKeyStateOriginal = originals.GetAsyncKeyState;
+        _getKeyboardStateOriginal = originals.GetKeyboardState;
+        _messageBeepOriginal = originals.MessageBeep;
+        _beepOriginal = originals.Beep;
+        _isClipboardFormatAvailableOriginal = originals.IsClipboardFormatAvailable;
+        _getClipboardDataOriginal = originals.GetClipboardData;
+        _openClipboardOriginal = originals.OpenClipboard;
+        _closeClipboardOriginal = originals.CloseClipboard;
+        _emptyClipboardOriginal = originals.EmptyClipboard;
+        _setClipboardDataOriginal = originals.SetClipboardData;
 
-        _getKeyStateOriginal = Marshal.GetDelegateForFunctionPointer<GetKeyStateDelegate>(getKeyStateAddress);
-        _getAsyncKeyStateOriginal = Marshal.GetDelegateForFunctionPointer<GetAsyncKeyStateDelegate>(getAsyncKeyStateAddress);
-        _getKeyboardStateOriginal = Marshal.GetDelegateForFunctionPointer<GetKeyboardStateDelegate>(getKeyboardStateAddress);
-        _messageBeepOriginal = Marshal.GetDelegateForFunctionPointer<MessageBeepDelegate>(messageBeepAddress);
-        _beepOriginal = Marshal.GetDelegateForFunctionPointer<BeepDelegate>(beepAddress);
-        _isClipboardFormatAvailableOriginal = Marshal.GetDelegateForFunctionPointer<IsClipboardFormatAvailableDelegate>(isClipboardFormatAvailableAddress);
-        _getClipboardDataOriginal = Marshal.GetDelegateForFunctionPointer<GetClipboardDataDelegate>(getClipboardDataAddress);
+        _getKeyStateHook = hooks.GetKeyState;
+        _getAsyncKeyStateHook = hooks.GetAsyncKeyState;
+        _getKeyboardStateHook = hooks.GetKeyboardState;
+        _messageBeepHook = hooks.MessageBeep;
+        _beepHook = hooks.Beep;
+        _isClipboardFormatAvailableHook = hooks.IsClipboardFormatAvailable;
+        _getClipboardDataHook = hooks.GetClipboardData;
+        _openClipboardHook = hooks.OpenClipboard;
+        _closeClipboardHook = hooks.CloseClipboard;
+        _emptyClipboardHook = hooks.EmptyClipboard;
+        _setClipboardDataHook = hooks.SetClipboardData;
 
-        _getKeyStateHook = LocalHook.Create(getKeyStateAddress, new GetKeyStateDelegate(GetKeyStateHooked), this);
-        _getAsyncKeyStateHook = LocalHook.Create(getAsyncKeyStateAddress, new GetAsyncKeyStateDelegate(GetAsyncKeyStateHooked), this);
-        _getKeyboardStateHook = LocalHook.Create(getKeyboardStateAddress, new GetKeyboardStateDelegate(GetKeyboardStateHooked), this);
-        _messageBeepHook = LocalHook.Create(messageBeepAddress, new MessageBeepDelegate(MessageBeepHooked), this);
-        _beepHook = LocalHook.Create(beepAddress, new BeepDelegate(BeepHooked), this);
-        _isClipboardFormatAvailableHook = LocalHook.Create(isClipboardFormatAvailableAddress, new IsClipboardFormatAvailableDelegate(IsClipboardFormatAvailableHooked), this);
-        _getClipboardDataHook = LocalHook.Create(getClipboardDataAddress, new GetClipboardDataDelegate(GetClipboardDataHooked), this);
+        ApplyHookThreadAcl(hooks);
+    }
 
+    // フック対象APIアドレスを解決
+    private static HookProcAddresses ResolveHookProcAddresses()
+    {
+        return new HookProcAddresses
+        {
+            GetKeyState = LocalHook.GetProcAddress("user32.dll", "GetKeyState"),
+            GetAsyncKeyState = LocalHook.GetProcAddress("user32.dll", "GetAsyncKeyState"),
+            GetKeyboardState = LocalHook.GetProcAddress("user32.dll", "GetKeyboardState"),
+            MessageBeep = LocalHook.GetProcAddress("user32.dll", "MessageBeep"),
+            Beep = LocalHook.GetProcAddress("kernel32.dll", "Beep"),
+            IsClipboardFormatAvailable = LocalHook.GetProcAddress("user32.dll", "IsClipboardFormatAvailable"),
+            GetClipboardData = LocalHook.GetProcAddress("user32.dll", "GetClipboardData"),
+            OpenClipboard = LocalHook.GetProcAddress("user32.dll", "OpenClipboard"),
+            CloseClipboard = LocalHook.GetProcAddress("user32.dll", "CloseClipboard"),
+            EmptyClipboard = LocalHook.GetProcAddress("user32.dll", "EmptyClipboard"),
+            SetClipboardData = LocalHook.GetProcAddress("user32.dll", "SetClipboardData")
+        };
+    }
+
+    // 元API delegateを束縛
+    private static OriginalHookDelegates BindOriginalHookDelegates(HookProcAddresses addresses)
+    {
+        return new OriginalHookDelegates
+        {
+            GetKeyState = Marshal.GetDelegateForFunctionPointer<GetKeyStateDelegate>(addresses.GetKeyState),
+            GetAsyncKeyState = Marshal.GetDelegateForFunctionPointer<GetAsyncKeyStateDelegate>(addresses.GetAsyncKeyState),
+            GetKeyboardState = Marshal.GetDelegateForFunctionPointer<GetKeyboardStateDelegate>(addresses.GetKeyboardState),
+            MessageBeep = Marshal.GetDelegateForFunctionPointer<MessageBeepDelegate>(addresses.MessageBeep),
+            Beep = Marshal.GetDelegateForFunctionPointer<BeepDelegate>(addresses.Beep),
+            IsClipboardFormatAvailable = Marshal.GetDelegateForFunctionPointer<IsClipboardFormatAvailableDelegate>(addresses.IsClipboardFormatAvailable),
+            GetClipboardData = Marshal.GetDelegateForFunctionPointer<GetClipboardDataDelegate>(addresses.GetClipboardData),
+            OpenClipboard = Marshal.GetDelegateForFunctionPointer<OpenClipboardDelegate>(addresses.OpenClipboard),
+            CloseClipboard = Marshal.GetDelegateForFunctionPointer<CloseClipboardDelegate>(addresses.CloseClipboard),
+            EmptyClipboard = Marshal.GetDelegateForFunctionPointer<EmptyClipboardDelegate>(addresses.EmptyClipboard),
+            SetClipboardData = Marshal.GetDelegateForFunctionPointer<SetClipboardDataDelegate>(addresses.SetClipboardData)
+        };
+    }
+
+    // Hookを生成
+    private InstalledHooks CreateInstalledHooks(HookProcAddresses addresses)
+    {
+        return new InstalledHooks
+        {
+            GetKeyState = LocalHook.Create(addresses.GetKeyState, new GetKeyStateDelegate(GetKeyStateHooked), this),
+            GetAsyncKeyState = LocalHook.Create(addresses.GetAsyncKeyState, new GetAsyncKeyStateDelegate(GetAsyncKeyStateHooked), this),
+            GetKeyboardState = LocalHook.Create(addresses.GetKeyboardState, new GetKeyboardStateDelegate(GetKeyboardStateHooked), this),
+            MessageBeep = LocalHook.Create(addresses.MessageBeep, new MessageBeepDelegate(MessageBeepHooked), this),
+            Beep = LocalHook.Create(addresses.Beep, new BeepDelegate(BeepHooked), this),
+            IsClipboardFormatAvailable = LocalHook.Create(addresses.IsClipboardFormatAvailable, new IsClipboardFormatAvailableDelegate(IsClipboardFormatAvailableHooked), this),
+            GetClipboardData = LocalHook.Create(addresses.GetClipboardData, new GetClipboardDataDelegate(GetClipboardDataHooked), this),
+            OpenClipboard = LocalHook.Create(addresses.OpenClipboard, new OpenClipboardDelegate(OpenClipboardHooked), this),
+            CloseClipboard = LocalHook.Create(addresses.CloseClipboard, new CloseClipboardDelegate(CloseClipboardHooked), this),
+            EmptyClipboard = LocalHook.Create(addresses.EmptyClipboard, new EmptyClipboardDelegate(EmptyClipboardHooked), this),
+            SetClipboardData = LocalHook.Create(addresses.SetClipboardData, new SetClipboardDataDelegate(SetClipboardDataHooked), this)
+        };
+    }
+
+    // 全HookへスレッドACLを適用
+    private static void ApplyHookThreadAcl(InstalledHooks hooks)
+    {
         // 全スレッドへ適用
         // 注入初期化スレッドのみ除外
-        _getKeyStateHook.ThreadACL.SetExclusiveACL(new[] { 0 });
-        _getAsyncKeyStateHook.ThreadACL.SetExclusiveACL(new[] { 0 });
-        _getKeyboardStateHook.ThreadACL.SetExclusiveACL(new[] { 0 });
-        _messageBeepHook.ThreadACL.SetExclusiveACL(new[] { 0 });
-        _beepHook.ThreadACL.SetExclusiveACL(new[] { 0 });
-        _isClipboardFormatAvailableHook.ThreadACL.SetExclusiveACL(new[] { 0 });
-        _getClipboardDataHook.ThreadACL.SetExclusiveACL(new[] { 0 });
+        hooks.GetKeyState.ThreadACL.SetExclusiveACL(new[] { 0 });
+        hooks.GetAsyncKeyState.ThreadACL.SetExclusiveACL(new[] { 0 });
+        hooks.GetKeyboardState.ThreadACL.SetExclusiveACL(new[] { 0 });
+        hooks.MessageBeep.ThreadACL.SetExclusiveACL(new[] { 0 });
+        hooks.Beep.ThreadACL.SetExclusiveACL(new[] { 0 });
+        hooks.IsClipboardFormatAvailable.ThreadACL.SetExclusiveACL(new[] { 0 });
+        hooks.GetClipboardData.ThreadACL.SetExclusiveACL(new[] { 0 });
+        hooks.OpenClipboard.ThreadACL.SetExclusiveACL(new[] { 0 });
+        hooks.CloseClipboard.ThreadACL.SetExclusiveACL(new[] { 0 });
+        hooks.EmptyClipboard.ThreadACL.SetExclusiveACL(new[] { 0 });
+        hooks.SetClipboardData.ThreadACL.SetExclusiveACL(new[] { 0 });
     }
 
     // 注入先で制御ループを開始
@@ -1273,7 +1543,7 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
     {
         try
         {
-            if (_state.IsEnabled() && _state.HasVirtualClipboardText())
+            if (_state.IsEnabled() && _virtualClipboardState.CanAdvertiseFormat(GetCurrentThreadId()))
             {
                 // 仮想クリップボード有効中はUnicodeTextのみ公開
                 return format == CfUnicodeText;
@@ -1292,9 +1562,18 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
     {
         try
         {
-            if (_state.IsEnabled() && format == CfUnicodeText && _state.TryConsumeVirtualClipboardText(out string text))
+            if (_state.IsEnabled() && format == CfUnicodeText)
             {
-                return CreateUnicodeClipboardHandle(text);
+                VirtualClipboardDataResult result = _virtualClipboardState.TryCreateHandleForSession(GetCurrentThreadId(), out IntPtr handle);
+                if (result == VirtualClipboardDataResult.Provided)
+                {
+                    return handle;
+                }
+
+                if (result == VirtualClipboardDataResult.AllocationFailed)
+                {
+                    return IntPtr.Zero;
+                }
             }
 
             return _getClipboardDataOriginal(format);
@@ -1305,26 +1584,75 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
         }
     }
 
-    // Unicode文字列のクリップボードハンドルを生成
-    private static IntPtr CreateUnicodeClipboardHandle(string text)
+    // OpenClipboard呼び出しをフック
+    private bool OpenClipboardHooked(IntPtr hWndNewOwner)
     {
-        byte[] bytes = Encoding.Unicode.GetBytes((text ?? string.Empty) + "\0");
-        IntPtr hGlobal = GlobalAlloc(GmemMoveable | GmemZeroInit, new UIntPtr((uint)bytes.Length));
-        if (hGlobal == IntPtr.Zero)
-        {
-            return IntPtr.Zero;
-        }
+        return RunClipboardBoolHook(
+            () => _openClipboardOriginal(hWndNewOwner),
+            threadId => _virtualClipboardState.BeginSession(threadId));
+    }
 
-        IntPtr locked = GlobalLock(hGlobal);
-        if (locked == IntPtr.Zero)
-        {
-            GlobalFree(hGlobal);
-            return IntPtr.Zero;
-        }
+    // CloseClipboard呼び出しをフック
+    private bool CloseClipboardHooked()
+    {
+        return RunClipboardBoolHook(
+            () => _closeClipboardOriginal(),
+            threadId => _virtualClipboardState.EndSession(threadId));
+    }
 
-        Marshal.Copy(bytes, 0, locked, bytes.Length);
-        GlobalUnlock(hGlobal);
-        return hGlobal;
+    // EmptyClipboard呼び出しをフック
+    private bool EmptyClipboardHooked()
+    {
+        return RunClipboardBoolHook(
+            () => _emptyClipboardOriginal(),
+            threadId => _virtualClipboardState.InvalidateSessionData(threadId));
+    }
+
+    // SetClipboardData呼び出しをフック
+    private IntPtr SetClipboardDataHooked(uint format, IntPtr hMem)
+    {
+        return RunClipboardHandleHook(
+            () => _setClipboardDataOriginal(format, hMem),
+            result => result != IntPtr.Zero && format == CfUnicodeText,
+            threadId => _virtualClipboardState.InvalidateSessionData(threadId));
+    }
+
+    // bool戻り値のClipboard Hook後処理を共通化
+    private bool RunClipboardBoolHook(Func<bool> originalCall, Action<int> onSuccess)
+    {
+        try
+        {
+            bool ok = originalCall();
+            if (ok)
+            {
+                onSuccess?.Invoke(GetCurrentThreadId());
+            }
+
+            return ok;
+        }
+        catch
+        {
+            return originalCall();
+        }
+    }
+
+    // ハンドル戻り値のClipboard Hook後処理を共通化
+    private IntPtr RunClipboardHandleHook(Func<IntPtr> originalCall, Func<IntPtr, bool> shouldHandleResult, Action<int> onSuccess)
+    {
+        try
+        {
+            IntPtr result = originalCall();
+            if (shouldHandleResult != null && shouldHandleResult(result))
+            {
+                onSuccess?.Invoke(GetCurrentThreadId());
+            }
+
+            return result;
+        }
+        catch
+        {
+            return originalCall();
+        }
     }
 
     // 修飾キー中立化対象を判定
@@ -1377,18 +1705,6 @@ public sealed class ModifierKeyHookEntryPoint : IEntryPoint
 
         return vKey == VkMenu || vKey == VkLMenu || vKey == VkRMenu;
     }
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr GlobalAlloc(uint uFlags, UIntPtr dwBytes);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr GlobalLock(IntPtr hMem);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool GlobalUnlock(IntPtr hMem);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr GlobalFree(IntPtr hMem);
 
     // Shift上書き対象か判定
     private bool ShouldForceShift(int vKey)
