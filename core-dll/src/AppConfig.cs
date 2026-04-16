@@ -43,7 +43,7 @@ public sealed class UiConfig
     public string PasteShortcutKey { get; set; } = "v";
     public string PlayShortcutModifier { get; set; } = string.Empty;
     public string PlayShortcutKey { get; set; } = "spacebar";
-    public int DelayBeforePlayShortcutMs { get; set; } = 60;
+    public int DelayBeforePlayShortcutMs { get; set; } = 20;
 }
 
 // 入力タイミング関連設定

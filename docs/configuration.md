@@ -54,7 +54,7 @@
   - VOICEPEAKの設定値と同じものを指定してください
   - 主な指定値は `cursor up`, `cursor down`, `cursor left`, `cursor right`, `F1-F12`, `spacebar`, `home`, `end`, `a-z`, `0-9`, 記号キー(`@`, `-`, `[`, `]`など)です
   - `Delete` や `Enter` は文字入力操作と誤認されるため指定できません。
-- `DelayBeforePlayShortcutMs` (default: `60`)
+- `DelayBeforePlayShortcutMs` (default: `20`)
   - 再生ショートカットを実行する前の待機時間(ミリ秒)です
 
 ## InputTimingConfig
