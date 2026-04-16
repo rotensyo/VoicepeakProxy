@@ -754,11 +754,17 @@ internal static class JobExecutionCore
             return 0;
         }
 
-        string[] parts = text.Split(new[] { '。' }, StringSplitOptions.None);
+        string[] parts = text.Split(new[] { '。', '｡', '．', '.', '！', '!', '？', '?', '\r', '\n' }, StringSplitOptions.None);
         int maxLen = 0;
         for (int i = 0; i < parts.Length; i++)
         {
-            int len = parts[i].Length;
+            string chunk = (parts[i] ?? string.Empty).Trim();
+            if (chunk.Length == 0)
+            {
+                continue;
+            }
+
+            int len = chunk.Length;
             if (len > maxLen)
             {
                 maxLen = len;

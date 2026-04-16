@@ -55,6 +55,60 @@ public class ExecutionLogicTests
     }
 
     [TestMethod]
+    public void ComputePostTypeWaitMs_UsesLongestChunkSeparatedBySentenceTerminators()
+    {
+        // 句点系で最長チャンクを算出
+        int actual = JobExecutionCore.ComputePostTypeWaitMs("ああ。いいい！う？", 10, 0);
+
+        Assert.AreEqual(30, actual);
+    }
+
+    [TestMethod]
+    public void ComputePostTypeWaitMs_UsesLongestChunkSeparatedByNewlines()
+    {
+        // 改行で最長チャンクを算出
+        int actual = JobExecutionCore.ComputePostTypeWaitMs("ああ\r\n いいい \nう", 10, 0);
+
+        Assert.AreEqual(30, actual);
+    }
+
+    [TestMethod]
+    public void ComputePostTypeWaitMs_TrimsChunksBeforeMeasuringLength()
+    {
+        // 前後空白を除外して長さを算出
+        int actual = JobExecutionCore.ComputePostTypeWaitMs("  あ  。　いいい　", 10, 0);
+
+        Assert.AreEqual(30, actual);
+    }
+
+    [TestMethod]
+    public void ComputePostTypeWaitMs_IgnoresEmptyChunksAfterSplit()
+    {
+        // 空チャンクを除外して最長を算出
+        int actual = JobExecutionCore.ComputePostTypeWaitMs("あ。。！\n\nいい", 10, 0);
+
+        Assert.AreEqual(20, actual);
+    }
+
+    [TestMethod]
+    public void ComputePostTypeWaitMs_AllChunksEmpty_ReturnsMinimumWait()
+    {
+        // 区切り後に全文空なら最小待機を返す
+        int actual = JobExecutionCore.ComputePostTypeWaitMs("。\n ！  ", 10, 80);
+
+        Assert.AreEqual(80, actual);
+    }
+
+    [TestMethod]
+    public void ComputePostTypeWaitMs_DoesNotSplitOnCommaOrSpaces()
+    {
+        // 読点や空白では分割しない
+        int actual = JobExecutionCore.ComputePostTypeWaitMs("ああ、いい うう", 10, 0);
+
+        Assert.AreEqual(80, actual);
+    }
+
+    [TestMethod]
     public void AdjustPauseByStopConfirmAndPlayDelay_PreFirst_UsesDelayBeforePlayOnly()
     {
         // 先頭は再生前待機のみを補正
