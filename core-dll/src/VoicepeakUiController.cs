@@ -900,49 +900,21 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             return result;
         }
 
-        Queue<AutomationElement> queue = new Queue<AutomationElement>();
-        EnqueueRootCandidateChildren(root, queue);
-
-        while (queue.Count > 0 && result.Count < maxCount)
+        AutomationElementCollection matches = root.FindAll(TreeScope.Descendants, BuildRootChildCandidateCondition());
+        int count = Math.Min(matches.Count, maxCount);
+        for (int i = 0; i < count; i++)
         {
-            AutomationElement e = queue.Dequeue();
-            ControlType controlType = TryGetControlTypeForTraversal(e);
+            AutomationElement e = matches[i];
             if (TryBuildTextCandidate(e, out TextCandidateInfo candidate))
             {
                 result.Add(candidate);
-            }
-
-            if (!ShouldTraverseChildren(controlType))
-            {
-                continue;
-            }
-
-            AutomationElementCollection children = e.FindAll(TreeScope.Children, Condition.TrueCondition);
-            for (int i = 0; i < children.Count; i++)
-            {
-                queue.Enqueue(children[i]);
             }
         }
 
         return result;
     }
 
-    // root直下では候補型だけを探索対象に投入
-    private static void EnqueueRootCandidateChildren(AutomationElement root, Queue<AutomationElement> queue)
-    {
-        if (root == null || queue == null)
-        {
-            return;
-        }
-
-        AutomationElementCollection children = root.FindAll(TreeScope.Children, BuildRootChildCandidateCondition());
-        for (int i = 0; i < children.Count; i++)
-        {
-            queue.Enqueue(children[i]);
-        }
-    }
-
-    // root直下で許可する候補型条件を構築
+    // 候補型の条件を構築
     private static Condition BuildRootChildCandidateCondition()
     {
         return new OrCondition(
@@ -983,28 +955,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                                   || controlType == ControlType.Document
                                   || controlType == ControlType.Text;
         return allowedControlType && name != null && name.Length == 0;
-    }
-
-    // 上位レイヤーの非クライアント要素は深掘りしない
-    internal static bool ShouldTraverseChildren(ControlType controlType)
-    {
-        return controlType != ControlType.TitleBar
-               && controlType != ControlType.MenuBar
-               && controlType != ControlType.Menu
-               && controlType != ControlType.Button;
-    }
-
-    // 子探索判定用にControlTypeを安全取得
-    private static ControlType TryGetControlTypeForTraversal(AutomationElement element)
-    {
-        try
-        {
-            return element?.Current.ControlType;
-        }
-        catch
-        {
-            return null;
-        }
     }
 
     private void LogTextCandidates(List<TextCandidateInfo> candidates)

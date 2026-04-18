@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Windows.Automation;
@@ -108,23 +107,11 @@ public class UiControllerTests
     }
 
     [TestMethod]
-    public void ShouldTraverseChildren_StopsAtNonClientUpperLayers()
+    public void BuildRootChildCandidateCondition_MatchesTextEditDocumentOnly()
     {
-        // 非クライアント上位層の深掘りを止める
-        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ShouldTraverseChildren", ControlType.TitleBar));
-        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ShouldTraverseChildren", ControlType.MenuBar));
-        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ShouldTraverseChildren", ControlType.Menu));
-        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ShouldTraverseChildren", ControlType.Button));
+        // 候補型条件はText/Edit/Documentのみに一致
+        Condition condition = (Condition)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "BuildRootChildCandidateCondition");
 
-        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ShouldTraverseChildren", ControlType.Window));
-        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ShouldTraverseChildren", ControlType.Pane));
-        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "ShouldTraverseChildren", ControlType.Edit));
-    }
-
-    [TestMethod]
-    public void EnqueueRootCandidateChildren_EnqueuesTextEditDocumentOnly()
-    {
-        // root直下では候補型のみを探索対象へ投入
         int count = ReflectionTestHelper.RunInSta(() =>
         {
             using Form form = new Form
@@ -142,34 +129,36 @@ public class UiControllerTests
                 Top = 20,
                 Width = 200
             };
+            using RichTextBox richText = new RichTextBox
+            {
+                Name = string.Empty,
+                AccessibleName = string.Empty,
+                Text = string.Empty,
+                Left = 20,
+                Top = 60,
+                Width = 200,
+                Height = 60
+            };
             using Button button = new Button
             {
                 Text = "button",
                 Left = 20,
-                Top = 60,
+                Top = 130,
                 Width = 100
-            };
-            using Panel panel = new Panel
-            {
-                Left = 20,
-                Top = 100,
-                Width = 100,
-                Height = 40
             };
 
             form.Controls.Add(textBox);
+            form.Controls.Add(richText);
             form.Controls.Add(button);
-            form.Controls.Add(panel);
             form.Show();
             Application.DoEvents();
 
             AutomationElement root = AutomationElement.FromHandle(form.Handle);
-            Queue<AutomationElement> queue = new Queue<AutomationElement>();
-            ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "EnqueueRootCandidateChildren", root, queue);
-            return queue.Count;
+            AutomationElementCollection matches = root.FindAll(TreeScope.Descendants, condition);
+            return matches.Count;
         });
 
-        Assert.AreEqual(1, count);
+        Assert.AreEqual(2, count);
     }
 
     [TestMethod]
