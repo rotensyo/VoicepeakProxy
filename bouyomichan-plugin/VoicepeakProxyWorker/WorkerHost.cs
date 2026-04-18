@@ -456,6 +456,11 @@ internal sealed class WorkerFileLogger : IAppLogger, IDisposable
     private static LogMinimumLevel ParseMinimumLevel(string level)
     {
         string normalized = (level ?? string.Empty).Trim().ToLowerInvariant();
+        if (normalized == "debug")
+        {
+            return LogMinimumLevel.Debug;
+        }
+
         if (normalized == "info")
         {
             return LogMinimumLevel.Info;
