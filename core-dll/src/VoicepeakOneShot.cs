@@ -101,12 +101,10 @@ public static class VoicepeakOneShot
         IAppLogger logger = null)
     {
         AppLogger log = InitializeApiCall(config, logger);
+        using VoicepeakUiController ui = new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log);
+        using AudioSessionReader audio = new AudioSessionReader(log);
 
-        return ValidateInputOnceCore(
-            config,
-            log,
-            new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log),
-            new AudioSessionReader(log));
+        return ValidateInputOnceCore(config, log, ui, audio);
     }
 
     // 依存を差し替えて単発入力検証
@@ -174,11 +172,9 @@ public static class VoicepeakOneShot
         IAppLogger logger = null)
     {
         AppLogger log = InitializeApiCall(config, logger);
+        using VoicepeakUiController ui = new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log);
 
-        return ClearInputOnceCore(
-            config,
-            log,
-            new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log));
+        return ClearInputOnceCore(config, log, ui);
     }
 
     // 依存を差し替えて単発入力削除
@@ -250,13 +246,10 @@ public static class VoicepeakOneShot
         IAppLogger logger = null)
     {
         AppLogger log = InitializeApiCall(config, logger);
+        using VoicepeakUiController ui = new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log);
+        using AudioSessionReader audio = new AudioSessionReader(log);
 
-        return SpeakOnceCore(
-            config,
-            request,
-            log,
-            new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log),
-            new AudioSessionReader(log));
+        return SpeakOnceCore(config, request, log, ui, audio);
     }
 
     // 依存を差し替えて単発実行
@@ -285,13 +278,10 @@ public static class VoicepeakOneShot
         IAppLogger logger = null)
     {
         AppLogger log = InitializeApiCall(config, logger);
+        using VoicepeakUiController ui = new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log);
+        using AudioSessionReader audio = new AudioSessionReader(log);
 
-        return SpeakOnceWaitCore(
-            config,
-            request,
-            log,
-            new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log),
-            new AudioSessionReader(log));
+        return SpeakOnceWaitCore(config, request, log, ui, audio);
     }
 
     // 依存を差し替えて単発実行

@@ -38,7 +38,7 @@ internal enum ModifierOverrideMode
 }
 
 // 修飾キー中立化フックの制御
-internal sealed class ModifierKeyHookController
+internal sealed class ModifierKeyHookController : IDisposable
 {
     private readonly object _gate = new object();
     private readonly int _hookCommandTimeoutMs;
@@ -243,6 +243,15 @@ internal sealed class ModifierKeyHookController
         }
 
         return true;
+    }
+
+    // 接続資源を破棄
+    public void Dispose()
+    {
+        lock (_gate)
+        {
+            DisposePipe();
+        }
     }
 
     // CLIP_SETコマンドを1回送信

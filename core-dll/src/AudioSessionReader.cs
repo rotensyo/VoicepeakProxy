@@ -5,7 +5,7 @@ using NAudio.CoreAudioApi;
 namespace VoicepeakProxyCore;
 
 // 音声ピーク値を取得
-internal sealed class AudioSessionReader : IAudioSessionReader
+internal sealed class AudioSessionReader : IAudioSessionReader, IDisposable
 {
     private readonly AppLogger _log;
     private readonly IAudioSessionSource _source;
@@ -64,6 +64,10 @@ internal sealed class AudioSessionReader : IAudioSessionReader
         }
 
         return snap;
+    }
+
+    public void Dispose()
+    {
     }
 }
 

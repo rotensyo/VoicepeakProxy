@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -9,7 +10,7 @@ using System.Windows.Automation;
 namespace VoicepeakProxyCore;
 
 // VOICEPEAKのUI操作を担当
-internal sealed class VoicepeakUiController : IVoicepeakUiController
+internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposable
 {
     private const uint SmtoAbortIfHung = 0x0002;
     private const uint WmKeyDown = 0x0100;
@@ -26,6 +27,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     private readonly AppLogger _log;
     private readonly VoicepeakTargetResolver _targetResolver;
     private readonly ModifierIsolationCoordinator _modifierIsolationCoordinator;
+    private readonly UiAutomationExecutor _uiAutomationExecutor;
     // 単一操作経路前提のためロックは設けない
     private int _cachedVoicepeakPid;  // テスト互換のため保持する解決キャッシュ
     private bool _modifierIsolationSessionActive;  // テスト互換のため保持するセッション状態
@@ -62,6 +64,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             _hook.HookConnectTimeoutMs,
             _hook.HookConnectTotalWaitMs);
         _modifierIsolationCoordinator = new ModifierIsolationCoordinator(modifierKeyHookController, _log);
+        _uiAutomationExecutor = new UiAutomationExecutor();
     }
 
     // 対象プロセスとメインウィンドウを解決
@@ -185,7 +188,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
     // 可視入力欄数を返す
     public int GetVisibleInputBlockCount(IntPtr mainHwnd)
     {
-        return EstimateVisibleBlockCount(mainHwnd);
+        return _uiAutomationExecutor.Invoke(() => EstimateVisibleBlockCount(mainHwnd));
     }
 
     // 完全削除判定を共通化
@@ -203,9 +206,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
     private ClearInputState ReadClearInputState(IntPtr mainHwnd)
     {
-        ReadInputResult read = ReadInputTextDetailed(mainHwnd);
-        int visibleBlockCount = EstimateVisibleBlockCount(mainHwnd);
-        return new ClearInputState(read, visibleBlockCount);
+        return _uiAutomationExecutor.Invoke(() => ReadClearInputStateCore(mainHwnd));
     }
 
     // 可視状態の入力ブロック数を取得
@@ -225,6 +226,27 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         catch
         {
             return 0;
+        }
+    }
+
+    // クリア判定用のUIA読み取りを1回で実行
+    private static ClearInputState ReadClearInputStateCore(IntPtr mainHwnd)
+    {
+        if (mainHwnd == IntPtr.Zero)
+        {
+            return new ClearInputState(ReadInputResult.Fail(ReadInputSource.NoCandidate, string.Empty, 0), 0);
+        }
+
+        try
+        {
+            AutomationElement root = AutomationElement.FromHandle(mainHwnd);
+            List<TextCandidateInfo> candidates = CollectTextCandidates(root, maxCount: 200);
+            ReadInputResult read = BuildReadInputResult(candidates, root);
+            return new ClearInputState(read, candidates.Count);
+        }
+        catch
+        {
+            return new ClearInputState(ReadInputResult.Fail(ReadInputSource.Exception, string.Empty, 0), 0);
         }
     }
 
@@ -776,30 +798,21 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
 
     public ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd)
     {
+        return _uiAutomationExecutor.Invoke(() => ReadInputTextDetailedCore(mainHwnd, _debug.LogTextCandidates, _log));
+    }
+
+    private static ReadInputResult ReadInputTextDetailedCore(IntPtr mainHwnd, bool logTextCandidates, AppLogger log)
+    {
         try
         {
             AutomationElement root = AutomationElement.FromHandle(mainHwnd);
             List<TextCandidateInfo> candidates = CollectTextCandidates(root, maxCount: 200);
-            if (_debug.LogTextCandidates)
+            if (logTextCandidates)
             {
-                LogTextCandidates(candidates);
+                LogTextCandidates(log, candidates);
             }
 
-            AutomationElement bestInput = FindBestInputBox(candidates);
-            if (bestInput == null)
-            {
-                return ReadInputResult.Fail(ReadInputSource.NoCandidate, string.Empty, 0);
-            }
-
-            string primary = TryGetElementTextOrWindowTextSafe(bestInput);
-            string normalizedPrimary = NormalizeForPanelCompare(primary);
-            int totalLength = EstimateTotalInputTextLength(root, bestInput);
-            if (totalLength < normalizedPrimary.Length)
-            {
-                totalLength = normalizedPrimary.Length;
-            }
-
-            return ReadInputResult.Ok(normalizedPrimary, totalLength, ReadInputSource.PrimaryUiA);
+            return BuildReadInputResult(candidates, root);
         }
         catch
         {
@@ -957,13 +970,13 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         return allowedControlType && name != null && name.Length == 0;
     }
 
-    private void LogTextCandidates(List<TextCandidateInfo> candidates)
+    private static void LogTextCandidates(AppLogger log, List<TextCandidateInfo> candidates)
     {
         int count = candidates != null ? candidates.Count : 0;
-        _log.Debug($"text_candidates_begin count={count}");
+        log.Debug($"text_candidates_begin count={count}");
         if (candidates == null)
         {
-            _log.Debug("text_candidates_end");
+            log.Debug("text_candidates_end");
             return;
         }
 
@@ -975,7 +988,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
             bool hasTextPattern = e.TryGetCurrentPattern(TextPattern.Pattern, out _);
             bool hasValuePattern = e.TryGetCurrentPattern(ValuePattern.Pattern, out _);
             string text = TryGetElementTextOrWindowTextSafe(e);
-            _log.Debug(
+            log.Debug(
                 "text_candidate " +
                 $"index={i} " +
                 $"controlType={e.Current.ControlType.ProgrammaticName} " +
@@ -989,7 +1002,26 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
                 $"text=\"{SanitizeForLog(text)}\"");
         }
 
-        _log.Debug("text_candidates_end");
+        log.Debug("text_candidates_end");
+    }
+
+    private static ReadInputResult BuildReadInputResult(List<TextCandidateInfo> candidates, AutomationElement root)
+    {
+        AutomationElement bestInput = FindBestInputBox(candidates);
+        if (bestInput == null)
+        {
+            return ReadInputResult.Fail(ReadInputSource.NoCandidate, string.Empty, 0);
+        }
+
+        string primary = TryGetElementTextOrWindowTextSafe(bestInput);
+        string normalizedPrimary = NormalizeForPanelCompare(primary);
+        int totalLength = EstimateTotalInputTextLength(root, bestInput);
+        if (totalLength < normalizedPrimary.Length)
+        {
+            totalLength = normalizedPrimary.Length;
+        }
+
+        return ReadInputResult.Ok(normalizedPrimary, totalLength, ReadInputSource.PrimaryUiA);
     }
 
     private static string NormalizeForPanelCompare(string text)
@@ -1198,5 +1230,101 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController
         public Process GetProcessById(int pid) => Process.GetProcessById(pid);
 
         public IntPtr WaitMainWindowHandle(Process process, int timeoutMs) => VoicepeakUiController.WaitMainWindowHandle(process, timeoutMs);
+    }
+
+    private sealed class UiAutomationExecutor : IDisposable
+    {
+        private readonly BlockingCollection<UiAutomationWorkItem> _queue = new BlockingCollection<UiAutomationWorkItem>();
+        private readonly Thread _thread;
+
+        public UiAutomationExecutor()
+        {
+            _thread = new Thread(WorkerMain)
+            {
+                IsBackground = true,
+                Name = "voicepeak-uia-worker"
+            };
+            _thread.SetApartmentState(ApartmentState.MTA);
+            _thread.Start();
+        }
+
+        public T Invoke<T>(Func<T> action)
+        {
+            if (action == null)
+            {
+                throw new ArgumentNullException(nameof(action));
+            }
+
+            UiAutomationWorkItem item = new UiAutomationWorkItem(() => action());
+            _queue.Add(item);
+            item.Wait();
+            if (item.Error != null)
+            {
+                throw item.Error;
+            }
+
+            return (T)item.Result;
+        }
+
+        public void Dispose()
+        {
+            _queue.CompleteAdding();
+            if (Thread.CurrentThread != _thread && _thread.IsAlive)
+            {
+                _thread.Join();
+            }
+
+            _queue.Dispose();
+        }
+
+        private void WorkerMain()
+        {
+            foreach (UiAutomationWorkItem item in _queue.GetConsumingEnumerable())
+            {
+                item.Execute();
+            }
+        }
+    }
+
+    private sealed class UiAutomationWorkItem
+    {
+        private readonly Func<object> _action;
+        private readonly ManualResetEventSlim _completed = new ManualResetEventSlim(false);
+
+        public UiAutomationWorkItem(Func<object> action)
+        {
+            _action = action;
+        }
+
+        public object Result { get; private set; }
+        public Exception Error { get; private set; }
+
+        public void Execute()
+        {
+            try
+            {
+                Result = _action();
+            }
+            catch (Exception ex)
+            {
+                Error = ex;
+            }
+            finally
+            {
+                _completed.Set();
+            }
+        }
+
+        public void Wait()
+        {
+            _completed.Wait();
+            _completed.Dispose();
+        }
+    }
+
+    public void Dispose()
+    {
+        _modifierIsolationCoordinator.Dispose();
+        _uiAutomationExecutor.Dispose();
     }
 }

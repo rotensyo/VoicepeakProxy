@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 namespace VoicepeakProxyCore;
 
 // 修飾キー中立化を管理
-internal sealed class ModifierIsolationCoordinator
+internal sealed class ModifierIsolationCoordinator : IDisposable
 {
     private readonly ModifierKeyHookController _modifierKeyHookController;
     private readonly AppLogger _log;
@@ -373,6 +373,11 @@ internal sealed class ModifierIsolationCoordinator
         return string.IsNullOrEmpty(value)
             ? string.Empty
             : value.Replace("\r", "\\r").Replace("\n", "\\n");
+    }
+
+    public void Dispose()
+    {
+        _modifierKeyHookController.Dispose();
     }
 
     [DllImport("user32.dll")]

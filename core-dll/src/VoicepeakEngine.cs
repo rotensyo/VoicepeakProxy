@@ -187,6 +187,15 @@ internal sealed class VoicepeakEngine : IDisposable
     {
         Stop();
         _wake.Dispose();
+        if (_ui is IDisposable uiDisposable)
+        {
+            uiDisposable.Dispose();
+        }
+
+        if (_audio is IDisposable audioDisposable)
+        {
+            audioDisposable.Dispose();
+        }
     }
 
     // キューを監視してジョブを実行
