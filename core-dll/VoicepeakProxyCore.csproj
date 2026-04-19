@@ -35,9 +35,9 @@
     <MakeDir Directories="$(CoreDepsDir)" />
 
     <ItemGroup>
-      <CoreDependencyFiles Include="$(OutputPath)EasyHook*.*" />
-      <CoreDependencyFiles Include="$(OutputPath)EasyLoad*.*" />
-      <CoreDependencyFiles Include="$(OutputPath)NAudio*.*" />
+      <CoreDependencyFiles Include="$(OutputPath)EasyHook*.dll" />
+      <CoreDependencyFiles Include="$(OutputPath)EasyLoad*.dll" />
+      <CoreDependencyFiles Include="$(OutputPath)NAudio*.dll" />
     </ItemGroup>
 
     <Copy SourceFiles="@(CoreDependencyFiles)" DestinationFolder="$(CoreDepsDir)" Condition="'@(CoreDependencyFiles)' != ''" />

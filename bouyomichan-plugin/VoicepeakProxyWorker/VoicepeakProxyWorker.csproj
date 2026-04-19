@@ -2,6 +2,8 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net48</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <AssemblyName>VoicepeakProxyWorker</AssemblyName>
@@ -45,9 +47,9 @@
     <MakeDir Directories="$(CoreDepsDir)" />
 
     <ItemGroup>
-      <WorkerDependencyFiles Include="$(OutputPath)EasyHook*.*" />
-      <WorkerDependencyFiles Include="$(OutputPath)EasyLoad*.*" />
-      <WorkerDependencyFiles Include="$(OutputPath)NAudio*.*" />
+      <WorkerDependencyFiles Include="$(OutputPath)EasyHook*.dll" />
+      <WorkerDependencyFiles Include="$(OutputPath)EasyLoad*.dll" />
+      <WorkerDependencyFiles Include="$(OutputPath)NAudio*.dll" />
     </ItemGroup>
 
     <Copy SourceFiles="@(WorkerDependencyFiles)" DestinationFolder="$(CoreDepsDir)" Condition="'@(WorkerDependencyFiles)' != ''" />
