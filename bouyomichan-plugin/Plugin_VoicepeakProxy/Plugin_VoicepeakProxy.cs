@@ -38,7 +38,7 @@ namespace Plugin_VoicepeakProxy
 
         public string Name { get { return "VoicepeakProxy for 棒読みちゃん"; } }
 
-        public string Version { get { return "2026/04/12版 (core 1.0.0)"; } }
+        public string Version { get { return "2026/04/19版 (core 1.0.0)"; } }
 
         public string Caption
         {
