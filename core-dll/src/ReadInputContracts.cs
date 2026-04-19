@@ -30,3 +30,16 @@ internal readonly struct ReadInputResult
     public static ReadInputResult Fail(ReadInputSource source, string text, int totalLength)
         => new ReadInputResult(false, text, totalLength, source);
 }
+
+// 入力読み取りスナップショット
+internal readonly struct ReadInputSnapshot
+{
+    public ReadInputResult Read { get; }
+    public int VisibleBlockCount { get; }
+
+    public ReadInputSnapshot(ReadInputResult read, int visibleBlockCount)
+    {
+        Read = read;
+        VisibleBlockCount = visibleBlockCount;
+    }
+}

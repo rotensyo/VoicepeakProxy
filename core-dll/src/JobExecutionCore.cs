@@ -329,9 +329,8 @@ internal static class JobExecutionCore
     // 入力欄が空状態か判定
     private static bool IsInputEmptyState(IVoicepeakUiController ui, IntPtr hwnd)
     {
-        ReadInputResult read = ui.ReadInputTextDetailed(hwnd);
-        int visibleBlockCount = ui.GetVisibleInputBlockCount(hwnd);
-        return VoicepeakUiController.IsClearCompleted(read, visibleBlockCount);
+        ReadInputSnapshot snapshot = ui.ReadInputSnapshot(hwnd);
+        return VoicepeakUiController.IsClearCompleted(snapshot.Read, snapshot.VisibleBlockCount);
     }
 
     // 再生開始と終了を監視

@@ -173,6 +173,9 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
         return EndModifierIsolationSessionHandler(operationName);
     }
 
+    public ReadInputSnapshot ReadInputSnapshot(IntPtr mainHwnd)
+        => new ReadInputSnapshot(ReadInputHandler(mainHwnd), VisibleInputBlockCountHandler(mainHwnd));
+
     public ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd) => ReadInputHandler(mainHwnd);
 
     public int GetVisibleInputBlockCount(IntPtr mainHwnd) => VisibleInputBlockCountHandler(mainHwnd);

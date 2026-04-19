@@ -188,7 +188,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
     // 可視入力欄数を返す
     public int GetVisibleInputBlockCount(IntPtr mainHwnd)
     {
-        return _uiAutomationExecutor.Invoke(() => EstimateVisibleBlockCount(mainHwnd));
+        return ReadInputSnapshot(mainHwnd).VisibleBlockCount;
     }
 
     // 完全削除判定を共通化
@@ -206,47 +206,44 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
 
     private ClearInputState ReadClearInputState(IntPtr mainHwnd)
     {
-        return _uiAutomationExecutor.Invoke(() => ReadClearInputStateCore(mainHwnd));
+        ReadInputSnapshot snapshot = ReadInputSnapshot(mainHwnd);
+        return new ClearInputState(snapshot.Read, snapshot.VisibleBlockCount);
     }
 
-    // 可視状態の入力ブロック数を取得
+    // UIA読み取りを1回で実行して共通スナップショットを返す
+    public ReadInputSnapshot ReadInputSnapshot(IntPtr mainHwnd)
+    {
+        return _uiAutomationExecutor.Invoke(() => ReadInputSnapshotCore(mainHwnd, _debug.LogTextCandidates, _log));
+    }
+
+    // テスト互換用の可視入力欄数算出
     private static int EstimateVisibleBlockCount(IntPtr mainHwnd)
     {
-        if (mainHwnd == IntPtr.Zero)
-        {
-            return 0;
-        }
-
-        try
-        {
-            AutomationElement root = AutomationElement.FromHandle(mainHwnd);
-            List<TextCandidateInfo> candidates = CollectTextCandidates(root, maxCount: 200);
-            return candidates.Count;
-        }
-        catch
-        {
-            return 0;
-        }
+        return ReadInputSnapshotCore(mainHwnd, logTextCandidates: false, log: null).VisibleBlockCount;
     }
 
-    // クリア判定用のUIA読み取りを1回で実行
-    private static ClearInputState ReadClearInputStateCore(IntPtr mainHwnd)
+    private static ReadInputSnapshot ReadInputSnapshotCore(IntPtr mainHwnd, bool logTextCandidates, AppLogger log)
     {
         if (mainHwnd == IntPtr.Zero)
         {
-            return new ClearInputState(ReadInputResult.Fail(ReadInputSource.NoCandidate, string.Empty, 0), 0);
+            return new ReadInputSnapshot(ReadInputResult.Fail(ReadInputSource.NoCandidate, string.Empty, 0), 0);
         }
 
         try
         {
             AutomationElement root = AutomationElement.FromHandle(mainHwnd);
             List<TextCandidateInfo> candidates = CollectTextCandidates(root, maxCount: 200);
+            if (logTextCandidates)
+            {
+                LogTextCandidates(log, candidates);
+            }
+
             ReadInputResult read = BuildReadInputResult(candidates, root);
-            return new ClearInputState(read, candidates.Count);
+            return new ReadInputSnapshot(read, candidates.Count);
         }
         catch
         {
-            return new ClearInputState(ReadInputResult.Fail(ReadInputSource.Exception, string.Empty, 0), 0);
+            return new ReadInputSnapshot(ReadInputResult.Fail(ReadInputSource.Exception, string.Empty, 0), 0);
         }
     }
 
@@ -798,26 +795,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
 
     public ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd)
     {
-        return _uiAutomationExecutor.Invoke(() => ReadInputTextDetailedCore(mainHwnd, _debug.LogTextCandidates, _log));
-    }
-
-    private static ReadInputResult ReadInputTextDetailedCore(IntPtr mainHwnd, bool logTextCandidates, AppLogger log)
-    {
-        try
-        {
-            AutomationElement root = AutomationElement.FromHandle(mainHwnd);
-            List<TextCandidateInfo> candidates = CollectTextCandidates(root, maxCount: 200);
-            if (logTextCandidates)
-            {
-                LogTextCandidates(log, candidates);
-            }
-
-            return BuildReadInputResult(candidates, root);
-        }
-        catch
-        {
-            return ReadInputResult.Fail(ReadInputSource.Exception, string.Empty, 0);
-        }
+        return ReadInputSnapshot(mainHwnd).Read;
     }
 
     private bool SendKey(IntPtr hwnd, VirtualKey key)

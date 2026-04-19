@@ -79,6 +79,7 @@ internal interface IVoicepeakUiController
     bool BeginModifierIsolationSession(int voicepeakProcessId, string operationName);
     bool EndModifierIsolationSession(string operationName);
     ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd);
+    ReadInputSnapshot ReadInputSnapshot(IntPtr mainHwnd);
 }
 
 // 音声監視の依存を抽象化
