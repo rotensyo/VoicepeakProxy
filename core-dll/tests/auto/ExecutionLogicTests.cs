@@ -611,6 +611,36 @@ public class ExecutionLogicTests
     }
 
     [TestMethod]
+    public void FinalizeJobInput_ClearSucceeded_NotifiesSafePoint()
+    {
+        // clear成功時はsafe point通知を行う
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ClearInputHandler = () => true
+        };
+
+        JobExecutionCore.FinalizeJobInput(new AppConfig(), ui, Process.GetCurrentProcess(), new IntPtr(1), killFocusAfterClear: false);
+
+        Assert.AreEqual(1, ui.NotifyFinalizeSafePointCalls);
+    }
+
+    [TestMethod]
+    public void FinalizeJobInput_ClearFailed_DoesNotNotifySafePoint()
+    {
+        // clear失敗時はsafe point通知を行わない
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ClearInputHandler = () => false
+        };
+        AppConfig config = new AppConfig();
+        config.InputTiming.ClearInputRetryMaxRetries = 0;
+
+        JobExecutionCore.FinalizeJobInput(config, ui, Process.GetCurrentProcess(), new IntPtr(1), killFocusAfterClear: false);
+
+        Assert.AreEqual(0, ui.NotifyFinalizeSafePointCalls);
+    }
+
+    [TestMethod]
     public void BuildInputMismatchCause_ReturnsExpectedReasons()
     {
         // 不一致理由分類を固定

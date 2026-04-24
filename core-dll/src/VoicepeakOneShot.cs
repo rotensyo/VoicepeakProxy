@@ -95,16 +95,21 @@ public static class VoicepeakOneShot
         DependencyResolver.EnsureInitialized();
     }
 
+    // 単発セッションを開始
+    public static VoicepeakOneShotSession Start(AppConfig config, IAppLogger logger = null)
+    {
+        AppLogger log = InitializeApiCall(config, logger);
+        return new VoicepeakOneShotSession(config, log);
+    }
+
     // 単発入力検証
     public static ValidateInputOnceResult ValidateInputOnce(
         AppConfig config,
         IAppLogger logger = null)
     {
-        AppLogger log = InitializeApiCall(config, logger);
-        using VoicepeakUiController ui = new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log);
-        using AudioSessionReader audio = new AudioSessionReader(log);
-
-        return ValidateInputOnceCore(config, log, ui, audio);
+        _ = config;
+        _ = logger;
+        throw new InvalidOperationException("VoicepeakOneShot.Start(...) で開始したセッション内で実行してください。");
     }
 
     // 依存を差し替えて単発入力検証
@@ -171,10 +176,9 @@ public static class VoicepeakOneShot
         AppConfig config,
         IAppLogger logger = null)
     {
-        AppLogger log = InitializeApiCall(config, logger);
-        using VoicepeakUiController ui = new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log);
-
-        return ClearInputOnceCore(config, log, ui);
+        _ = config;
+        _ = logger;
+        throw new InvalidOperationException("VoicepeakOneShot.Start(...) で開始したセッション内で実行してください。");
     }
 
     // 依存を差し替えて単発入力削除
@@ -245,11 +249,10 @@ public static class VoicepeakOneShot
         SpeakOnceRequest request,
         IAppLogger logger = null)
     {
-        AppLogger log = InitializeApiCall(config, logger);
-        using VoicepeakUiController ui = new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log);
-        using AudioSessionReader audio = new AudioSessionReader(log);
-
-        return SpeakOnceCore(config, request, log, ui, audio);
+        _ = config;
+        _ = request;
+        _ = logger;
+        throw new InvalidOperationException("VoicepeakOneShot.Start(...) で開始したセッション内で実行してください。");
     }
 
     // 依存を差し替えて単発実行
@@ -277,11 +280,10 @@ public static class VoicepeakOneShot
         SpeakOnceRequest request,
         IAppLogger logger = null)
     {
-        AppLogger log = InitializeApiCall(config, logger);
-        using VoicepeakUiController ui = new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log);
-        using AudioSessionReader audio = new AudioSessionReader(log);
-
-        return SpeakOnceWaitCore(config, request, log, ui, audio);
+        _ = config;
+        _ = request;
+        _ = logger;
+        throw new InvalidOperationException("VoicepeakOneShot.Start(...) で開始したセッション内で実行してください。");
     }
 
     // 依存を差し替えて単発実行
@@ -304,7 +306,7 @@ public static class VoicepeakOneShot
     }
 
     // 公開API呼び出しの共通初期化
-    private static AppLogger InitializeApiCall(AppConfig config, IAppLogger logger)
+    internal static AppLogger InitializeApiCall(AppConfig config, IAppLogger logger)
     {
         if (config == null)
         {
@@ -796,4 +798,85 @@ public static class VoicepeakOneShot
         };
     }
 
+}
+
+// 単発実行セッション
+public sealed class VoicepeakOneShotSession : IDisposable
+{
+    private readonly AppConfig _config;
+    private readonly AppLogger _log;
+    private readonly UiaProcessHost _uiaHost;
+    private readonly VoicepeakUiController _ui;
+    private readonly AudioSessionReader _audio;
+    private bool _disposed;
+
+    // セッションを初期化
+    internal VoicepeakOneShotSession(AppConfig config, AppLogger log)
+    {
+        _config = config ?? throw new ArgumentNullException(nameof(config));
+        _log = log ?? throw new ArgumentNullException(nameof(log));
+        _uiaHost = new UiaProcessHost(_config.Debug.UiaProbeMaxRequests, _log);
+        _ui = new VoicepeakUiController(
+            _config.Ui,
+            _config.InputTiming,
+            _config.Hook,
+            _config.Text,
+            _config.Debug,
+            _log,
+            processApi: null,
+            uiaProcessHost: _uiaHost,
+            ownsUiaProcessHost: false);
+        _audio = new AudioSessionReader(_log);
+    }
+
+    // 入力検証を実行
+    public ValidateInputOnceResult ValidateInputOnce()
+    {
+        ThrowIfDisposed();
+        return VoicepeakOneShot.ValidateInputOnceCore(_config, _log, _ui, _audio);
+    }
+
+    // 入力欄クリアを実行
+    public ClearInputOnceResult ClearInputOnce()
+    {
+        ThrowIfDisposed();
+        return VoicepeakOneShot.ClearInputOnceCore(_config, _log, _ui);
+    }
+
+    // 開始確認までの単発実行
+    public SpeakOnceResult SpeakOnce(SpeakOnceRequest request)
+    {
+        ThrowIfDisposed();
+        return VoicepeakOneShot.SpeakOnceCore(_config, request, _log, _ui, _audio);
+    }
+
+    // 終了確認までの単発実行
+    public SpeakOnceResult SpeakOnceWait(SpeakOnceRequest request)
+    {
+        ThrowIfDisposed();
+        return VoicepeakOneShot.SpeakOnceWaitCore(_config, request, _log, _ui, _audio);
+    }
+
+    // リソースを解放
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _audio.Dispose();
+        _ui.Dispose();
+        _uiaHost.Dispose();
+    }
+
+    // 破棄済みを検証
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(VoicepeakOneShotSession));
+        }
+    }
 }

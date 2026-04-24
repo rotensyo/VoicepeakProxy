@@ -10,7 +10,7 @@ public class VoicepeakOneShotUtilityTests
     [TestMethod]
     public void ValidateInputOnce_NullConfig_Throws()
     {
-        Assert.ThrowsException<ArgumentNullException>(() => VoicepeakOneShot.ValidateInputOnce(null));
+        Assert.ThrowsException<InvalidOperationException>(() => VoicepeakOneShot.ValidateInputOnce(new AppConfig()));
     }
 
     [TestMethod]
@@ -222,7 +222,7 @@ public class VoicepeakOneShotUtilityTests
     [TestMethod]
     public void ClearInputOnce_NullConfig_Throws()
     {
-        Assert.ThrowsException<ArgumentNullException>(() => VoicepeakOneShot.ClearInputOnce(null));
+        Assert.ThrowsException<InvalidOperationException>(() => VoicepeakOneShot.ClearInputOnce(new AppConfig()));
     }
 
     [TestMethod]

@@ -18,6 +18,7 @@ internal sealed class WorkerHost
     private readonly int _ownerPid;
     private readonly WorkerFileLogger _logger;
     private readonly WorkerSettingsProvider _settingsProvider;
+    private VoicepeakOneShotSession _oneShotSession;
 
     private bool _running;
     private Thread _ownerWatchThread;
@@ -34,20 +35,30 @@ internal sealed class WorkerHost
     // Worker処理を開始
     public bool Run()
     {
-        if (!TryRunStartupValidation())
+        try
         {
-            return false;
+            PluginSettingsFile settings = _settingsProvider.GetCurrent();
+            _oneShotSession = VoicepeakOneShot.Start(AppConfigMapper.Map(settings.AppConfig), _logger);
+            if (!TryRunStartupValidation())
+            {
+                return false;
+            }
+
+            _running = true;
+            StartOwnerWatchThread();
+
+            while (_running)
+            {
+                ServeSingleConnection();
+            }
+
+            return true;
         }
-
-        _running = true;
-        StartOwnerWatchThread();
-
-        while (_running)
+        finally
         {
-            ServeSingleConnection();
+            _oneShotSession?.Dispose();
+            _oneShotSession = null;
         }
-
-        return true;
     }
 
     // 親プロセス監視スレッドを開始
@@ -206,14 +217,13 @@ internal sealed class WorkerHost
         try
         {
             PluginSettingsFile settings = _settingsProvider.GetCurrent();
-            AppConfig config = AppConfigMapper.Map(settings.AppConfig);
             _logger.Info("speak_start taskId=" + request.TaskId + " length=" + request.Text.Length);
 
             SpeakOnceRequest speakRequest = new SpeakOnceRequest();
             speakRequest.Text = request.Text;
 
-            SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWait(config, speakRequest, _logger);
-            ClearInputOnceResult clearResult = VoicepeakOneShot.ClearInputOnce(config, _logger);
+            SpeakOnceResult result = _oneShotSession.SpeakOnceWait(speakRequest);
+            ClearInputOnceResult clearResult = _oneShotSession.ClearInputOnce();
             if (!clearResult.Succeeded)
             {
                 _logger.Warn("post_speak_clear_failed taskId=" + request.TaskId + " status=" + clearResult.Status + " error=" + clearResult.ErrorMessage);
@@ -271,8 +281,7 @@ internal sealed class WorkerHost
         {
             PluginSettingsFile settings = _settingsProvider.GetCurrent();
             _logger.SetMinimumLevel(settings.AppConfig.Debug.LogMinimumLevel);
-            AppConfig config = AppConfigMapper.Map(settings.AppConfig);
-            ValidateInputOnceResult validate = VoicepeakOneShot.ValidateInputOnce(config, _logger);
+            ValidateInputOnceResult validate = _oneShotSession.ValidateInputOnce();
             if (!validate.Succeeded)
             {
                 _logger.Warn("startup_validation_failed status=" + validate.Status + " error=" + validate.ErrorMessage);

@@ -35,7 +35,7 @@ internal sealed class VoicepeakEngine : IDisposable
 
     // バックグラウンドワーカーを開始
     public VoicepeakEngine(AppConfig config, CancellationTokenSource appCts, AppLogger log)
-        : this(config, appCts, log, null, null, true)
+        : this(config, appCts, log, null, null, true, null)
     {
     }
 
@@ -45,12 +45,13 @@ internal sealed class VoicepeakEngine : IDisposable
         AppLogger log,
         IVoicepeakUiController ui,
         IAudioSessionReader audio,
-        bool startWorker)
+        bool startWorker,
+        UiaProcessHost uiaProcessHost = null)
     {
         _config = config;
         _appCts = appCts;
         _log = log;
-        _ui = ui ?? new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, _log);
+        _ui = ui ?? new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, _log, processApi: null, uiaProcessHost: uiaProcessHost, ownsUiaProcessHost: false);
         _audio = audio ?? new AudioSessionReader(_log);
         _worker = null;
         if (startWorker)

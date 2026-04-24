@@ -82,31 +82,28 @@ public class RuntimeAndOneShotTests
     [TestMethod]
     public void SpeakOnceWait_NullConfig_Throws()
     {
-        Assert.ThrowsException<ArgumentNullException>(() => VoicepeakOneShot.SpeakOnceWait(null, new SpeakOnceRequest()));
+        Assert.ThrowsException<ArgumentNullException>(() => VoicepeakOneShot.Start(null));
     }
 
     [TestMethod]
-    public void SpeakOnceWait_NullRequest_ReturnsInvalidRequest()
+    public void SpeakOnceWait_StaticCall_ThrowsInvalidOperation()
     {
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWait(new AppConfig(), null, new TestLogger());
-
-        Assert.AreEqual(SpeakOnceStatus.InvalidRequest, result.Status);
-        StringAssert.Contains(result.ErrorMessage, "request は null");
+        Assert.ThrowsException<InvalidOperationException>(() => VoicepeakOneShot.SpeakOnceWait(new AppConfig(), null, new TestLogger()));
     }
 
     [TestMethod]
     public void SpeakOnce_NullConfig_Throws()
     {
-        Assert.ThrowsException<ArgumentNullException>(() => VoicepeakOneShot.SpeakOnce(null, new SpeakOnceRequest()));
+        Assert.ThrowsException<InvalidOperationException>(() => VoicepeakOneShot.SpeakOnce(new AppConfig(), new SpeakOnceRequest()));
     }
 
     [TestMethod]
-    public void SpeakOnce_NullRequest_ReturnsInvalidRequest()
+    public void OneShotSession_DisposeAfterStart_ThrowsOnUse()
     {
-        SpeakOnceResult result = VoicepeakOneShot.SpeakOnce(new AppConfig(), null, new TestLogger());
+        VoicepeakOneShotSession session = VoicepeakOneShot.Start(new AppConfig(), new TestLogger());
+        session.Dispose();
 
-        Assert.AreEqual(SpeakOnceStatus.InvalidRequest, result.Status);
-        StringAssert.Contains(result.ErrorMessage, "request は null");
+        Assert.ThrowsException<ObjectDisposedException>(() => session.ClearInputOnce());
     }
 
     [TestMethod]
@@ -132,7 +129,7 @@ public class RuntimeAndOneShotTests
         InvalidOperationException ex = Assert.ThrowsException<InvalidOperationException>(() => VoicepeakRuntime.StartCore(
             config,
             new TestLogger(),
-            (cfg, cts, log) =>
+            (cfg, cts, log, host) =>
             {
                 captured = cts;
                 return null;

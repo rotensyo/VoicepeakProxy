@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>VoicepeakProxyCore.UiaProbe</AssemblyName>
+    <RootNamespace>VoicepeakProxyCore.UiaProbe</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\VoicepeakProxyCore.csproj" />
+  </ItemGroup>
+</Project>

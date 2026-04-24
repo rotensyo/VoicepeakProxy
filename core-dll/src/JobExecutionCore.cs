@@ -722,7 +722,12 @@ internal static class JobExecutionCore
             return;
         }
 
-        TryClearInputWithRetry(config, ui, process, hwnd, null, "finalize");
+        bool cleared = TryClearInputWithRetry(config, ui, process, hwnd, null, "finalize");
+        if (cleared)
+        {
+            ui.NotifyFinalizeSafePoint();
+        }
+
         if (killFocusAfterClear)
         {
             ui.KillFocus(hwnd);

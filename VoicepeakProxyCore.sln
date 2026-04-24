@@ -9,6 +9,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VoicepeakProxyCore.Tests", "core-dll\tests\auto\VoicepeakProxyCore.Tests.csproj", "{EBCD611C-5532-4CB9-AA6E-2EF787F4DAF8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VoicepeakProxyCore.UiaProbe", "core-dll\uia-probe\VoicepeakProxyCore.UiaProbe.csproj", "{9A77D528-56A0-46A9-B6C4-23BDAF26B66C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -43,12 +45,25 @@ Global
 		{EBCD611C-5532-4CB9-AA6E-2EF787F4DAF8}.Release|x64.Build.0 = Release|Any CPU
 		{EBCD611C-5532-4CB9-AA6E-2EF787F4DAF8}.Release|x86.ActiveCfg = Release|Any CPU
 		{EBCD611C-5532-4CB9-AA6E-2EF787F4DAF8}.Release|x86.Build.0 = Release|Any CPU
+		{9A77D528-56A0-46A9-B6C4-23BDAF26B66C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9A77D528-56A0-46A9-B6C4-23BDAF26B66C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9A77D528-56A0-46A9-B6C4-23BDAF26B66C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{9A77D528-56A0-46A9-B6C4-23BDAF26B66C}.Debug|x64.Build.0 = Debug|Any CPU
+		{9A77D528-56A0-46A9-B6C4-23BDAF26B66C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{9A77D528-56A0-46A9-B6C4-23BDAF26B66C}.Debug|x86.Build.0 = Debug|Any CPU
+		{9A77D528-56A0-46A9-B6C4-23BDAF26B66C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9A77D528-56A0-46A9-B6C4-23BDAF26B66C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9A77D528-56A0-46A9-B6C4-23BDAF26B66C}.Release|x64.ActiveCfg = Release|Any CPU
+		{9A77D528-56A0-46A9-B6C4-23BDAF26B66C}.Release|x64.Build.0 = Release|Any CPU
+		{9A77D528-56A0-46A9-B6C4-23BDAF26B66C}.Release|x86.ActiveCfg = Release|Any CPU
+		{9A77D528-56A0-46A9-B6C4-23BDAF26B66C}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{EBCD611C-5532-4CB9-AA6E-2EF787F4DAF8} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{9A77D528-56A0-46A9-B6C4-23BDAF26B66C} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {4FDFCDEC-60D2-40AB-8E31-8086BFCA761E}
