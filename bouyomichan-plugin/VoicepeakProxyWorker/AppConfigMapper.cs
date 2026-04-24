@@ -74,6 +74,7 @@ internal static class AppConfigMapper
 
         config.Debug.LogTextCandidates = data.Debug.LogTextCandidates;
         config.Debug.LogModifierHookStats = data.Debug.LogModifierHookStats;
+        config.Debug.UiaProbeMaxRequests = data.Debug.UiaProbeMaxRequests;
         config.Debug.LogMinimumLevel = data.Debug.LogMinimumLevel;
 
         return config;
@@ -136,6 +137,7 @@ internal static class AppConfigMapper
 
         data.Debug.LogTextCandidates = config.Debug.LogTextCandidates;
         data.Debug.LogModifierHookStats = config.Debug.LogModifierHookStats;
+        data.Debug.UiaProbeMaxRequests = config.Debug.UiaProbeMaxRequests;
         data.Debug.LogMinimumLevel = config.Debug.LogMinimumLevel;
 
         data.Normalize();

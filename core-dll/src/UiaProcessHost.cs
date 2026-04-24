@@ -267,6 +267,7 @@ internal sealed class UiaProcessHost : IDisposable
     // セッション再起動を実行
     private void RecycleCore(string reason)
     {
+        _log?.Info($"uia_probe_recycle_start reason={reason}");
         ProbeSession oldSession;
         lock (_gate)
         {

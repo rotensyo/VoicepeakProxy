@@ -650,6 +650,15 @@ namespace Plugin_VoicepeakProxy
             get { return State.Settings.AppConfig.Debug.LogMinimumLevel; }
             set { State.Settings.AppConfig.Debug.LogMinimumLevel = (value ?? string.Empty).Trim().ToLowerInvariant(); }
         }
+
+        [Category("Debug")]
+        [DisplayName("04)uiaProbeMaxRequests")]
+        [Description("UIAサブプロセスの再起動要求回数閾値です。1以上を指定します。")]
+        public int UiaProbeMaxRequests
+        {
+            get { return State.Settings.AppConfig.Debug.UiaProbeMaxRequests; }
+            set { State.Settings.AppConfig.Debug.UiaProbeMaxRequests = value; }
+        }
     }
 
     // ファイル選択エディタ共通基底

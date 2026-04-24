@@ -258,16 +258,23 @@ public sealed class UiConfigData
     {
         public bool LogTextCandidates { get; set; }
         public bool LogModifierHookStats { get; set; }
+        public int UiaProbeMaxRequests { get; set; }
         public string LogMinimumLevel { get; set; }
 
         public DebugConfigData()
         {
+            UiaProbeMaxRequests = 1000;
             LogMinimumLevel = "warn";
         }
 
         // 不足項目を既定値で補完
         public void Normalize()
         {
+            if (UiaProbeMaxRequests <= 0)
+            {
+                UiaProbeMaxRequests = 1000;
+            }
+
             string raw = LogMinimumLevel ?? string.Empty;
             string normalized = raw.Trim().ToLowerInvariant();
             if (normalized == "debug"
