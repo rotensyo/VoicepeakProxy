@@ -17,7 +17,7 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
     public Func<IntPtr, bool> KillFocusHandler { get; set; } = _ => true;
     public Func<int, string, bool> BeginModifierIsolationSessionHandler { get; set; } = (_, _) => true;
     public Func<string, bool> EndModifierIsolationSessionHandler { get; set; } = _ => true;
-    public Action NotifyFinalizeSafePointHandler { get; set; } = () => { };
+    public Action NotifyPlaybackSafePointHandler { get; set; } = () => { };
     public Func<IntPtr, ReadInputResult> ReadInputHandler { get; set; }
         = _ => ReadInputResult.Ok(string.Empty, 0, ReadInputSource.PrimaryUiA);
     public Func<IntPtr, int> VisibleInputBlockCountHandler { get; set; } = _ => 1;
@@ -41,7 +41,7 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
     public int EndModifierIsolationSessionCalls { get; private set; }
     public int GetVoicepeakProcessCountCalls { get; private set; }
     public int TryResolveTargetDetailedCalls { get; private set; }
-    public int NotifyFinalizeSafePointCalls { get; private set; }
+    public int NotifyPlaybackSafePointCalls { get; private set; }
 
     public bool TryResolveTarget(out Process process, out IntPtr mainHwnd)
     {
@@ -182,11 +182,11 @@ internal sealed class FakeVoicepeakUiController : IVoicepeakUiController
 
     public int GetVisibleInputBlockCount(IntPtr mainHwnd) => VisibleInputBlockCountHandler(mainHwnd);
 
-    // finalize完了通知を記録
-    public void NotifyFinalizeSafePoint()
+    // 発話開始後通知を記録
+    public void NotifyPlaybackSafePoint()
     {
-        NotifyFinalizeSafePointCalls++;
-        NotifyFinalizeSafePointHandler();
+        NotifyPlaybackSafePointCalls++;
+        NotifyPlaybackSafePointHandler();
     }
 }
 

@@ -226,10 +226,10 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
         return _uiAutomationExecutor.Invoke(() => _uiaProcessHost.ReadInputSnapshot(mainHwnd));
     }
 
-    // finalize完了時のsafe pointを通知
-    public void NotifyFinalizeSafePoint()
+    // 発話開始後のsafe pointを通知
+    public void NotifyPlaybackSafePoint()
     {
-        _uiaProcessHost.NotifySafePoint();
+        _uiaProcessHost.NotifyPlaybackSafePoint();
     }
 
     // テスト互換用の可視入力欄数算出

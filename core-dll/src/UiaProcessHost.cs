@@ -25,6 +25,7 @@ internal sealed class UiaProcessHost : IDisposable
     private DateTime _sessionStartedUtc;
     private int _inFlight;
     private bool _pendingRecycle;
+    private bool _recycleWorkerRunning;
     private bool _disposed;
 
     // 設定を保持
@@ -47,7 +48,6 @@ internal sealed class UiaProcessHost : IDisposable
 
             ReadInputSnapshot snapshot;
             bool requestOk = TryRequestWithSingleRetry(session, mainHwnd, out snapshot);
-            ReleaseInFlightAndTryIdleRecycle();
             if (!requestOk)
             {
                 return BuildProbeFailureSnapshot();
@@ -62,26 +62,35 @@ internal sealed class UiaProcessHost : IDisposable
         }
     }
 
-    // safe pointで再起動を実行
-    public void NotifySafePoint()
+    // 発話開始後safe pointで再起動を予約
+    public void NotifyPlaybackSafePoint()
     {
-        bool shouldRecycle;
+        bool shouldStartWorker;
         lock (_gate)
         {
-            shouldRecycle = !_disposed && _pendingRecycle && _inFlight == 0 && _state == HostState.Running;
-            if (shouldRecycle)
+            if (_disposed || _state != HostState.Running || _session == null || _inFlight != 0)
             {
-                _state = HostState.Recycling;
-                _readyEvent.Reset();
+                return;
             }
+
+            TryMarkPendingRecycleByElapsedUnsafe();
+            if (!_pendingRecycle || _recycleWorkerRunning)
+            {
+                return;
+            }
+
+            _state = HostState.Recycling;
+            _readyEvent.Reset();
+            _recycleWorkerRunning = true;
+            shouldStartWorker = true;
         }
 
-        if (!shouldRecycle)
+        if (!shouldStartWorker)
         {
             return;
         }
 
-        RecycleCore("safe_point");
+        ThreadPool.QueueUserWorkItem(_ => RunBackgroundRecycle("playback_safe_point"));
     }
 
     // リソースを破棄
@@ -167,10 +176,16 @@ internal sealed class UiaProcessHost : IDisposable
     private bool TryRequestWithSingleRetry(ProbeSession session, IntPtr mainHwnd, out ReadInputSnapshot snapshot)
     {
         snapshot = default(ReadInputSnapshot);
-        if (TryRequestCore(session, mainHwnd, out snapshot))
+        try
         {
-            MarkRequestCompleted();
-            return true;
+            if (TryRequestCore(session, mainHwnd, out snapshot))
+            {
+                return true;
+            }
+        }
+        finally
+        {
+            ReleaseInFlight();
         }
 
         _log?.Warn("uia_probe_request_failed retry=1");
@@ -180,9 +195,14 @@ internal sealed class UiaProcessHost : IDisposable
             return false;
         }
 
-        bool ok = TryRequestCore(retriedSession, mainHwnd, out snapshot);
-        MarkRequestCompleted();
-        return ok;
+        try
+        {
+            return TryRequestCore(retriedSession, mainHwnd, out snapshot);
+        }
+        finally
+        {
+            ReleaseInFlight();
+        }
     }
 
     // 1回要求を送受信
@@ -203,50 +223,48 @@ internal sealed class UiaProcessHost : IDisposable
         return TryParseResponse(response, out snapshot);
     }
 
-    // 要求完了時のカウンタ更新
-    private void MarkRequestCompleted()
+    // 経過時間で再起動予約を更新
+    private void TryMarkPendingRecycleByElapsedUnsafe()
     {
-        lock (_gate)
+        if (_pendingRecycle)
         {
-            if (_pendingRecycle)
-            {
-                return;
-            }
+            return;
+        }
 
-            double elapsedMs = (DateTime.UtcNow - _sessionStartedUtc).TotalMilliseconds;
-            if (elapsedMs >= _recycleIntervalMs)
-            {
-                _pendingRecycle = true;
-                _log?.Info("uia_probe_recycle_pending reason=elapsed_interval");
-            }
+        double elapsedMs = (DateTime.UtcNow - _sessionStartedUtc).TotalMilliseconds;
+        if (elapsedMs >= _recycleIntervalMs)
+        {
+            _pendingRecycle = true;
+            _log?.Info("uia_probe_recycle_pending reason=elapsed_interval");
         }
     }
 
-    // in-flightを解放してidle再起動を試行
-    private void ReleaseInFlightAndTryIdleRecycle()
+    // in-flight要求数を解放
+    private void ReleaseInFlight()
     {
-        bool shouldRecycle;
         lock (_gate)
         {
             if (_inFlight > 0)
             {
                 _inFlight--;
             }
+        }
+    }
 
-            shouldRecycle = !_disposed && _pendingRecycle && _inFlight == 0 && _state == HostState.Running;
-            if (shouldRecycle)
+    // バックグラウンド再起動を実行
+    private void RunBackgroundRecycle(string reason)
+    {
+        try
+        {
+            RecycleCore(reason);
+        }
+        finally
+        {
+            lock (_gate)
             {
-                _state = HostState.Recycling;
-                _readyEvent.Reset();
+                _recycleWorkerRunning = false;
             }
         }
-
-        if (!shouldRecycle)
-        {
-            return;
-        }
-
-        RecycleCore("idle");
     }
 
     // 障害時の再起動を実行

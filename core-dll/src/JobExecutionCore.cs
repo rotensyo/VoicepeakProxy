@@ -381,6 +381,7 @@ internal static class JobExecutionCore
                     startConfirmed = true;
                     speakingStartedAt = now;
                     log.Info("speak_start_confirmed");
+                    ui.NotifyPlaybackSafePoint();
                 }
                 else if (now > startDeadline)
                 {
@@ -722,11 +723,7 @@ internal static class JobExecutionCore
             return;
         }
 
-        bool cleared = TryClearInputWithRetry(config, ui, process, hwnd, null, "finalize");
-        if (cleared)
-        {
-            ui.NotifyFinalizeSafePoint();
-        }
+        TryClearInputWithRetry(config, ui, process, hwnd, null, "finalize");
 
         if (killFocusAfterClear)
         {
