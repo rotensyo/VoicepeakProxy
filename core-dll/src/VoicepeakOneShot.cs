@@ -815,7 +815,7 @@ public sealed class VoicepeakOneShotSession : IDisposable
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _log = log ?? throw new ArgumentNullException(nameof(log));
-        _uiaHost = new UiaProcessHost(_config.Debug.UiaProbeMaxRequests, _log);
+        _uiaHost = new UiaProcessHost(_config.Debug.UiaProbeRecycleIntervalSec, _log);
         _ui = new VoicepeakUiController(
             _config.Ui,
             _config.InputTiming,

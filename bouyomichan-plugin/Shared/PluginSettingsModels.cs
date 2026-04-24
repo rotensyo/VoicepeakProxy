@@ -225,11 +225,6 @@ public sealed class UiConfigData
     {
         public List<ReplaceRuleData> ReplaceRules { get; set; }
 
-        public TextConfigData()
-        {
-            ReplaceRules = new List<ReplaceRuleData>();
-        }
-
         // 不足項目を既定値で補完
         public void Normalize()
         {
@@ -245,12 +240,6 @@ public sealed class UiConfigData
     {
         public int MaxQueuedJobs { get; set; }
         public BootValidationModeOption BootValidation { get; set; }
-
-        public RuntimeConfigData()
-        {
-            MaxQueuedJobs = 500;
-            BootValidation = BootValidationModeOption.Required;
-        }
     }
 
     // デバッグ設定
@@ -258,23 +247,12 @@ public sealed class UiConfigData
     {
         public bool LogTextCandidates { get; set; }
         public bool LogModifierHookStats { get; set; }
-        public int UiaProbeMaxRequests { get; set; }
+        public int UiaProbeRecycleIntervalSec { get; set; }
         public string LogMinimumLevel { get; set; }
-
-        public DebugConfigData()
-        {
-            UiaProbeMaxRequests = 1000;
-            LogMinimumLevel = "warn";
-        }
 
         // 不足項目を既定値で補完
         public void Normalize()
         {
-            if (UiaProbeMaxRequests <= 0)
-            {
-                UiaProbeMaxRequests = 1000;
-            }
-
             string raw = LogMinimumLevel ?? string.Empty;
             string normalized = raw.Trim().ToLowerInvariant();
             if (normalized == "debug"
@@ -286,7 +264,7 @@ public sealed class UiConfigData
                 return;
             }
 
-            LogMinimumLevel = "warn";
+            LogMinimumLevel = string.Empty;
         }
     }
 

@@ -56,7 +56,7 @@ public sealed class VoicepeakRuntime : IDisposable
         VoicepeakEngine engine = null;
         try
         {
-            uiaHost = new UiaProcessHost(config.Debug.UiaProbeMaxRequests, appLogger);
+            uiaHost = new UiaProcessHost(config.Debug.UiaProbeRecycleIntervalSec, appLogger);
             engine = engineFactory != null
                 ? engineFactory(config, cts, appLogger, uiaHost)
                 : new VoicepeakEngine(config, cts, appLogger, null, null, true, uiaHost);

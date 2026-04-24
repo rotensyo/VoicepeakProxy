@@ -652,12 +652,12 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("Debug")]
-        [DisplayName("04)uiaProbeMaxRequests")]
-        [Description("UIAサブプロセスの再起動要求回数閾値です。1以上を指定します。")]
-        public int UiaProbeMaxRequests
+        [DisplayName("04)uiaProbeRecycleIntervalSec")]
+        [Description("UIAサブプロセスの再起動間隔秒です。1以上を指定します。")]
+        public int UiaProbeRecycleIntervalSec
         {
-            get { return State.Settings.AppConfig.Debug.UiaProbeMaxRequests; }
-            set { State.Settings.AppConfig.Debug.UiaProbeMaxRequests = value; }
+            get { return State.Settings.AppConfig.Debug.UiaProbeRecycleIntervalSec; }
+            set { State.Settings.AppConfig.Debug.UiaProbeRecycleIntervalSec = value; }
         }
     }
 

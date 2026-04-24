@@ -73,7 +73,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
             _hook.HookConnectTotalWaitMs);
         _modifierIsolationCoordinator = new ModifierIsolationCoordinator(modifierKeyHookController, _log);
         _uiAutomationExecutor = new UiAutomationExecutor();
-        _uiaProcessHost = uiaProcessHost ?? new UiaProcessHost(_debug.UiaProbeMaxRequests, _log);
+        _uiaProcessHost = uiaProcessHost ?? new UiaProcessHost(_debug.UiaProbeRecycleIntervalSec, _log);
         _ownsUiaProcessHost = uiaProcessHost == null || ownsUiaProcessHost;
     }
 

@@ -17,20 +17,20 @@ internal sealed class UiaProcessHost : IDisposable
     private const int RecycleWaitTimeoutMs = 1500;
     private readonly object _gate = new object();
     private readonly AppLogger _log;
-    private readonly int _maxRequests;
+    private readonly int _recycleIntervalMs;
     private readonly ManualResetEventSlim _readyEvent = new ManualResetEventSlim(false);
     private ProbeSession _session;
     private HostState _state;
     private int _generation;
-    private int _requestCount;
+    private DateTime _sessionStartedUtc;
     private int _inFlight;
     private bool _pendingRecycle;
     private bool _disposed;
 
     // 設定を保持
-    public UiaProcessHost(int maxRequests, AppLogger log)
+    public UiaProcessHost(int recycleIntervalSec, AppLogger log)
     {
-        _maxRequests = Math.Max(1, maxRequests);
+        _recycleIntervalMs = Math.Max(1, recycleIntervalSec) * 1000;
         _log = log;
         _state = HostState.Stopped;
     }
@@ -208,11 +208,16 @@ internal sealed class UiaProcessHost : IDisposable
     {
         lock (_gate)
         {
-            _requestCount++;
-            if (_requestCount >= _maxRequests)
+            if (_pendingRecycle)
+            {
+                return;
+            }
+
+            double elapsedMs = (DateTime.UtcNow - _sessionStartedUtc).TotalMilliseconds;
+            if (elapsedMs >= _recycleIntervalMs)
             {
                 _pendingRecycle = true;
-                _log?.Info("uia_probe_recycle_pending reason=max_requests");
+                _log?.Info("uia_probe_recycle_pending reason=elapsed_interval");
             }
         }
     }
@@ -321,7 +326,7 @@ internal sealed class UiaProcessHost : IDisposable
             _state = HostState.Running;
             _generation = generation;
             _pendingRecycle = false;
-            _requestCount = 0;
+            _sessionStartedUtc = DateTime.UtcNow;
             _readyEvent.Set();
         }
 
