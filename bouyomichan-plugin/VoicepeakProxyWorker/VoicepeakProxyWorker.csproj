@@ -42,7 +42,7 @@
   <Target Name="MoveWorkerDependenciesToCoreDepsFolder" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
     <PropertyGroup>
       <CoreDepsDir>$(OutputPath)VoicepeakProxyCore.deps\</CoreDepsDir>
-      <CoreProjectDepsDir>$(MSBuildThisFileDirectory)..\..\core-dll\bin\$(Configuration)\net48\VoicepeakProxyCore.deps\</CoreProjectDepsDir>
+      <CoreProjectDepsDir>$(MSBuildThisFileDirectory)..\..\core-dll\bin\x64\$(Configuration)\net48\VoicepeakProxyCore.deps\</CoreProjectDepsDir>
     </PropertyGroup>
 
     <RemoveDir Directories="$(CoreDepsDir)" Condition="Exists('$(CoreDepsDir)')" />
@@ -61,7 +61,7 @@
     <Delete Files="@(WorkerDependencyFiles)" Condition="'@(WorkerDependencyFiles)' != ''" />
   </Target>
 
-  <Target Name="BundleWorkerOutputs" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+  <Target Name="BundleWorkerOutputs" AfterTargets="MoveWorkerDependenciesToCoreDepsFolder" Condition="'$(Configuration)' == 'Release'">
     <PropertyGroup>
       <WorkerBundleDir>$(OutputPath)VoicepeakProxyWorker\</WorkerBundleDir>
       <CoreDepsDir>$(OutputPath)VoicepeakProxyCore.deps\</CoreDepsDir>
