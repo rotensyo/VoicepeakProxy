@@ -759,10 +759,10 @@ public static class VoicepeakOneShot
 // 単発実行セッション
 public sealed class VoicepeakOneShotSession : IDisposable
 {
-    private readonly AppConfig _config;
+    private AppConfig _config;
     private readonly AppLogger _log;
     private readonly UiaProcessHost _uiaHost;
-    private readonly VoicepeakUiController _ui;
+    private VoicepeakUiController _ui;
     private readonly AudioSessionReader _audio;
     private bool _disposed;
 
@@ -772,17 +772,26 @@ public sealed class VoicepeakOneShotSession : IDisposable
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _log = log ?? throw new ArgumentNullException(nameof(log));
         _uiaHost = new UiaProcessHost(_config.Debug.UiaProbeRecycleIntervalSec, _log);
-        _ui = new VoicepeakUiController(
-            _config.Ui,
-            _config.InputTiming,
-            _config.Hook,
-            _config.Text,
-            _config.Debug,
-            _log,
-            processApi: null,
-            uiaProcessHost: _uiaHost,
-            ownsUiaProcessHost: false);
+        _ui = BuildUiController(_config);
         _audio = new AudioSessionReader(_log);
+    }
+
+    // 実行設定を更新
+    public void UpdateConfig(AppConfig config)
+    {
+        ThrowIfDisposed();
+        if (config == null)
+        {
+            throw new ArgumentNullException(nameof(config));
+        }
+
+        AppConfigValidator.Validate(config);
+        VoicepeakUiController nextUi = BuildUiController(config);
+        VoicepeakUiController oldUi = _ui;
+        _ui = nextUi;
+        _config = config;
+        _uiaHost.UpdateRecycleInterval(config.Debug.UiaProbeRecycleIntervalSec);
+        oldUi.Dispose();
     }
 
     // 入力検証を実行
@@ -834,5 +843,21 @@ public sealed class VoicepeakOneShotSession : IDisposable
         {
             throw new ObjectDisposedException(nameof(VoicepeakOneShotSession));
         }
+    }
+
+    // UIコントローラーを生成
+    private VoicepeakUiController BuildUiController(AppConfig config)
+    {
+        AppConfig c = config ?? new AppConfig();
+        return new VoicepeakUiController(
+            c.Ui,
+            c.InputTiming,
+            c.Hook,
+            c.Text,
+            c.Debug,
+            _log,
+            processApi: null,
+            uiaProcessHost: _uiaHost,
+            ownsUiaProcessHost: false);
     }
 }

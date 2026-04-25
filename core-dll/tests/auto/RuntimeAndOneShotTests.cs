@@ -115,6 +115,62 @@ public class RuntimeAndOneShotTests
     }
 
     [TestMethod]
+    public void OneShotSession_UpdateConfig_Null_Throws()
+    {
+        using VoicepeakOneShotSession session = VoicepeakOneShot.Start(new AppConfig(), new TestLogger());
+
+        Assert.ThrowsException<ArgumentNullException>(() => session.UpdateConfig(null));
+    }
+
+    [TestMethod]
+    public void OneShotSession_UpdateConfig_AfterDispose_Throws()
+    {
+        VoicepeakOneShotSession session = VoicepeakOneShot.Start(new AppConfig(), new TestLogger());
+        session.Dispose();
+
+        Assert.ThrowsException<ObjectDisposedException>(() => session.UpdateConfig(new AppConfig()));
+    }
+
+    [TestMethod]
+    public void OneShotSession_UpdateConfig_ReusesUiaHostAndReplacesUiController()
+    {
+        using VoicepeakOneShotSession session = VoicepeakOneShot.Start(new AppConfig(), new TestLogger());
+        object uiaHostBefore = ReflectionTestHelper.GetField(session, "_uiaHost");
+        object uiBefore = ReflectionTestHelper.GetField(session, "_ui");
+
+        AppConfig updated = new AppConfig();
+        updated.Debug.UiaProbeRecycleIntervalSec = 7;
+
+        session.UpdateConfig(updated);
+
+        object uiaHostAfter = ReflectionTestHelper.GetField(session, "_uiaHost");
+        object uiAfter = ReflectionTestHelper.GetField(session, "_ui");
+        object configAfter = ReflectionTestHelper.GetField(session, "_config");
+        int recycleIntervalMs = (int)ReflectionTestHelper.GetField(uiaHostAfter, "_recycleIntervalMs");
+
+        Assert.AreSame(uiaHostBefore, uiaHostAfter);
+        Assert.AreNotSame(uiBefore, uiAfter);
+        Assert.AreSame(updated, configAfter);
+        Assert.AreEqual(7000, recycleIntervalMs);
+    }
+
+    [TestMethod]
+    public void OneShotSession_UpdateConfig_DoesNotResetUiaSessionStartedTime()
+    {
+        using VoicepeakOneShotSession session = VoicepeakOneShot.Start(new AppConfig(), new TestLogger());
+        object uiaHost = ReflectionTestHelper.GetField(session, "_uiaHost");
+        DateTime expectedStartedUtc = new DateTime(2026, 4, 1, 10, 20, 30, DateTimeKind.Utc);
+        ReflectionTestHelper.SetField(uiaHost, "_sessionStartedUtc", expectedStartedUtc);
+
+        AppConfig updated = new AppConfig();
+        updated.Debug.UiaProbeRecycleIntervalSec = 3;
+        session.UpdateConfig(updated);
+
+        DateTime actualStartedUtc = (DateTime)ReflectionTestHelper.GetField(uiaHost, "_sessionStartedUtc");
+        Assert.AreEqual(expectedStartedUtc, actualStartedUtc);
+    }
+
+    [TestMethod]
     public void Logger_IsIsolatedPerRuntimeInstance()
     {
         AppConfig config = CreateRuntimeConfig();

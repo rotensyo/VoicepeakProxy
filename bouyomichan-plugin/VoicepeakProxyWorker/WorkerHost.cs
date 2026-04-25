@@ -38,6 +38,7 @@ internal sealed class WorkerHost
         try
         {
             PluginSettingsFile settings = _settingsProvider.GetCurrent();
+            _logger.SetMinimumLevel(settings.AppConfig.Debug.LogMinimumLevel);
             _oneShotSession = VoicepeakOneShot.Start(AppConfigMapper.Map(settings.AppConfig), _logger);
             if (!TryRunStartupValidation())
             {
@@ -217,6 +218,8 @@ internal sealed class WorkerHost
         try
         {
             PluginSettingsFile settings = _settingsProvider.GetCurrent();
+            _logger.SetMinimumLevel(settings.AppConfig.Debug.LogMinimumLevel);
+            _oneShotSession.UpdateConfig(AppConfigMapper.Map(settings.AppConfig));
             _logger.Info("speak_start taskId=" + request.TaskId + " length=" + request.Text.Length);
 
             SpeakOnceRequest speakRequest = new SpeakOnceRequest();
@@ -281,6 +284,7 @@ internal sealed class WorkerHost
         {
             PluginSettingsFile settings = _settingsProvider.GetCurrent();
             _logger.SetMinimumLevel(settings.AppConfig.Debug.LogMinimumLevel);
+            _oneShotSession.UpdateConfig(AppConfigMapper.Map(settings.AppConfig));
             ValidateInputOnceResult validate = _oneShotSession.ValidateInputOnce();
             if (!validate.Succeeded)
             {

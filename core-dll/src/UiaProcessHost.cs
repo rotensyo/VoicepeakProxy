@@ -17,7 +17,7 @@ internal sealed class UiaProcessHost : IDisposable
     private const int RecycleWaitTimeoutMs = 1500;
     private readonly object _gate = new object();
     private readonly AppLogger _log;
-    private readonly int _recycleIntervalMs;
+    private int _recycleIntervalMs;
     private readonly ManualResetEventSlim _readyEvent = new ManualResetEventSlim(false);
     private ProbeSession _session;
     private HostState _state;
@@ -34,6 +34,15 @@ internal sealed class UiaProcessHost : IDisposable
         _recycleIntervalMs = Math.Max(1, recycleIntervalSec) * 1000;
         _log = log;
         _state = HostState.Stopped;
+    }
+
+    // 再起動間隔を更新
+    public void UpdateRecycleInterval(int recycleIntervalSec)
+    {
+        lock (_gate)
+        {
+            _recycleIntervalMs = Math.Max(1, recycleIntervalSec) * 1000;
+        }
     }
 
     // UIA読み取り要求を実行
