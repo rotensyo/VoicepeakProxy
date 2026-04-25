@@ -8,9 +8,9 @@ namespace VoicepeakProxyCore.Tests;
 public class VoicepeakOneShotUtilityTests
 {
     [TestMethod]
-    public void ValidateInputOnce_NullConfig_Throws()
+    public void Start_NullConfig_ThrowsArgumentNullException()
     {
-        Assert.ThrowsException<ArgumentNullException>(() => VoicepeakOneShot.ValidateInputOnce(null));
+        Assert.ThrowsException<ArgumentNullException>(() => VoicepeakOneShot.Start(null));
     }
 
     [TestMethod]
@@ -220,9 +220,11 @@ public class VoicepeakOneShotUtilityTests
     }
 
     [TestMethod]
-    public void ClearInputOnce_NullConfig_Throws()
+    public void Start_NullLogger_UsesConsoleLoggerAndCanDispose()
     {
-        Assert.ThrowsException<ArgumentNullException>(() => VoicepeakOneShot.ClearInputOnce(null));
+        using VoicepeakOneShotSession session = VoicepeakOneShot.Start(new AppConfig(), null);
+
+        Assert.IsNotNull(session);
     }
 
     [TestMethod]

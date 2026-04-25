@@ -625,16 +625,7 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("Debug")]
-        [DisplayName("01)logTextCandidates")]
-        [Description("入力欄候補収集の詳細ログを出力します。")]
-        public bool LogTextCandidates
-        {
-            get { return State.Settings.AppConfig.Debug.LogTextCandidates; }
-            set { State.Settings.AppConfig.Debug.LogTextCandidates = value; }
-        }
-
-        [Category("Debug")]
-        [DisplayName("02)logModifierHookStats")]
+        [DisplayName("01)logModifierHookStats")]
         [Description("修飾キー中立化フックの統計ログを出力します。")]
         public bool LogModifierHookStats
         {
@@ -643,12 +634,21 @@ namespace Plugin_VoicepeakProxy
         }
 
         [Category("Debug")]
-        [DisplayName("03)logMinimumLevel")]
+        [DisplayName("02)logMinimumLevel")]
         [Description("ログレベルをdebug/info/warn/errorで指定します。")]
         public string LogMinimumLevel
         {
             get { return State.Settings.AppConfig.Debug.LogMinimumLevel; }
             set { State.Settings.AppConfig.Debug.LogMinimumLevel = (value ?? string.Empty).Trim().ToLowerInvariant(); }
+        }
+
+        [Category("Debug")]
+        [DisplayName("03)uiaProbeRecycleIntervalSec")]
+        [Description("UIAサブプロセスの再起動間隔秒です。1以上を指定します。")]
+        public int UiaProbeRecycleIntervalSec
+        {
+            get { return State.Settings.AppConfig.Debug.UiaProbeRecycleIntervalSec; }
+            set { State.Settings.AppConfig.Debug.UiaProbeRecycleIntervalSec = value; }
         }
     }
 
@@ -722,7 +722,7 @@ namespace Plugin_VoicepeakProxy
 
         protected override string GetFilter()
         {
-            return "VOICEPEAK executable (voicepeak.exe)|voicepeak.exe|Executable (*.exe)|*.exe|All files (*.*)|*.*";
+            return "Executable (*.exe)|*.exe|All files (*.*)|*.*";
         }
     }
 

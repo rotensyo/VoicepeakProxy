@@ -42,21 +42,26 @@
   <Target Name="MoveWorkerDependenciesToCoreDepsFolder" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
     <PropertyGroup>
       <CoreDepsDir>$(OutputPath)VoicepeakProxyCore.deps\</CoreDepsDir>
+      <CoreProjectDepsDir>$(MSBuildThisFileDirectory)..\..\core-dll\bin\x64\$(Configuration)\net48\VoicepeakProxyCore.deps\</CoreProjectDepsDir>
     </PropertyGroup>
 
+    <RemoveDir Directories="$(CoreDepsDir)" Condition="Exists('$(CoreDepsDir)')" />
     <MakeDir Directories="$(CoreDepsDir)" />
 
     <ItemGroup>
       <WorkerDependencyFiles Include="$(OutputPath)EasyHook*.dll" />
       <WorkerDependencyFiles Include="$(OutputPath)EasyLoad*.dll" />
       <WorkerDependencyFiles Include="$(OutputPath)NAudio*.dll" />
+      <ProbeDependencyFiles Include="$(CoreProjectDepsDir)VoicepeakProxyCore.UiaProbe.exe" Condition="Exists('$(CoreProjectDepsDir)VoicepeakProxyCore.UiaProbe.exe')" />
+      <AllDependencyFiles Include="@(WorkerDependencyFiles)" />
+      <AllDependencyFiles Include="@(ProbeDependencyFiles)" />
     </ItemGroup>
 
-    <Copy SourceFiles="@(WorkerDependencyFiles)" DestinationFolder="$(CoreDepsDir)" Condition="'@(WorkerDependencyFiles)' != ''" />
+    <Copy SourceFiles="@(AllDependencyFiles)" DestinationFolder="$(CoreDepsDir)" Condition="'@(AllDependencyFiles)' != ''" />
     <Delete Files="@(WorkerDependencyFiles)" Condition="'@(WorkerDependencyFiles)' != ''" />
   </Target>
 
-  <Target Name="BundleWorkerOutputs" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+  <Target Name="BundleWorkerOutputs" AfterTargets="MoveWorkerDependenciesToCoreDepsFolder" Condition="'$(Configuration)' == 'Release'">
     <PropertyGroup>
       <WorkerBundleDir>$(OutputPath)VoicepeakProxyWorker\</WorkerBundleDir>
       <CoreDepsDir>$(OutputPath)VoicepeakProxyCore.deps\</CoreDepsDir>

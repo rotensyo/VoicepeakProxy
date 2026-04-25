@@ -8,6 +8,7 @@ public sealed class VoicepeakRuntime : IDisposable
 {
     private readonly CancellationTokenSource _cts;
     private readonly VoicepeakEngine _engine;
+    private readonly UiaProcessHost _uiaProcessHost;
     private readonly AppLogger _log;
     private int _disposed;
     private int _accepting;
@@ -18,11 +19,12 @@ public sealed class VoicepeakRuntime : IDisposable
         DependencyResolver.EnsureInitialized();
     }
 
-    private VoicepeakRuntime(VoicepeakEngine engine, CancellationTokenSource cts, AppLogger log)
+    private VoicepeakRuntime(VoicepeakEngine engine, CancellationTokenSource cts, AppLogger log, UiaProcessHost uiaProcessHost)
     {
         _engine = engine;
         _cts = cts;
         _log = log;
+        _uiaProcessHost = uiaProcessHost;
         _accepting = 1;
     }
 
@@ -31,14 +33,14 @@ public sealed class VoicepeakRuntime : IDisposable
     // 起動時検証後に常駐実行を開始
     public static VoicepeakRuntime Start(AppConfig config, IAppLogger logger = null)
     {
-        return StartCore(config, logger, (cfg, cts, appLogger) => new VoicepeakEngine(cfg, cts, appLogger));
+        return StartCore(config, logger, (cfg, cts, appLogger, uiaHost) => new VoicepeakEngine(cfg, cts, appLogger, null, null, true, uiaHost));
     }
 
     // テスト用にエンジン生成を差し替えて起動
     internal static VoicepeakRuntime StartCore(
         AppConfig config,
         IAppLogger logger,
-        Func<AppConfig, CancellationTokenSource, AppLogger, VoicepeakEngine> engineFactory)
+        Func<AppConfig, CancellationTokenSource, AppLogger, UiaProcessHost, VoicepeakEngine> engineFactory)
     {
         if (config == null)
         {
@@ -50,12 +52,14 @@ public sealed class VoicepeakRuntime : IDisposable
         appLogger.Info("boot_start");
 
         CancellationTokenSource cts = new CancellationTokenSource();
+        UiaProcessHost uiaHost = null;
         VoicepeakEngine engine = null;
         try
         {
+            uiaHost = new UiaProcessHost(config.Debug.UiaProbeRecycleIntervalSec, appLogger);
             engine = engineFactory != null
-                ? engineFactory(config, cts, appLogger)
-                : new VoicepeakEngine(config, cts, appLogger);
+                ? engineFactory(config, cts, appLogger, uiaHost)
+                : new VoicepeakEngine(config, cts, appLogger, null, null, true, uiaHost);
             if (engine == null)
             {
                 throw new InvalidOperationException("engineFactory returned null.");
@@ -69,11 +73,12 @@ public sealed class VoicepeakRuntime : IDisposable
             }
 
             appLogger.Info("runtime_started");
-            return new VoicepeakRuntime(engine, cts, appLogger);
+            return new VoicepeakRuntime(engine, cts, appLogger, uiaHost);
         }
         catch
         {
             engine?.Dispose();
+            uiaHost?.Dispose();
             cts.Dispose();
             throw;
         }
@@ -116,6 +121,7 @@ public sealed class VoicepeakRuntime : IDisposable
         Interlocked.Exchange(ref _accepting, 0);
         _cts.Cancel();
         _engine.Dispose();
+        _uiaProcessHost.Dispose();
         _cts.Dispose();
         _log.Info("runtime_disposed");
     }

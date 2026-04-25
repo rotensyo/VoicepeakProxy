@@ -101,4 +101,22 @@ public class AppLoggerTests
         CollectionAssert.AreEqual(new[] { "d" }, logger.DebugMessages);
         CollectionAssert.AreEqual(new[] { "i" }, logger.InfoMessages);
     }
+
+    [TestMethod]
+    public void AppLogger_SetMinimumLevel_UpdatesThreshold()
+    {
+        TestLogger logger = new TestLogger();
+        AppLogger appLogger = new AppLogger(logger, "debug");
+
+        appLogger.SetMinimumLevel("error");
+        appLogger.Debug("d");
+        appLogger.Info("i");
+        appLogger.Warn("w");
+        appLogger.Error("e");
+
+        Assert.AreEqual(0, logger.DebugMessages.Count);
+        Assert.AreEqual(0, logger.InfoMessages.Count);
+        Assert.AreEqual(0, logger.WarnMessages.Count);
+        CollectionAssert.AreEqual(new[] { "e" }, logger.ErrorMessages);
+    }
 }

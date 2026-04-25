@@ -17,6 +17,9 @@ internal static class AppConfigMapper
         // core既定値を欠損補完に利用
         HookConfig defaults = new AppConfig().Hook;
         UiConfig uiDefaults = new AppConfig().Ui;
+        TextConfig textDefaults = new AppConfig().Text;
+        RuntimeConfig runtimeDefaults = new AppConfig().Runtime;
+        DebugConfig debugDefaults = new AppConfig().Debug;
 
         config.Validation.ValidationText = data.Validation.ValidationText ?? string.Empty;
         config.Validation.ValidationMaxRetries = data.Validation.ValidationMaxRetries;
@@ -58,10 +61,25 @@ internal static class AppConfigMapper
         config.Audio.StopConfirmMs = data.Audio.StopConfirmMs;
         config.Audio.MaxSpeakingDurationSec = data.Audio.MaxSpeakingDurationSec;
 
-        config.Text.ReplaceRules = new List<ReplaceRule>();
-        for (int i = 0; i < data.Text.ReplaceRules.Count; i++)
+        List<ReplaceRuleData> sourceRules = data.Text.ReplaceRules;
+        if (sourceRules == null || sourceRules.Count == 0)
         {
-            ReplaceRuleData rule = data.Text.ReplaceRules[i] ?? new ReplaceRuleData();
+            sourceRules = new List<ReplaceRuleData>();
+            for (int i = 0; i < textDefaults.ReplaceRules.Count; i++)
+            {
+                ReplaceRule fallbackRule = textDefaults.ReplaceRules[i] ?? new ReplaceRule();
+                sourceRules.Add(new ReplaceRuleData
+                {
+                    From = fallbackRule.From ?? string.Empty,
+                    To = fallbackRule.To ?? string.Empty
+                });
+            }
+        }
+
+        config.Text.ReplaceRules = new List<ReplaceRule>();
+        for (int i = 0; i < sourceRules.Count; i++)
+        {
+            ReplaceRuleData rule = sourceRules[i] ?? new ReplaceRuleData();
             config.Text.ReplaceRules.Add(new ReplaceRule
             {
                 From = rule.From ?? string.Empty,
@@ -69,12 +87,18 @@ internal static class AppConfigMapper
             });
         }
 
-        config.Runtime.MaxQueuedJobs = data.Runtime.MaxQueuedJobs;
-        config.Runtime.BootValidation = MapBootValidation(data.Runtime.BootValidation);
+        config.Runtime.MaxQueuedJobs = data.Runtime.MaxQueuedJobs >= 0
+            ? data.Runtime.MaxQueuedJobs
+            : runtimeDefaults.MaxQueuedJobs;
+        config.Runtime.BootValidation = MapBootValidation(data.Runtime.BootValidation, runtimeDefaults.BootValidation);
 
-        config.Debug.LogTextCandidates = data.Debug.LogTextCandidates;
         config.Debug.LogModifierHookStats = data.Debug.LogModifierHookStats;
-        config.Debug.LogMinimumLevel = data.Debug.LogMinimumLevel;
+        config.Debug.UiaProbeRecycleIntervalSec = data.Debug.UiaProbeRecycleIntervalSec > 0
+            ? data.Debug.UiaProbeRecycleIntervalSec
+            : debugDefaults.UiaProbeRecycleIntervalSec;
+        config.Debug.LogMinimumLevel = string.IsNullOrWhiteSpace(data.Debug.LogMinimumLevel)
+            ? debugDefaults.LogMinimumLevel
+            : data.Debug.LogMinimumLevel;
 
         return config;
     }
@@ -134,8 +158,8 @@ internal static class AppConfigMapper
 
         data.Runtime.BootValidation = MapBootValidationBack(config.Runtime.BootValidation);
 
-        data.Debug.LogTextCandidates = config.Debug.LogTextCandidates;
         data.Debug.LogModifierHookStats = config.Debug.LogModifierHookStats;
+        data.Debug.UiaProbeRecycleIntervalSec = config.Debug.UiaProbeRecycleIntervalSec;
         data.Debug.LogMinimumLevel = config.Debug.LogMinimumLevel;
 
         data.Normalize();
@@ -143,7 +167,7 @@ internal static class AppConfigMapper
     }
 
     // 起動時検証方針を変換
-    private static BootValidationMode MapBootValidation(BootValidationModeOption mode)
+    private static BootValidationMode MapBootValidation(BootValidationModeOption mode, BootValidationMode fallback)
     {
         switch (mode)
         {
@@ -151,8 +175,10 @@ internal static class AppConfigMapper
                 return BootValidationMode.Optional;
             case BootValidationModeOption.Disabled:
                 return BootValidationMode.Disabled;
-            default:
+            case BootValidationModeOption.Required:
                 return BootValidationMode.Required;
+            default:
+                return fallback;
         }
     }
 

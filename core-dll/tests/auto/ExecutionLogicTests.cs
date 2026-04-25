@@ -608,6 +608,61 @@ public class ExecutionLogicTests
 
         Assert.AreEqual(SpeakMonitorKind.Completed, result.Kind);
         Assert.IsTrue(result.SegEndAtMs > 0);
+        Assert.AreEqual(1, ui.NotifyPlaybackSafePointCalls);
+    }
+
+    [TestMethod]
+    public void MonitorSpeaking_StartTimeout_DoesNotNotifyPlaybackSafePoint()
+    {
+        // 開始確認失敗時は発話開始通知を行わない
+        AppConfig config = CreateMonitorConfig();
+        config.Audio.StartConfirmTimeoutMs = 1;
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController();
+        FakeAudioSessionReader audio = new FakeAudioSessionReader();
+
+        SpeakMonitorResult result = JobExecutionCore.MonitorSpeaking(
+            config,
+            ui,
+            audio,
+            Process.GetCurrentProcess(),
+            IntPtr.Zero,
+            new AppLogger(new TestLogger()),
+            () => false,
+            () => false,
+            null);
+
+        Assert.AreEqual(SpeakMonitorKind.StartTimeout, result.Kind);
+        Assert.AreEqual(0, ui.NotifyPlaybackSafePointCalls);
+    }
+
+    [TestMethod]
+    public void FinalizeJobInput_ClearSucceeded_DoesNotNotifyPlaybackSafePoint()
+    {
+        // clear成功時も発話開始通知は行わない
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ClearInputHandler = () => true
+        };
+
+        JobExecutionCore.FinalizeJobInput(new AppConfig(), ui, Process.GetCurrentProcess(), new IntPtr(1), killFocusAfterClear: false);
+
+        Assert.AreEqual(0, ui.NotifyPlaybackSafePointCalls);
+    }
+
+    [TestMethod]
+    public void FinalizeJobInput_ClearFailed_DoesNotNotifyPlaybackSafePoint()
+    {
+        // clear失敗時も発話開始通知は行わない
+        FakeVoicepeakUiController ui = new FakeVoicepeakUiController
+        {
+            ClearInputHandler = () => false
+        };
+        AppConfig config = new AppConfig();
+        config.InputTiming.ClearInputRetryMaxRetries = 0;
+
+        JobExecutionCore.FinalizeJobInput(config, ui, Process.GetCurrentProcess(), new IntPtr(1), killFocusAfterClear: false);
+
+        Assert.AreEqual(0, ui.NotifyPlaybackSafePointCalls);
     }
 
     [TestMethod]

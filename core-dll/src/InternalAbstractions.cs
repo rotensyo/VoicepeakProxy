@@ -80,6 +80,7 @@ internal interface IVoicepeakUiController
     bool EndModifierIsolationSession(string operationName);
     ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd);
     ReadInputSnapshot ReadInputSnapshot(IntPtr mainHwnd);
+    void NotifyPlaybackSafePoint();
 }
 
 // 音声監視の依存を抽象化

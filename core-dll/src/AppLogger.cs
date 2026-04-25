@@ -38,7 +38,7 @@ internal sealed class AppLogger
     }
 
     private readonly IAppLogger _logger;
-    private readonly LogMinimumLevel _minimumLevel;
+    private LogMinimumLevel _minimumLevel;
 
     public AppLogger(IAppLogger logger)
         : this(logger, null)
@@ -48,6 +48,12 @@ internal sealed class AppLogger
     public AppLogger(IAppLogger logger, string minimumLevel)
     {
         _logger = logger ?? new ConsoleAppLogger();
+        _minimumLevel = ParseMinimumLevel(minimumLevel);
+    }
+
+    // 最小ログレベルを更新
+    public void SetMinimumLevel(string minimumLevel)
+    {
         _minimumLevel = ParseMinimumLevel(minimumLevel);
     }
 
