@@ -171,6 +171,20 @@ public class RuntimeAndOneShotTests
     }
 
     [TestMethod]
+    public void OneShotSession_UpdateConfig_UpdatesCoreLoggerMinimumLevel()
+    {
+        using VoicepeakOneShotSession session = VoicepeakOneShot.Start(new AppConfig(), new TestLogger());
+        object appLogger = ReflectionTestHelper.GetField(session, "_log");
+
+        AppConfig updated = new AppConfig();
+        updated.Debug.LogMinimumLevel = "error";
+        session.UpdateConfig(updated);
+
+        object minimum = ReflectionTestHelper.GetField(appLogger, "_minimumLevel");
+        Assert.AreEqual("Error", minimum.ToString());
+    }
+
+    [TestMethod]
     public void Logger_IsIsolatedPerRuntimeInstance()
     {
         AppConfig config = CreateRuntimeConfig();

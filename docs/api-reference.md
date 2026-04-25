@@ -58,6 +58,13 @@
 ### `VoicepeakOneShotSession.ClearInputOnce()`
 - 入力欄のクリアだけを1回同期実行します
 
+### `VoicepeakOneShotSession.UpdateConfig(AppConfig config)`
+- 実行中セッションへ最新設定を注入します
+- `config == null` は `ArgumentNullException`
+- 設定バリデーション失敗時は `InvalidOperationException`
+- `Dispose()`後は `ObjectDisposedException`
+- UIAサブプロセス管理は維持したまま、次回実行から新設定を反映します
+
 ## 入力モデル
 
 ### `SpeakRequest`
@@ -103,8 +110,8 @@ public sealed class SpeakOnceRequest
 - 指定した時間が文字削除・入力等の時間より短い場合、完了次第即発話を開始します
   - 読み上げ完了から次の開始まで数秒程度はかかるので、500ms程度を指定しても意味がない場合が多いです
 - `[[pause:NNN]]`自体には文字列置換は適用されません
-- `VoicepeakOneShot.SpeakOnce`では`[[pause:NNN]]`は無視され、1回の再生として扱います
-- `VoicepeakOneShot.SpeakOnceWait`と常駐実行では従来通りpauseとして解釈します
+- `VoicepeakOneShotSession.SpeakOnce(...)`では`[[pause:NNN]]`は無視され、1回の再生として扱います
+- `VoicepeakOneShotSession.SpeakOnceWait(...)`と常駐実行では従来通りpauseとして解釈します
 
 例:
 ```text

@@ -217,9 +217,7 @@ internal sealed class WorkerHost
     {
         try
         {
-            PluginSettingsFile settings = _settingsProvider.GetCurrent();
-            _logger.SetMinimumLevel(settings.AppConfig.Debug.LogMinimumLevel);
-            _oneShotSession.UpdateConfig(AppConfigMapper.Map(settings.AppConfig));
+            ApplyLatestSettings();
             _logger.Info("speak_start taskId=" + request.TaskId + " length=" + request.Text.Length);
 
             SpeakOnceRequest speakRequest = new SpeakOnceRequest();
@@ -282,9 +280,7 @@ internal sealed class WorkerHost
     {
         try
         {
-            PluginSettingsFile settings = _settingsProvider.GetCurrent();
-            _logger.SetMinimumLevel(settings.AppConfig.Debug.LogMinimumLevel);
-            _oneShotSession.UpdateConfig(AppConfigMapper.Map(settings.AppConfig));
+            ApplyLatestSettings();
             ValidateInputOnceResult validate = _oneShotSession.ValidateInputOnce();
             if (!validate.Succeeded)
             {
@@ -300,6 +296,14 @@ internal sealed class WorkerHost
             _logger.Error("startup_validation_error detail=" + ex.Message);
             return false;
         }
+    }
+
+    // 最新設定をセッションへ反映
+    private void ApplyLatestSettings()
+    {
+        PluginSettingsFile settings = _settingsProvider.GetCurrent();
+        _logger.SetMinimumLevel(settings.AppConfig.Debug.LogMinimumLevel);
+        _oneShotSession.UpdateConfig(AppConfigMapper.Map(settings.AppConfig));
     }
 
 }

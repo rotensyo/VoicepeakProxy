@@ -786,6 +786,7 @@ public sealed class VoicepeakOneShotSession : IDisposable
         }
 
         AppConfigValidator.Validate(config);
+        _log.SetMinimumLevel(config.Debug.LogMinimumLevel);
         VoicepeakUiController nextUi = BuildUiController(config);
         VoicepeakUiController oldUi = _ui;
         _ui = nextUi;
