@@ -446,6 +446,42 @@ internal sealed class UiaProcessHost : IDisposable
             NamedPipeClientStream pipe = null;
             IntPtr jobHandle = IntPtr.Zero;
 
+            // 起動失敗時の後始末を共通化
+            void CleanupStartFailure()
+            {
+                try
+                {
+                    pipe?.Dispose();
+                }
+                catch
+                {
+                }
+
+                if (jobHandle != IntPtr.Zero)
+                {
+                    try
+                    {
+                        CloseHandle(jobHandle);
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                if (process != null)
+                {
+                    TryKill(process);
+                    try
+                    {
+                        process.Dispose();
+                    }
+                    catch
+                    {
+                    }
+                }
+
+            }
+
             try
             {
                 ProcessStartInfo psi = new ProcessStartInfo
@@ -460,6 +496,7 @@ internal sealed class UiaProcessHost : IDisposable
                 if (process == null)
                 {
                     reason = "probe_process_start_failed";
+                    CleanupStartFailure();
                     return false;
                 }
 
@@ -467,48 +504,42 @@ internal sealed class UiaProcessHost : IDisposable
                 if (jobHandle == IntPtr.Zero || !AssignProcessToJobObject(jobHandle, process.Handle))
                 {
                     reason = "job_object_assign_failed";
+                    CleanupStartFailure();
                     return false;
                 }
 
                 pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.None);
                 pipe.Connect(Math.Max(1, connectTimeoutMs));
 
-                StreamReader reader = new StreamReader(pipe, Utf8NoBom, false, 1024, true);
-                var readyTask = reader.ReadLineAsync();
-                if (!readyTask.Wait(Math.Max(1, readyTimeoutMs)))
+                using (StreamReader reader = new StreamReader(pipe, Utf8NoBom, false, 1024, true))
                 {
-                    reason = "probe_ready_timeout";
-                    reader.Dispose();
-                    return false;
+                    var readyTask = reader.ReadLineAsync();
+                    if (!readyTask.Wait(Math.Max(1, readyTimeoutMs)))
+                    {
+                        reason = "probe_ready_timeout";
+                        CleanupStartFailure();
+                        return false;
+                    }
+
+                    string readyLine = readyTask.Result ?? string.Empty;
+                    if (!TryParseReadyLine(readyLine, out generation))
+                    {
+                        reason = "probe_ready_invalid";
+                        CleanupStartFailure();
+                        return false;
+                    }
                 }
 
-                string readyLine = readyTask.Result ?? string.Empty;
-                if (!TryParseReadyLine(readyLine, out generation))
-                {
-                    reason = "probe_ready_invalid";
-                    reader.Dispose();
-                    return false;
-                }
-
-                reader.Dispose();
                 session = new ProbeSession(process, jobHandle, pipe);
+                process = null;
+                pipe = null;
+                jobHandle = IntPtr.Zero;
                 return true;
             }
             catch (Exception ex)
             {
                 reason = "probe_start_exception:" + ex.GetType().Name;
-                pipe?.Dispose();
-                if (jobHandle != IntPtr.Zero)
-                {
-                    CloseHandle(jobHandle);
-                }
-
-                if (process != null)
-                {
-                    TryKill(process);
-                    process.Dispose();
-                }
-
+                CleanupStartFailure();
                 return false;
             }
         }
