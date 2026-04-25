@@ -722,7 +722,7 @@ namespace Plugin_VoicepeakProxy
 
         protected override string GetFilter()
         {
-            return "VOICEPEAK executable/shortcut (voicepeak.exe;*.lnk)|voicepeak.exe;*.lnk|Executable (*.exe)|*.exe|Shortcut (*.lnk)|*.lnk|All files (*.*)|*.*";
+            return "Executable (*.exe)|*.exe|All files (*.*)|*.*";
         }
     }
 
