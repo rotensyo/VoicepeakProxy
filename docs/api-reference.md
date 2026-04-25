@@ -60,10 +60,9 @@
 
 ### `VoicepeakOneShotSession.UpdateConfig(AppConfig config)`
 - 実行中セッションへ最新設定を注入します
-- `config == null` は `ArgumentNullException`
-- 設定バリデーション失敗時は `InvalidOperationException`
-- `Dispose()`後は `ObjectDisposedException`
-- UIAサブプロセス管理は維持したまま、次回実行から新設定を反映します
+- `config == null` は `ArgumentNullException` として返します
+- 設定バリデーション失敗時は `InvalidOperationException` として返します
+- `Dispose()`後は `ObjectDisposedException` を返します
 
 ## 入力モデル
 
