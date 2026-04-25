@@ -120,7 +120,7 @@ internal static class Program
             return false;
         }
 
-        ReadInputSnapshot snapshot = VoicepeakUiController.ReadInputSnapshotCore(new IntPtr(hwndValue), logTextCandidates: false, log: null);
+        ReadInputSnapshot snapshot = VoicepeakUiController.ReadInputSnapshotCore(new IntPtr(hwndValue));
         string encodedText = Convert.ToBase64String(Encoding.UTF8.GetBytes(snapshot.Read.Text ?? string.Empty));
         int successFlag = snapshot.Read.Success ? 1 : 0;
         response = string.Concat(

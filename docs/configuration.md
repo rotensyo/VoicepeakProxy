@@ -120,7 +120,7 @@ AppConfig config = new AppConfig
 - `StartConfirmMaxRetries` (default: `2`)
   - `StartConfirmTimeoutMs` 超過時の再試行回数です
   - 再試行時は `MoveToStart` → `PressPlay` → 開始確認 をやり直します
-  - `VoicepeakOneShot.SpeakOnce` では再試行せず、超過で即 `StartConfirmTimeout` になります
+- `VoicepeakOneShotSession.SpeakOnce(...)` では再試行せず、超過で即 `StartConfirmTimeout` になります
 - `StopConfirmMs` (default: `200`)
   - 発話開始後、この時間(ミリ秒)だけ閾値未満が続いたら終了と判定します
 - `MaxSpeakingDurationSec` (default: `300`)
@@ -141,9 +141,6 @@ AppConfig config = new AppConfig
   - 修飾キー中立化フックの接続待機総時間(ミリ秒)です
 
 ## DebugConfig
-- `LogTextCandidates` (default: `false`)
-  - 入力欄候補収集の詳細ログを出力します
-  - `ReadInputTextDetailed(...)` の候補一覧と推定情報ログを有効化します
 - `LogModifierHookStats` (default: `false`)
   - 修飾キー中立化フックの統計ログを出力します
   - `modifier_hook_stats_probe_*` と `modifier_hook_stats` を有効化します

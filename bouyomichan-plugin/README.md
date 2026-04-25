@@ -8,7 +8,7 @@
   - 棒読みちゃんプラグイン本体です。
 - `VoicepeakProxyWorker/`
   - `VoicepeakProxyCore.dll` を動かすための補助プロセスです。
-  - `VoicepeakOneShot.SpeakOnceWait` 経由でVOICEPEAK読み上げを実行します。
+- `VoicepeakOneShotSession.SpeakOnceWait(...)` 経由でVOICEPEAK読み上げを実行します。
 - `Shared/`
   - PluginとWorkerの共通モデルです。
 

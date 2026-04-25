@@ -235,10 +235,10 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
     // テスト互換用の可視入力欄数算出
     private static int EstimateVisibleBlockCount(IntPtr mainHwnd)
     {
-        return ReadInputSnapshotCore(mainHwnd, logTextCandidates: false, log: null).VisibleBlockCount;
+        return ReadInputSnapshotCore(mainHwnd).VisibleBlockCount;
     }
 
-    internal static ReadInputSnapshot ReadInputSnapshotCore(IntPtr mainHwnd, bool logTextCandidates, AppLogger log)
+    internal static ReadInputSnapshot ReadInputSnapshotCore(IntPtr mainHwnd)
     {
         if (mainHwnd == IntPtr.Zero)
         {
@@ -249,11 +249,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
         {
             AutomationElement root = AutomationElement.FromHandle(mainHwnd);
             List<TextCandidateInfo> candidates = CollectTextCandidates(root, maxCount: 200);
-            if (logTextCandidates)
-            {
-                LogTextCandidates(log, candidates);
-            }
-
             ReadInputResult read = BuildReadInputResult(candidates, root);
             return new ReadInputSnapshot(read, candidates.Count);
         }
@@ -962,41 +957,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
                                   || controlType == ControlType.Document
                                   || controlType == ControlType.Text;
         return allowedControlType && name != null && name.Length == 0;
-    }
-
-    private static void LogTextCandidates(AppLogger log, List<TextCandidateInfo> candidates)
-    {
-        int count = candidates != null ? candidates.Count : 0;
-        log.Debug($"text_candidates_begin count={count}");
-        if (candidates == null)
-        {
-            log.Debug("text_candidates_end");
-            return;
-        }
-
-        for (int i = 0; i < candidates.Count; i++)
-        {
-            TextCandidateInfo c = candidates[i];
-            AutomationElement e = c.Element;
-            var r = e.Current.BoundingRectangle;
-            bool hasTextPattern = e.TryGetCurrentPattern(TextPattern.Pattern, out _);
-            bool hasValuePattern = e.TryGetCurrentPattern(ValuePattern.Pattern, out _);
-            string text = TryGetElementTextOrWindowTextSafe(e);
-            log.Debug(
-                "text_candidate " +
-                $"index={i} " +
-                $"controlType={e.Current.ControlType.ProgrammaticName} " +
-                $"name=\"{SanitizeForLog(e.Current.Name)}\" " +
-                $"automationId=\"{SanitizeForLog(e.Current.AutomationId)}\" " +
-                $"className=\"{SanitizeForLog(e.Current.ClassName)}\" " +
-                $"hasTextPattern={hasTextPattern} " +
-                $"hasValuePattern={hasValuePattern} " +
-                $"rect=({r.Left:F1},{r.Top:F1},{r.Width:F1},{r.Height:F1}) " +
-                $"score={c.Score:F1} " +
-                $"text=\"{SanitizeForLog(text)}\"");
-        }
-
-        log.Debug("text_candidates_end");
     }
 
     private static ReadInputResult BuildReadInputResult(List<TextCandidateInfo> candidates, AutomationElement root)

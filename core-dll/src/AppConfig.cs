@@ -86,7 +86,6 @@ public sealed class RuntimeConfig
 // デバッグ関連設定
 public sealed class DebugConfig
 {
-    public bool LogTextCandidates { get; set; } = false;
     public bool LogModifierHookStats { get; set; } = false;
     public int UiaProbeRecycleIntervalSec { get; set; } = 1800;
     public string LogMinimumLevel { get; set; } = "warn";

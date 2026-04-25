@@ -245,6 +245,7 @@ public sealed class UiConfigData
     // デバッグ設定
     public sealed class DebugConfigData
     {
+        // 旧設定互換のため受理するが無視する
         public bool LogTextCandidates { get; set; }
         public bool LogModifierHookStats { get; set; }
         public int UiaProbeRecycleIntervalSec { get; set; }

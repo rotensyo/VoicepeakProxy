@@ -92,7 +92,6 @@ internal static class AppConfigMapper
             : runtimeDefaults.MaxQueuedJobs;
         config.Runtime.BootValidation = MapBootValidation(data.Runtime.BootValidation, runtimeDefaults.BootValidation);
 
-        config.Debug.LogTextCandidates = data.Debug.LogTextCandidates;
         config.Debug.LogModifierHookStats = data.Debug.LogModifierHookStats;
         config.Debug.UiaProbeRecycleIntervalSec = data.Debug.UiaProbeRecycleIntervalSec > 0
             ? data.Debug.UiaProbeRecycleIntervalSec
@@ -159,7 +158,6 @@ internal static class AppConfigMapper
 
         data.Runtime.BootValidation = MapBootValidationBack(config.Runtime.BootValidation);
 
-        data.Debug.LogTextCandidates = config.Debug.LogTextCandidates;
         data.Debug.LogModifierHookStats = config.Debug.LogModifierHookStats;
         data.Debug.UiaProbeRecycleIntervalSec = config.Debug.UiaProbeRecycleIntervalSec;
         data.Debug.LogMinimumLevel = config.Debug.LogMinimumLevel;
