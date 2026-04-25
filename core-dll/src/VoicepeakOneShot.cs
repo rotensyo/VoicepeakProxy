@@ -102,16 +102,6 @@ public static class VoicepeakOneShot
         return new VoicepeakOneShotSession(config, log);
     }
 
-    // 単発入力検証
-    public static ValidateInputOnceResult ValidateInputOnce(
-        AppConfig config,
-        IAppLogger logger = null)
-    {
-        _ = config;
-        _ = logger;
-        throw new InvalidOperationException("VoicepeakOneShot.Start(...) で開始したセッション内で実行してください。");
-    }
-
     // 依存を差し替えて単発入力検証
     internal static ValidateInputOnceResult ValidateInputOnceCore(
         AppConfig config,
@@ -169,16 +159,6 @@ public static class VoicepeakOneShot
         }
 
         return result;
-    }
-
-    // 単発入力削除
-    public static ClearInputOnceResult ClearInputOnce(
-        AppConfig config,
-        IAppLogger logger = null)
-    {
-        _ = config;
-        _ = logger;
-        throw new InvalidOperationException("VoicepeakOneShot.Start(...) で開始したセッション内で実行してください。");
     }
 
     // 依存を差し替えて単発入力削除
@@ -243,18 +223,6 @@ public static class VoicepeakOneShot
         return result;
     }
 
-    // 単発実行
-    public static SpeakOnceResult SpeakOnce(
-        AppConfig config,
-        SpeakOnceRequest request,
-        IAppLogger logger = null)
-    {
-        _ = config;
-        _ = request;
-        _ = logger;
-        throw new InvalidOperationException("VoicepeakOneShot.Start(...) で開始したセッション内で実行してください。");
-    }
-
     // 依存を差し替えて単発実行
     internal static SpeakOnceResult SpeakOnceCore(
         AppConfig config,
@@ -272,18 +240,6 @@ public static class VoicepeakOneShot
             waitForCompletion: false,
             stripPauseTokens: true,
             operationName: "oneshot_speak_once");
-    }
-
-    // 単発実行
-    public static SpeakOnceResult SpeakOnceWait(
-        AppConfig config,
-        SpeakOnceRequest request,
-        IAppLogger logger = null)
-    {
-        _ = config;
-        _ = request;
-        _ = logger;
-        throw new InvalidOperationException("VoicepeakOneShot.Start(...) で開始したセッション内で実行してください。");
     }
 
     // 依存を差し替えて単発実行

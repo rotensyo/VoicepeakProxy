@@ -86,15 +86,23 @@ public class RuntimeAndOneShotTests
     }
 
     [TestMethod]
-    public void SpeakOnceWait_StaticCall_ThrowsInvalidOperation()
+    public void OneShotSession_SpeakOnce_NullRequest_ReturnsInvalidRequest()
     {
-        Assert.ThrowsException<InvalidOperationException>(() => VoicepeakOneShot.SpeakOnceWait(new AppConfig(), null, new TestLogger()));
+        using VoicepeakOneShotSession session = VoicepeakOneShot.Start(new AppConfig(), new TestLogger());
+
+        SpeakOnceResult result = session.SpeakOnce(null);
+
+        Assert.AreEqual(SpeakOnceStatus.InvalidRequest, result.Status);
     }
 
     [TestMethod]
-    public void SpeakOnce_NullConfig_Throws()
+    public void OneShotSession_SpeakOnceWait_NullRequest_ReturnsInvalidRequest()
     {
-        Assert.ThrowsException<InvalidOperationException>(() => VoicepeakOneShot.SpeakOnce(new AppConfig(), new SpeakOnceRequest()));
+        using VoicepeakOneShotSession session = VoicepeakOneShot.Start(new AppConfig(), new TestLogger());
+
+        SpeakOnceResult result = session.SpeakOnceWait(null);
+
+        Assert.AreEqual(SpeakOnceStatus.InvalidRequest, result.Status);
     }
 
     [TestMethod]

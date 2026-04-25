@@ -147,6 +147,9 @@ AppConfig config = new AppConfig
 - `LogModifierHookStats` (default: `false`)
   - 修飾キー中立化フックの統計ログを出力します
   - `modifier_hook_stats_probe_*` と `modifier_hook_stats` を有効化します
+- `UiaProbeRecycleIntervalSec` (default: `1800`)
+  - UIA探索サブプロセス再起動の判定間隔(秒)です
+  - UIA探索は不具合があるようで際限無くメモリを消費するため、定期的に再起動することで消費量の削減を試みます
 - `LogMinimumLevel` (default: `warn`)
   - core/plugin/workerログの最小出力レベルです
   - `debug`/`info`/`warn`/`error`を指定できます
