@@ -96,10 +96,41 @@ public static class VoicepeakOneShot
     }
 
     // 単発セッションを開始
-    public static VoicepeakOneShotSession Start(AppConfig config, IAppLogger logger = null)
+    
+
+    // 単発入力検証を実行
+    public static ValidateInputOnceResult ValidateInputOnce(AppConfig config, IAppLogger logger = null)
     {
         AppLogger log = InitializeApiCall(config, logger);
-        return new VoicepeakOneShotSession(config, log);
+        using VoicepeakUiController ui = new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log);
+        using AudioSessionReader audio = new AudioSessionReader(log);
+        return ValidateInputOnceCore(config, log, ui, audio);
+    }
+
+    // 単発入力欄クリアを実行
+    public static ClearInputOnceResult ClearInputOnce(AppConfig config, IAppLogger logger = null)
+    {
+        AppLogger log = InitializeApiCall(config, logger);
+        using VoicepeakUiController ui = new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log);
+        return ClearInputOnceCore(config, log, ui);
+    }
+
+    // 開始確認までの単発読み上げを実行
+    public static SpeakOnceResult SpeakOnce(AppConfig config, SpeakOnceRequest request, IAppLogger logger = null)
+    {
+        AppLogger log = InitializeApiCall(config, logger);
+        using VoicepeakUiController ui = new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log);
+        using AudioSessionReader audio = new AudioSessionReader(log);
+        return SpeakOnceCore(config, request, log, ui, audio);
+    }
+
+    // 終了確認までの単発読み上げを実行
+    public static SpeakOnceResult SpeakOnceWait(AppConfig config, SpeakOnceRequest request, IAppLogger logger = null)
+    {
+        AppLogger log = InitializeApiCall(config, logger);
+        using VoicepeakUiController ui = new VoicepeakUiController(config.Ui, config.InputTiming, config.Hook, config.Text, config.Debug, log);
+        using AudioSessionReader audio = new AudioSessionReader(log);
+        return SpeakOnceWaitCore(config, request, log, ui, audio);
     }
 
     // 依存を差し替えて単発入力検証
@@ -756,109 +787,3 @@ public static class VoicepeakOneShot
 
 }
 
-// 単発実行セッション
-public sealed class VoicepeakOneShotSession : IDisposable
-{
-    private AppConfig _config;
-    private readonly AppLogger _log;
-    private readonly UiaProcessHost _uiaHost;
-    private VoicepeakUiController _ui;
-    private readonly AudioSessionReader _audio;
-    private bool _disposed;
-
-    // セッションを初期化
-    internal VoicepeakOneShotSession(AppConfig config, AppLogger log)
-    {
-        _config = config ?? throw new ArgumentNullException(nameof(config));
-        _log = log ?? throw new ArgumentNullException(nameof(log));
-        _uiaHost = new UiaProcessHost(_config.Debug.UiaProbeRecycleIntervalSec, _log);
-        _ui = BuildUiController(_config);
-        _audio = new AudioSessionReader(_log);
-    }
-
-    // 実行設定を更新
-    public void UpdateConfig(AppConfig config)
-    {
-        ThrowIfDisposed();
-        if (config == null)
-        {
-            throw new ArgumentNullException(nameof(config));
-        }
-
-        AppConfigValidator.Validate(config);
-        _log.SetMinimumLevel(config.Debug.LogMinimumLevel);
-        VoicepeakUiController nextUi = BuildUiController(config);
-        VoicepeakUiController oldUi = _ui;
-        _ui = nextUi;
-        _config = config;
-        _uiaHost.UpdateRecycleInterval(config.Debug.UiaProbeRecycleIntervalSec);
-        oldUi.Dispose();
-    }
-
-    // 入力検証を実行
-    public ValidateInputOnceResult ValidateInputOnce()
-    {
-        ThrowIfDisposed();
-        return VoicepeakOneShot.ValidateInputOnceCore(_config, _log, _ui, _audio);
-    }
-
-    // 入力欄クリアを実行
-    public ClearInputOnceResult ClearInputOnce()
-    {
-        ThrowIfDisposed();
-        return VoicepeakOneShot.ClearInputOnceCore(_config, _log, _ui);
-    }
-
-    // 開始確認までの単発実行
-    public SpeakOnceResult SpeakOnce(SpeakOnceRequest request)
-    {
-        ThrowIfDisposed();
-        return VoicepeakOneShot.SpeakOnceCore(_config, request, _log, _ui, _audio);
-    }
-
-    // 終了確認までの単発実行
-    public SpeakOnceResult SpeakOnceWait(SpeakOnceRequest request)
-    {
-        ThrowIfDisposed();
-        return VoicepeakOneShot.SpeakOnceWaitCore(_config, request, _log, _ui, _audio);
-    }
-
-    // リソースを解放
-    public void Dispose()
-    {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-        _audio.Dispose();
-        _ui.Dispose();
-        _uiaHost.Dispose();
-    }
-
-    // 破棄済みを検証
-    private void ThrowIfDisposed()
-    {
-        if (_disposed)
-        {
-            throw new ObjectDisposedException(nameof(VoicepeakOneShotSession));
-        }
-    }
-
-    // UIコントローラーを生成
-    private VoicepeakUiController BuildUiController(AppConfig config)
-    {
-        AppConfig c = config ?? new AppConfig();
-        return new VoicepeakUiController(
-            c.Ui,
-            c.InputTiming,
-            c.Hook,
-            c.Text,
-            c.Debug,
-            _log,
-            processApi: null,
-            uiaProcessHost: _uiaHost,
-            ownsUiaProcessHost: false);
-    }
-}

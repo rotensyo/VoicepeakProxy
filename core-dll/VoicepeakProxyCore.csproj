@@ -32,11 +32,7 @@
     <Compile Remove="uia-probe\**\*.cs" />
   </ItemGroup>
 
-  <Target Name="BuildUiaProbe" AfterTargets="Build" Condition="'$(IsUiaProbeBuild)' != 'true'">
-    <MSBuild Projects="uia-probe\VoicepeakProxyCore.UiaProbe.csproj" Targets="Restore;Build" Properties="Configuration=$(Configuration);Platform=x64;BuildProjectReferences=false;IsUiaProbeBuild=true" />
-  </Target>
-
-  <Target Name="MoveDependenciesToDepsFolder" AfterTargets="Build" DependsOnTargets="BuildUiaProbe" Condition="'$(IsUiaProbeBuild)' != 'true'">
+  <Target Name="MoveDependenciesToDepsFolder" AfterTargets="Build" Condition="'$(IsUiaProbeBuild)' != 'true'">
     <PropertyGroup>
       <CoreDepsDir>$(OutputPath)VoicepeakProxyCore.deps\</CoreDepsDir>
     </PropertyGroup>
@@ -48,7 +44,6 @@
       <CoreDependencyFiles Include="$(OutputPath)EasyHook*.dll" />
       <CoreDependencyFiles Include="$(OutputPath)EasyLoad*.dll" />
       <CoreDependencyFiles Include="$(OutputPath)NAudio*.dll" />
-      <CoreDependencyFiles Include="uia-probe\bin\x64\$(Configuration)\$(TargetFramework)\VoicepeakProxyCore.UiaProbe.exe" Condition="Exists('uia-probe\bin\x64\$(Configuration)\$(TargetFramework)\VoicepeakProxyCore.UiaProbe.exe')" />
     </ItemGroup>
 
     <Copy SourceFiles="@(CoreDependencyFiles)" DestinationFolder="$(CoreDepsDir)" Condition="'@(CoreDependencyFiles)' != ''" />

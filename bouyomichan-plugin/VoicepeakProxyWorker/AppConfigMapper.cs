@@ -93,9 +93,6 @@ internal static class AppConfigMapper
         config.Runtime.BootValidation = MapBootValidation(data.Runtime.BootValidation, runtimeDefaults.BootValidation);
 
         config.Debug.LogModifierHookStats = data.Debug.LogModifierHookStats;
-        config.Debug.UiaProbeRecycleIntervalSec = data.Debug.UiaProbeRecycleIntervalSec > 0
-            ? data.Debug.UiaProbeRecycleIntervalSec
-            : debugDefaults.UiaProbeRecycleIntervalSec;
         config.Debug.LogMinimumLevel = string.IsNullOrWhiteSpace(data.Debug.LogMinimumLevel)
             ? debugDefaults.LogMinimumLevel
             : data.Debug.LogMinimumLevel;
@@ -159,7 +156,6 @@ internal static class AppConfigMapper
         data.Runtime.BootValidation = MapBootValidationBack(config.Runtime.BootValidation);
 
         data.Debug.LogModifierHookStats = config.Debug.LogModifierHookStats;
-        data.Debug.UiaProbeRecycleIntervalSec = config.Debug.UiaProbeRecycleIntervalSec;
         data.Debug.LogMinimumLevel = config.Debug.LogMinimumLevel;
 
         data.Normalize();

@@ -28,8 +28,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
     private readonly VoicepeakTargetResolver _targetResolver;
     private readonly ModifierIsolationCoordinator _modifierIsolationCoordinator;
     private readonly UiAutomationExecutor _uiAutomationExecutor;
-    private readonly UiaProcessHost _uiaProcessHost;
-    private readonly bool _ownsUiaProcessHost;
     // 単一操作経路前提のためロックは設けない
     private int _cachedVoicepeakPid;  // テスト互換のため保持する解決キャッシュ
     private bool _modifierIsolationSessionActive;  // テスト互換のため保持するセッション状態
@@ -37,27 +35,21 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
 
     // UI設定とロガーを保持
     public VoicepeakUiController(UiConfig ui, DebugConfig debug, AppLogger log)
-        : this(ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), debug, log, new DefaultVoicepeakProcessApi(), null, true)
+        : this(ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), debug, log, new DefaultVoicepeakProcessApi())
     {
     }
 
     public VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log)
-        : this(ui, inputTiming, hook, text, debug, log, new DefaultVoicepeakProcessApi(), null, true)
+        : this(ui, inputTiming, hook, text, debug, log, new DefaultVoicepeakProcessApi())
     {
     }
 
     internal VoicepeakUiController(UiConfig ui, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
-        : this(ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), debug, log, processApi, null, true)
+        : this(ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), debug, log, processApi)
     {
     }
 
     internal VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
-        : this(ui, inputTiming, hook, text, debug, log, processApi, null, true)
-    {
-    }
-
-    // 依存を受け取ってUI操作を初期化
-    internal VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi, UiaProcessHost uiaProcessHost, bool ownsUiaProcessHost)
     {
         IVoicepeakProcessApi resolvedProcessApi = processApi ?? new DefaultVoicepeakProcessApi();
         _ui = ui ?? new UiConfig();
@@ -73,9 +65,10 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
             _hook.HookConnectTotalWaitMs);
         _modifierIsolationCoordinator = new ModifierIsolationCoordinator(modifierKeyHookController, _log);
         _uiAutomationExecutor = new UiAutomationExecutor();
-        _uiaProcessHost = uiaProcessHost ?? new UiaProcessHost(_debug.UiaProbeRecycleIntervalSec, _log);
-        _ownsUiaProcessHost = uiaProcessHost == null || ownsUiaProcessHost;
     }
+
+    // 依存を受け取ってUI操作を初期化
+    
 
     // 対象プロセスとメインウィンドウを解決
     public bool TryResolveTarget(out Process process, out IntPtr mainHwnd)
@@ -223,13 +216,12 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
     // UIA読み取りを1回で実行して共通スナップショットを返す
     public ReadInputSnapshot ReadInputSnapshot(IntPtr mainHwnd)
     {
-        return _uiAutomationExecutor.Invoke(() => _uiaProcessHost.ReadInputSnapshot(mainHwnd));
+        return _uiAutomationExecutor.Invoke(() => ReadInputSnapshotCore(mainHwnd));
     }
 
     // 発話開始後のsafe pointを通知
     public void NotifyPlaybackSafePoint()
     {
-        _uiaProcessHost.NotifyPlaybackSafePoint();
     }
 
     // テスト互換用の可視入力欄数算出
@@ -1279,11 +1271,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
     public void Dispose()
     {
         _modifierIsolationCoordinator.Dispose();
-        if (_ownsUiaProcessHost)
-        {
-            _uiaProcessHost.Dispose();
-        }
-
         _uiAutomationExecutor.Dispose();
     }
 }

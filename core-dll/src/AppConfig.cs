@@ -87,7 +87,6 @@ public sealed class RuntimeConfig
 public sealed class DebugConfig
 {
     public bool LogModifierHookStats { get; set; } = false;
-    public int UiaProbeRecycleIntervalSec { get; set; } = 1800;
     public string LogMinimumLevel { get; set; } = "warn";
 }
 
@@ -180,7 +179,6 @@ internal static class AppConfigValidator
         EnsurePositive(config.Hook.HookCommandTimeoutMs, "hook.hookCommandTimeoutMs は 1 以上で指定してください");
         EnsurePositive(config.Hook.HookConnectTimeoutMs, "hook.hookConnectTimeoutMs は 1 以上で指定してください");
         EnsurePositive(config.Hook.HookConnectTotalWaitMs, "hook.hookConnectTotalWaitMs は 1 以上で指定してください");
-        EnsurePositive(config.Debug.UiaProbeRecycleIntervalSec, "debug.uiaProbeRecycleIntervalSec は 1 以上で指定してください");
 
         if (config.Text.ReplaceRules == null)
         {

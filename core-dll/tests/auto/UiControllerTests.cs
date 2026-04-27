@@ -707,7 +707,7 @@ public class UiControllerTests
     [TestMethod]
     public void ReadInputTextDetailed_NoCandidate_ReturnsNoCandidate()
     {
-        // プローブ未接続時はException系失敗を返す
+        // 候補未検出時はNoCandidate系失敗を返す
         var result = ReflectionTestHelper.RunInSta(() =>
         {
             using Form form = new Form();
@@ -719,7 +719,7 @@ public class UiControllerTests
         });
 
         Assert.IsFalse(result.Success);
-        Assert.AreEqual(ReadInputSource.Exception, result.Source);
+        Assert.AreEqual(ReadInputSource.NoCandidate, result.Source);
     }
 
     [TestMethod]
