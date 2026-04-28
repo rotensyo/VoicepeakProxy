@@ -259,9 +259,17 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
             }
 
             using ComScope rootScope = new ComScope(root);
-            List<OfficialComTextCandidateInfo> candidates = CollectTextCandidatesOfficialCom(automation, root, maxCount: 200);
-            ReadInputResult read = BuildReadInputResultOfficialCom(candidates);
-            return new ReadInputSnapshot(read, candidates.Count);
+            List<OfficialComTextCandidateInfo> candidates = null;
+            try
+            {
+                candidates = CollectTextCandidatesOfficialCom(automation, root, maxCount: 200);
+                ReadInputResult read = BuildReadInputResultOfficialCom(candidates);
+                return new ReadInputSnapshot(read, candidates.Count);
+            }
+            finally
+            {
+                ReleaseOfficialComCandidates(candidates);
+            }
         }
         catch
         {
@@ -292,8 +300,16 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
             }
 
             using ComScope rootScope = new ComScope(root);
-            List<OfficialComTextCandidateInfo> candidates = CollectTextCandidatesOfficialCom(automation, root, maxCount: 200);
-            return BuildReadInputResultForValidationOfficialCom(candidates);
+            List<OfficialComTextCandidateInfo> candidates = null;
+            try
+            {
+                candidates = CollectTextCandidatesOfficialCom(automation, root, maxCount: 200);
+                return BuildReadInputResultForValidationOfficialCom(candidates);
+            }
+            finally
+            {
+                ReleaseOfficialComCandidates(candidates);
+            }
         }
         catch
         {
@@ -1057,6 +1073,9 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
             return string.Empty;
         }
 
+        object valuePatternObj = null;
+        object textPatternObj = null;
+        Interop.UIAutomationClient.IUIAutomationTextRange range = null;
         try
         {
             string valuePropertyText = Convert.ToString(element.GetCurrentPropertyValue(UiaValueValuePropertyId)) ?? string.Empty;
@@ -1065,7 +1084,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
                 return valuePropertyText;
             }
 
-            object valuePatternObj = element.GetCurrentPattern(UiaValuePatternId);
+            valuePatternObj = element.GetCurrentPattern(UiaValuePatternId);
             if (valuePatternObj is Interop.UIAutomationClient.IUIAutomationValuePattern valuePattern)
             {
                 string value = valuePattern.CurrentValue;
@@ -1075,10 +1094,10 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
                 }
             }
 
-            object textPatternObj = element.GetCurrentPattern(UiaTextPatternId);
+            textPatternObj = element.GetCurrentPattern(UiaTextPatternId);
             if (textPatternObj is Interop.UIAutomationClient.IUIAutomationTextPattern textPattern)
             {
-                Interop.UIAutomationClient.IUIAutomationTextRange range = textPattern.DocumentRange;
+                range = textPattern.DocumentRange;
                 if (range != null)
                 {
                     return (range.GetText(-1) ?? string.Empty).TrimEnd('\r', '\n');
@@ -1088,8 +1107,28 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
         catch
         {
         }
+        finally
+        {
+            ReleaseComObjectIfNeeded(range);
+            ReleaseComObjectIfNeeded(textPatternObj);
+            ReleaseComObjectIfNeeded(valuePatternObj);
+        }
 
         return string.Empty;
+    }
+
+    // 候補COM要素を一括解放
+    private static void ReleaseOfficialComCandidates(List<OfficialComTextCandidateInfo> candidates)
+    {
+        if (candidates == null || candidates.Count == 0)
+        {
+            return;
+        }
+
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            ReleaseComObjectIfNeeded(candidates[i].Element);
+        }
     }
 
     // 公式COMオートメーションを生成
