@@ -262,7 +262,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
             List<OfficialComTextCandidateInfo> candidates = null;
             try
             {
-                candidates = CollectTextCandidatesOfficialCom(automation, root, maxCount: 200);
+                candidates = CollectTextCandidatesOfficialCom(automation, root);
                 ReadInputResult read = BuildReadInputResultOfficialCom(candidates);
                 return new ReadInputSnapshot(read, candidates.Count);
             }
@@ -303,7 +303,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
             List<OfficialComTextCandidateInfo> candidates = null;
             try
             {
-                candidates = CollectTextCandidatesOfficialCom(automation, root, maxCount: 200);
+                candidates = CollectTextCandidatesOfficialCom(automation, root);
                 return BuildReadInputResultForValidationOfficialCom(candidates);
             }
             finally
@@ -887,11 +887,10 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
 
     private static List<OfficialComTextCandidateInfo> CollectTextCandidatesOfficialCom(
         Interop.UIAutomationClient.IUIAutomation automation,
-        Interop.UIAutomationClient.IUIAutomationElement root,
-        int maxCount)
+        Interop.UIAutomationClient.IUIAutomationElement root)
     {
         List<OfficialComTextCandidateInfo> result = new List<OfficialComTextCandidateInfo>();
-        if (automation == null || root == null || maxCount <= 0)
+        if (automation == null || root == null)
         {
             return result;
         }
@@ -900,7 +899,12 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
         Interop.UIAutomationClient.IUIAutomationElementArray matches = null;
         try
         {
-            condition = automation.CreateTrueCondition();
+            condition = CreateTextCandidateConditionOfficialCom(automation);
+            if (condition == null)
+            {
+                return result;
+            }
+
             matches = root.FindAll(Interop.UIAutomationClient.TreeScope.TreeScope_Descendants, condition);
             if (matches == null)
             {
@@ -937,17 +941,45 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
             ReleaseComObjectIfNeeded(condition);
         }
 
-        if (result.Count > maxCount)
-        {
-            for (int i = maxCount; i < result.Count; i++)
-            {
-                ReleaseComObjectIfNeeded(result[i].Element);
-            }
+        return result;
+    }
 
-            result.RemoveRange(maxCount, result.Count - maxCount);
+    // 候補型の絞り込み条件を構築
+    private static Interop.UIAutomationClient.IUIAutomationCondition CreateTextCandidateConditionOfficialCom(
+        Interop.UIAutomationClient.IUIAutomation automation)
+    {
+        if (automation == null)
+        {
+            return null;
         }
 
-        return result;
+        Interop.UIAutomationClient.IUIAutomationCondition editCondition = null;
+        Interop.UIAutomationClient.IUIAutomationCondition textCondition = null;
+        Interop.UIAutomationClient.IUIAutomationCondition documentCondition = null;
+        Interop.UIAutomationClient.IUIAutomationCondition typeCondition = null;
+        Interop.UIAutomationClient.IUIAutomationCondition nameEmptyCondition = null;
+        Interop.UIAutomationClient.IUIAutomationCondition firstOr = null;
+        Interop.UIAutomationClient.IUIAutomationCondition finalCondition = null;
+        try
+        {
+            editCondition = automation.CreatePropertyCondition(UiaControlTypePropertyId, UiaControlTypeEdit);
+            textCondition = automation.CreatePropertyCondition(UiaControlTypePropertyId, UiaControlTypeText);
+            documentCondition = automation.CreatePropertyCondition(UiaControlTypePropertyId, UiaControlTypeDocument);
+            firstOr = automation.CreateOrCondition(editCondition, textCondition);
+            typeCondition = automation.CreateOrCondition(firstOr, documentCondition);
+            nameEmptyCondition = automation.CreatePropertyCondition(UiaNamePropertyId, string.Empty);
+            finalCondition = automation.CreateAndCondition(typeCondition, nameEmptyCondition);
+            return finalCondition;
+        }
+        finally
+        {
+            ReleaseComObjectIfNeeded(firstOr);
+            ReleaseComObjectIfNeeded(nameEmptyCondition);
+            ReleaseComObjectIfNeeded(typeCondition);
+            ReleaseComObjectIfNeeded(documentCondition);
+            ReleaseComObjectIfNeeded(textCondition);
+            ReleaseComObjectIfNeeded(editCondition);
+        }
     }
 
     // 候補条件でCOM要素を判定
