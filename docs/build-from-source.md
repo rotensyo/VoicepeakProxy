@@ -51,5 +51,4 @@ msbuild "bouyomichan-plugin/Plugin_VoicepeakProxy/Plugin_VoicepeakProxy.csproj" 
 
 ## 補足
 - `core-dll`と`Worker`はReleaseビルド時に依存ライブラリを`VoicepeakProxyCore.deps`にまとめます。そのまま使用してください。
-- `Interop.UIAutomationClient.dll`は入力読取のpure COM経路で使用するため、`VoicepeakProxyCore.deps`から除外しないでください。
 - Pluginビルドでは`BouyomiChanExePath`の指定が必須です。

@@ -64,18 +64,12 @@ VoicepeakProxy は、[VOICEPEAK](https://www.ah-soft.com/voice/)の自動読み�
 using VoicepeakProxyCore;
 
 var config = new AppConfig();
-VoicepeakOneShotSession session = VoicepeakOneShot.Start(config);
-try
-{
-    SpeakOnceResult result = session.SpeakOnceWait(
-        new SpeakOnceRequest { Text = "こんにちは。テストです。" });
 
-    Console.WriteLine($"status={result.Status} ok={result.Succeeded} segments={result.SegmentsExecuted}");
-}
-finally
-{
-    session.Dispose();
-}
+SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWait(
+    config,
+    new SpeakOnceRequest { Text = "こんにちは。テストです。" });
+
+Console.WriteLine($"status={result.Status} ok={result.Succeeded} segments={result.SegmentsExecuted}");
 ```
 
 ### 常駐ランタイムAPI使用例

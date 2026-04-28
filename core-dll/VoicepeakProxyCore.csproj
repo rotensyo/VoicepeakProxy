@@ -7,10 +7,10 @@
     <Prefer32Bit>false</Prefer32Bit>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
-    <Version>1.1.0</Version>
-    <FileVersion>1.1.0.0</FileVersion>
+    <Version>1.2.0</Version>
+    <FileVersion>1.2.0.0</FileVersion>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <InformationalVersion>1.1.0</InformationalVersion>
+    <InformationalVersion>1.2.0</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <SourceRevisionId></SourceRevisionId>
   </PropertyGroup>
