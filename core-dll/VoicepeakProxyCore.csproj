@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <PackageReference Include="EasyHook" Version="2.7.7097" />
+    <PackageReference Include="Interop.UIAutomationClient" Version="10.19041.0" />
     <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
   </ItemGroup>
 
@@ -44,6 +45,7 @@
       <CoreDependencyFiles Include="$(OutputPath)EasyHook*.dll" />
       <CoreDependencyFiles Include="$(OutputPath)EasyLoad*.dll" />
       <CoreDependencyFiles Include="$(OutputPath)NAudio*.dll" />
+      <CoreDependencyFiles Include="$(OutputPath)Interop.UIAutomationClient*.dll" />
     </ItemGroup>
 
     <Copy SourceFiles="@(CoreDependencyFiles)" DestinationFolder="$(CoreDepsDir)" Condition="'@(CoreDependencyFiles)' != ''" />

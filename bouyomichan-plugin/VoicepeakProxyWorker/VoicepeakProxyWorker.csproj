@@ -52,6 +52,7 @@
       <WorkerDependencyFiles Include="$(OutputPath)EasyHook*.dll" />
       <WorkerDependencyFiles Include="$(OutputPath)EasyLoad*.dll" />
       <WorkerDependencyFiles Include="$(OutputPath)NAudio*.dll" />
+      <WorkerDependencyFiles Include="$(OutputPath)Interop.UIAutomationClient*.dll" />
       <AllDependencyFiles Include="@(WorkerDependencyFiles)" />
     </ItemGroup>
 

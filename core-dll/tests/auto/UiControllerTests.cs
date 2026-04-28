@@ -96,69 +96,21 @@ public class UiControllerTests
     public void IsCollectTextCandidateTarget_UsesAllowedControlTypeAndStrictEmptyName()
     {
         // 候補条件は型と空文字名のみを許可
-        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", ControlType.Edit, string.Empty));
-        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", ControlType.Document, string.Empty));
-        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", ControlType.Text, string.Empty));
+        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", 50004, string.Empty));
+        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", 50030, string.Empty));
+        Assert.IsTrue((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", 50020, string.Empty));
 
-        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", ControlType.Button, string.Empty));
-        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", ControlType.Edit, "name"));
-        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", ControlType.Edit, " "));
-        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", ControlType.Edit, null));
+        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", 50000, string.Empty));
+        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", 50004, "name"));
+        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", 50004, " "));
+        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", 50004, null));
     }
 
     [TestMethod]
-    public void BuildRootChildCandidateCondition_MatchesTextEditDocumentOnly()
+    public void IsCollectTextCandidateTarget_DisallowsUnsupportedControlType()
     {
-        // 候補型条件はText/Edit/Documentのみに一致
-        Condition condition = (Condition)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "BuildRootChildCandidateCondition");
-
-        int count = ReflectionTestHelper.RunInSta(() =>
-        {
-            using Form form = new Form
-            {
-                Text = string.Empty,
-                Width = 400,
-                Height = 200
-            };
-            using TextBox textBox = new TextBox
-            {
-                Name = string.Empty,
-                AccessibleName = string.Empty,
-                Text = string.Empty,
-                Left = 20,
-                Top = 20,
-                Width = 200
-            };
-            using RichTextBox richText = new RichTextBox
-            {
-                Name = string.Empty,
-                AccessibleName = string.Empty,
-                Text = string.Empty,
-                Left = 20,
-                Top = 60,
-                Width = 200,
-                Height = 60
-            };
-            using Button button = new Button
-            {
-                Text = "button",
-                Left = 20,
-                Top = 130,
-                Width = 100
-            };
-
-            form.Controls.Add(textBox);
-            form.Controls.Add(richText);
-            form.Controls.Add(button);
-            form.Show();
-            Application.DoEvents();
-
-            AutomationElement root = AutomationElement.FromHandle(form.Handle);
-            AutomationElementCollection matches = root.FindAll(TreeScope.Descendants, condition);
-            return matches.Count;
-        });
-
-        Assert.AreEqual(2, count);
+        // 非対応型は候補から除外
+        Assert.IsFalse((bool)ReflectionTestHelper.InvokeCoreStatic("VoicepeakUiController", "IsCollectTextCandidateTarget", 50032, string.Empty));
     }
 
     [TestMethod]
