@@ -30,39 +30,30 @@
 - 例: `voicepeak.exe` 喪失、 `BootValidationMode.Optional` での起動時検証失敗
 
 ## 単発実行 API
-キューを持たず、セッション内で単発操作を実行する機能です。
+キューを持たず、静的APIで単発操作を直接実行する機能です。
 
-### `VoicepeakOneShot.Start(AppConfig config, IAppLogger logger = null)`
-- 単発実行セッション(`VoicepeakOneShotSession`)を開始します
-- `config == null` は `ArgumentNullException`
-- セッション生成時にUIAサブプロセス管理を初期化します
-
-### `VoicepeakOneShotSession.Dispose()`
-- 単発実行セッションを終了します
-- UIAサブプロセスと関連リソースを解放します
-
-### `VoicepeakOneShotSession.SpeakOnce(SpeakOnceRequest request)`
+### `VoicepeakOneShot.SpeakOnce(AppConfig config, SpeakOnceRequest request, IAppLogger logger = null)`
 - 発話を1ジョブだけ同期実行します
 - 再生開始を確認できた時点で完了となります
+- `config == null` は `ArgumentNullException`
 - `request == null` は `SpeakOnceStatus.InvalidRequest` として返します
 
-### `VoicepeakOneShotSession.SpeakOnceWait(SpeakOnceRequest request)`
+### `VoicepeakOneShot.SpeakOnceWait(AppConfig config, SpeakOnceRequest request, IAppLogger logger = null)`
 - 発話を1ジョブだけ同期実行します
 - 再生終了まで待機してから完了となります
+- `config == null` は `ArgumentNullException`
 - `request == null` は `SpeakOnceStatus.InvalidRequest` として返します
 
-### `VoicepeakOneShotSession.ValidateInputOnce()`
+### `VoicepeakOneShot.ValidateInputOnce(AppConfig config, IAppLogger logger = null)`
 - 入力検証と発話確認を1回だけ同期実行します
 - 検証文字列は`config.Validation.ValidationText`を使用します
+- `config == null` は `ArgumentNullException`
 
-### `VoicepeakOneShotSession.ClearInputOnce()`
+### `VoicepeakOneShot.ClearInputOnce(AppConfig config, IAppLogger logger = null)`
 - 入力欄のクリアだけを1回同期実行します
+- `config == null` は `ArgumentNullException`
 
-### `VoicepeakOneShotSession.UpdateConfig(AppConfig config)`
-- 実行中セッションへ最新設定を注入します
-- `config == null` は `ArgumentNullException` として返します
-- 設定バリデーション失敗時は `InvalidOperationException` として返します
-- `Dispose()`後は `ObjectDisposedException` を返します
+- `VoicepeakOneShotSession`型と`VoicepeakOneShot.Start(...)`/`UpdateConfig(...)`は現行実装には存在しません。
 
 ## 入力モデル
 
@@ -109,8 +100,8 @@ public sealed class SpeakOnceRequest
 - 指定した時間が文字削除・入力等の時間より短い場合、完了次第即発話を開始します
   - 読み上げ完了から次の開始まで数秒程度はかかるので、500ms程度を指定しても意味がない場合が多いです
 - `[[pause:NNN]]`自体には文字列置換は適用されません
-- `VoicepeakOneShotSession.SpeakOnce(...)`では`[[pause:NNN]]`は無視され、1回の再生として扱います
-- `VoicepeakOneShotSession.SpeakOnceWait(...)`と常駐実行では従来通りpauseとして解釈します
+- `VoicepeakOneShot.SpeakOnce(...)`では`[[pause:NNN]]`は無視され、1回の再生として扱います
+- `VoicepeakOneShot.SpeakOnceWait(...)`と常駐実行では従来通りpauseとして解釈します
 
 例:
 ```text

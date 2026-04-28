@@ -120,7 +120,7 @@ AppConfig config = new AppConfig
 - `StartConfirmMaxRetries` (default: `2`)
   - `StartConfirmTimeoutMs` 超過時の再試行回数です
   - 再試行時は `MoveToStart` → `PressPlay` → 開始確認 をやり直します
-- `VoicepeakOneShotSession.SpeakOnce(...)` では再試行せず、超過で即 `StartConfirmTimeout` になります
+- `VoicepeakOneShot.SpeakOnce(...)` では再試行せず、超過で即 `StartConfirmTimeout` になります
 - `StopConfirmMs` (default: `200`)
   - 発話開始後、この時間(ミリ秒)だけ閾値未満が続いたら終了と判定します
 - `MaxSpeakingDurationSec` (default: `300`)
