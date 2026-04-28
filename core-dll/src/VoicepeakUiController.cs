@@ -14,13 +14,9 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
     private const uint SmtoAbortIfHung = 0x0002;
     private const uint WmKeyDown = 0x0100;
     private const uint WmKeyUp = 0x0101;
-    private const uint WmPaste = 0x0302;
     private const uint WmKillFocus = 0x0008;
     private const int UiaControlTypePropertyId = 30003;
     private const int UiaNamePropertyId = 30005;
-    private const int UiaAutomationIdPropertyId = 30011;
-    private const int UiaIsTextPatternAvailablePropertyId = 30040;
-    private const int UiaIsValuePatternAvailablePropertyId = 30043;
     private const int UiaValueValuePropertyId = 30045;
     private const int UiaValuePatternId = 10002;
     private const int UiaTextPatternId = 10014;
@@ -405,12 +401,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
     private bool ExecuteWithModifierIsolation(IntPtr targetHwnd, string operationName, Func<bool> action)
     {
         return _modifierIsolationCoordinator.ExecuteWithModifierIsolation(targetHwnd, operationName, action);
-    }
-
-    // フック統計をデバッグ時のみ出力
-    private void LogModifierHookStatsIfEnabled()
-    {
-        _modifierIsolationCoordinator.LogStatsIfEnabled(_debug.LogModifierHookStats);
     }
 
     // 互換フィールドをcoordinatorへ反映
@@ -899,7 +889,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
             ReleaseComObjectIfNeeded(condition);
         }
 
-        result.Sort((a, b) => b.Score.CompareTo(a.Score));
         if (result.Count > maxCount)
         {
             for (int i = maxCount; i < result.Count; i++)
@@ -931,52 +920,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
             return false;
         }
 
-        string autoId = Convert.ToString(element.GetCurrentPropertyValue(UiaAutomationIdPropertyId)) ?? string.Empty;
-        int isTextPatternAvailable = Convert.ToInt32(element.GetCurrentPropertyValue(UiaIsTextPatternAvailablePropertyId));
-        int isValuePatternAvailable = Convert.ToInt32(element.GetCurrentPropertyValue(UiaIsValuePatternAvailablePropertyId));
-        string valuePropertyText = Convert.ToString(element.GetCurrentPropertyValue(UiaValueValuePropertyId)) ?? string.Empty;
-        bool hasPotentialTextSource = isTextPatternAvailable != 0 || isValuePatternAvailable != 0 || !string.IsNullOrEmpty(valuePropertyText);
-        if (!hasPotentialTextSource)
-        {
-            return false;
-        }
-
-        double score = 0;
-        if (controlTypeId == UiaControlTypeEdit)
-        {
-            score += 10000;
-        }
-        else if (controlTypeId == UiaControlTypeDocument)
-        {
-            score += 5000;
-        }
-
-        if (string.IsNullOrEmpty(name))
-        {
-            score += 4000;
-        }
-
-        if (isTextPatternAvailable != 0)
-        {
-            score += 3000;
-        }
-
-        if (isValuePatternAvailable != 0)
-        {
-            score += 2000;
-        }
-
-        if (!string.IsNullOrEmpty(autoId) && autoId.IndexOf("Voicepeak", StringComparison.OrdinalIgnoreCase) >= 0)
-        {
-            score += 1500;
-        }
-
-        if (!string.IsNullOrEmpty(autoId) && autoId.IndexOf("<empty>", StringComparison.OrdinalIgnoreCase) >= 0)
-        {
-            score += 1000;
-        }
-
-        candidate = new OfficialComTextCandidateInfo(element, score);
+        candidate = new OfficialComTextCandidateInfo(element);
         return true;
     }
 
@@ -1035,16 +979,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
             return null;
         }
 
-        OfficialComTextCandidateInfo best = candidates[0];
-        for (int i = 1; i < candidates.Count; i++)
-        {
-            if (candidates[i].Score > best.Score)
-            {
-                best = candidates[i];
-            }
-        }
-
-        return best;
+        return candidates[0];
     }
 
     // 候補群の総文字数を算出
@@ -1151,16 +1086,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
         }
     }
 
-    private static string SanitizeForLog(string value)
-    {
-        if (value == null)
-        {
-            return string.Empty;
-        }
-
-        return value.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\"", "\\\"");
-    }
-
     private static IntPtr WaitMainWindowHandle(Process process, int timeoutMs)
     {
         Stopwatch sw = Stopwatch.StartNew();
@@ -1246,12 +1171,10 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
     private readonly struct OfficialComTextCandidateInfo
     {
         public Interop.UIAutomationClient.IUIAutomationElement Element { get; }
-        public double Score { get; }
 
-        public OfficialComTextCandidateInfo(Interop.UIAutomationClient.IUIAutomationElement element, double score)
+        public OfficialComTextCandidateInfo(Interop.UIAutomationClient.IUIAutomationElement element)
         {
             Element = element;
-            Score = score;
         }
     }
 
