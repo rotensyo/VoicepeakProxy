@@ -674,6 +674,48 @@ public class UiControllerTests
         Assert.AreEqual(ReadInputSource.NoCandidate, result.Source);
     }
 
+[TestMethod]
+    public void ReadInputTextDetailed_MultipleCandidates_ReturnsNoCandidate()
+    {
+        // 検証用入力欄が複数候補なら失敗扱い
+        var result = ReflectionTestHelper.RunInSta(() =>
+        {
+            using Form form = new Form();
+            TextBox first = new TextBox { Text = "first" };
+            TextBox second = new TextBox { Text = "second" };
+            form.Controls.Add(first);
+            form.Controls.Add(second);
+            form.Show();
+            Application.DoEvents();
+
+            VoicepeakUiController controller = CreateController(new UiConfig(), new FakeVoicepeakProcessApi());
+            return controller.ReadInputTextDetailed(form.Handle);
+        });
+
+        Assert.IsFalse(result.Success);
+        Assert.AreEqual(ReadInputSource.NoCandidate, result.Source);
+    }
+
+[TestMethod]
+    public void ReadInputTextDetailed_SingleCandidate_ReturnsPrimaryUiA()
+    {
+        // 検証用入力欄が単一候補なら成功扱い
+        var result = ReflectionTestHelper.RunInSta(() =>
+        {
+            using Form form = new Form();
+            TextBox input = new TextBox { Text = "single input" };
+            form.Controls.Add(input);
+            form.Show();
+            Application.DoEvents();
+
+            VoicepeakUiController controller = CreateController(new UiConfig(), new FakeVoicepeakProcessApi());
+            return controller.ReadInputTextDetailed(form.Handle);
+        });
+
+        Assert.IsTrue(result.Success);
+        Assert.AreEqual(ReadInputSource.PrimaryUiA, result.Source);
+    }
+
     [TestMethod]
     public void EndModifierIsolationSession_WhenDisableFails_ReturnsFalseAndClearsSessionState()
     {

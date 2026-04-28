@@ -269,6 +269,38 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
         }
     }
 
+    internal static ReadInputResult ReadInputTextDetailedCore(IntPtr mainHwnd)
+    {
+        if (mainHwnd == IntPtr.Zero)
+        {
+            return ReadInputResult.Fail(ReadInputSource.NoCandidate, string.Empty, 0);
+        }
+
+        try
+        {
+            Interop.UIAutomationClient.IUIAutomation automation = CreateOfficialUiaAutomation();
+            if (automation == null)
+            {
+                return ReadInputResult.Fail(ReadInputSource.Exception, string.Empty, 0);
+            }
+
+            using ComScope automationScope = new ComScope(automation);
+            Interop.UIAutomationClient.IUIAutomationElement root = automation.ElementFromHandle(mainHwnd);
+            if (root == null)
+            {
+                return ReadInputResult.Fail(ReadInputSource.NoCandidate, string.Empty, 0);
+            }
+
+            using ComScope rootScope = new ComScope(root);
+            List<OfficialComTextCandidateInfo> candidates = CollectTextCandidatesOfficialCom(automation, root, maxCount: 200);
+            return BuildReadInputResultForValidationOfficialCom(candidates);
+        }
+        catch
+        {
+            return ReadInputResult.Fail(ReadInputSource.Exception, string.Empty, 0);
+        }
+    }
+
     // 仮想クリップボード経由で文字列をペースト
     public bool TypeText(IntPtr mainHwnd, string text)
     {
@@ -811,7 +843,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
 
     public ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd)
     {
-        return ReadInputSnapshot(mainHwnd).Read;
+        return _uiAutomationExecutor.Invoke(() => ReadInputTextDetailedCore(mainHwnd));
     }
 
     private bool SendKey(IntPtr hwnd, VirtualKey key)
@@ -934,13 +966,13 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
 
     private static ReadInputResult BuildReadInputResultOfficialCom(List<OfficialComTextCandidateInfo> candidates)
     {
-        OfficialComTextCandidateInfo? best = FindBestInputBoxOfficialCom(candidates);
-        if (!best.HasValue || best.Value.Element == null)
+        if (candidates == null || candidates.Count == 0)
         {
             return ReadInputResult.Fail(ReadInputSource.NoCandidate, string.Empty, 0);
         }
 
-        string primary = TryGetElementTextOfficialCom(best.Value.Element);
+        OfficialComTextCandidateInfo primaryCandidate = candidates[0];
+        string primary = TryGetElementTextOfficialCom(primaryCandidate.Element);
         string normalizedPrimary = NormalizeForPanelCompare(primary);
         int totalLength = EstimateTotalInputTextLengthOfficialCom(candidates);
         if (totalLength < normalizedPrimary.Length)
@@ -948,6 +980,20 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
             totalLength = normalizedPrimary.Length;
         }
 
+        return ReadInputResult.Ok(normalizedPrimary, totalLength, ReadInputSource.PrimaryUiA);
+    }
+
+    private static ReadInputResult BuildReadInputResultForValidationOfficialCom(List<OfficialComTextCandidateInfo> candidates)
+    {
+        OfficialComTextCandidateInfo? single = FindSingleInputBoxOfficialCom(candidates);
+        if (!single.HasValue || single.Value.Element == null)
+        {
+            return ReadInputResult.Fail(ReadInputSource.NoCandidate, string.Empty, 0);
+        }
+
+        string primary = TryGetElementTextOfficialCom(single.Value.Element);
+        string normalizedPrimary = NormalizeForPanelCompare(primary);
+        int totalLength = NormalizeForLength(normalizedPrimary).Length;
         return ReadInputResult.Ok(normalizedPrimary, totalLength, ReadInputSource.PrimaryUiA);
     }
 
@@ -972,9 +1018,9 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
     }
 
     // 候補配列から最良入力欄を選択
-    private static OfficialComTextCandidateInfo? FindBestInputBoxOfficialCom(List<OfficialComTextCandidateInfo> candidates)
+    private static OfficialComTextCandidateInfo? FindSingleInputBoxOfficialCom(List<OfficialComTextCandidateInfo> candidates)
     {
-        if (candidates == null || candidates.Count == 0)
+        if (candidates == null || candidates.Count != 1)
         {
             return null;
         }
