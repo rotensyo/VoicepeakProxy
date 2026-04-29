@@ -8,7 +8,7 @@
   - 棒読みちゃんプラグイン本体です。
 - `VoicepeakProxyWorker/`
   - `VoicepeakProxyCore.dll` を動かすための補助プロセスです。
-- `VoicepeakOneShotSession.SpeakOnceWait(...)` 経由でVOICEPEAK読み上げを実行します。
+- `VoicepeakOneShot.SpeakOnceWait(...)` 経由でVOICEPEAK読み上げを実行します。
 - `Shared/`
   - PluginとWorkerの共通モデルです。
 
@@ -38,6 +38,7 @@ msbuild "bouyomichan-plugin/Plugin_VoicepeakProxy/Plugin_VoicepeakProxy.csproj" 
 - `VoicepeakProxyWorker/VoicepeakProxyCore.deps/`
   - `EasyHook*`
   - `EasyLoad*`
+  - `Interop.UIAutomationClient*`
   - `NAudio*`
 
 ## 仕様

@@ -248,7 +248,6 @@ public sealed class UiConfigData
         // 旧設定互換のため受理するが無視する
         public bool LogTextCandidates { get; set; }
         public bool LogModifierHookStats { get; set; }
-        public int UiaProbeRecycleIntervalSec { get; set; }
         public string LogMinimumLevel { get; set; }
 
         // 不足項目を既定値で補完

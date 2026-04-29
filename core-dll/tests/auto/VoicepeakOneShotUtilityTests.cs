@@ -10,7 +10,7 @@ public class VoicepeakOneShotUtilityTests
     [TestMethod]
     public void Start_NullConfig_ThrowsArgumentNullException()
     {
-        Assert.ThrowsException<ArgumentNullException>(() => VoicepeakOneShot.Start(null));
+        Assert.ThrowsException<ArgumentNullException>(() => VoicepeakOneShot.ValidateInputOnce(null));
     }
 
     [TestMethod]
@@ -220,11 +220,11 @@ public class VoicepeakOneShotUtilityTests
     }
 
     [TestMethod]
-    public void Start_NullLogger_UsesConsoleLoggerAndCanDispose()
+    public void ValidateInputOnce_NullLogger_UsesConsoleLoggerAndCanExecute()
     {
-        using VoicepeakOneShotSession session = VoicepeakOneShot.Start(new AppConfig(), null);
+        ValidateInputOnceResult result = VoicepeakOneShot.ValidateInputOnce(new AppConfig(), null);
 
-        Assert.IsNotNull(session);
+        Assert.IsNotNull(result);
     }
 
     [TestMethod]

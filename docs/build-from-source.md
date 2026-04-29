@@ -20,8 +20,8 @@ dotnet build "core-dll/VoicepeakProxyCore.csproj" -c Release
 - `core-dll/bin/Release/net48/VoicepeakProxyCore.deps/`
   - `EasyHook*`
   - `EasyLoad*`
+  - `Interop.UIAutomationClient*`
   - `NAudio*`
-  - `VoicepeakProxyCore.UiaProbe.exe`
 
 ### 2. Worker(VoicepeakProxyWorker.exe)
 ```powershell
@@ -35,8 +35,8 @@ dotnet build "bouyomichan-plugin/VoicepeakProxyWorker/VoicepeakProxyWorker.cspro
 - `bouyomichan-plugin/VoicepeakProxyWorker/bin/Release/VoicepeakProxyWorker/VoicepeakProxyCore.deps/`
   - `EasyHook*`
   - `EasyLoad*`
+  - `Interop.UIAutomationClient*`
   - `NAudio*`
-  - `VoicepeakProxyCore.UiaProbe.exe`
 
 ### 3. 棒読みちゃんPlugin(Plugin_VoicepeakProxy.dll)
 棒読みちゃん本体への参照が必要です。

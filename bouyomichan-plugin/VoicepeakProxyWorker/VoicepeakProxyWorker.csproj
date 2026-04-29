@@ -52,9 +52,8 @@
       <WorkerDependencyFiles Include="$(OutputPath)EasyHook*.dll" />
       <WorkerDependencyFiles Include="$(OutputPath)EasyLoad*.dll" />
       <WorkerDependencyFiles Include="$(OutputPath)NAudio*.dll" />
-      <ProbeDependencyFiles Include="$(CoreProjectDepsDir)VoicepeakProxyCore.UiaProbe.exe" Condition="Exists('$(CoreProjectDepsDir)VoicepeakProxyCore.UiaProbe.exe')" />
+      <WorkerDependencyFiles Include="$(OutputPath)Interop.UIAutomationClient*.dll" />
       <AllDependencyFiles Include="@(WorkerDependencyFiles)" />
-      <AllDependencyFiles Include="@(ProbeDependencyFiles)" />
     </ItemGroup>
 
     <Copy SourceFiles="@(AllDependencyFiles)" DestinationFolder="$(CoreDepsDir)" Condition="'@(AllDependencyFiles)' != ''" />

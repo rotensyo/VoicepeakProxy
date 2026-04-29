@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
-using System.Windows.Automation;
 
 namespace VoicepeakProxyCore;
 
@@ -15,10 +14,17 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
     private const uint SmtoAbortIfHung = 0x0002;
     private const uint WmKeyDown = 0x0100;
     private const uint WmKeyUp = 0x0101;
-    private const uint WmPaste = 0x0302;
-    private const uint WmGetText = 0x000D;
-    private const uint WmGetTextLength = 0x000E;
     private const uint WmKillFocus = 0x0008;
+    private const int UiaControlTypePropertyId = 30003;
+    private const int UiaNamePropertyId = 30005;
+    private const int UiaValueValuePropertyId = 30045;
+    private const int UiaValuePatternId = 10002;
+    private const int UiaTextPatternId = 10014;
+    private const int UiaControlTypeEdit = 50004;
+    private const int UiaControlTypeText = 50020;
+    private const int UiaControlTypeDocument = 50030;
+    private static readonly Guid ClsidCUIAutomation = new Guid("FF48DBA4-60EF-4201-AA87-54103EEF594E");
+    private static readonly Guid ClsidCUIAutomation8 = new Guid("E22AD333-B25F-460C-83D0-0581107395C9");
     private readonly UiConfig _ui;
     private readonly InputTimingConfig _inputTiming;
     private readonly HookConfig _hook;
@@ -28,8 +34,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
     private readonly VoicepeakTargetResolver _targetResolver;
     private readonly ModifierIsolationCoordinator _modifierIsolationCoordinator;
     private readonly UiAutomationExecutor _uiAutomationExecutor;
-    private readonly UiaProcessHost _uiaProcessHost;
-    private readonly bool _ownsUiaProcessHost;
     // 単一操作経路前提のためロックは設けない
     private int _cachedVoicepeakPid;  // テスト互換のため保持する解決キャッシュ
     private bool _modifierIsolationSessionActive;  // テスト互換のため保持するセッション状態
@@ -37,27 +41,21 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
 
     // UI設定とロガーを保持
     public VoicepeakUiController(UiConfig ui, DebugConfig debug, AppLogger log)
-        : this(ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), debug, log, new DefaultVoicepeakProcessApi(), null, true)
+        : this(ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), debug, log, new DefaultVoicepeakProcessApi())
     {
     }
 
     public VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log)
-        : this(ui, inputTiming, hook, text, debug, log, new DefaultVoicepeakProcessApi(), null, true)
+        : this(ui, inputTiming, hook, text, debug, log, new DefaultVoicepeakProcessApi())
     {
     }
 
     internal VoicepeakUiController(UiConfig ui, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
-        : this(ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), debug, log, processApi, null, true)
+        : this(ui, new InputTimingConfig(), new HookConfig(), new TextConfig(), debug, log, processApi)
     {
     }
 
     internal VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi)
-        : this(ui, inputTiming, hook, text, debug, log, processApi, null, true)
-    {
-    }
-
-    // 依存を受け取ってUI操作を初期化
-    internal VoicepeakUiController(UiConfig ui, InputTimingConfig inputTiming, HookConfig hook, TextConfig text, DebugConfig debug, AppLogger log, IVoicepeakProcessApi processApi, UiaProcessHost uiaProcessHost, bool ownsUiaProcessHost)
     {
         IVoicepeakProcessApi resolvedProcessApi = processApi ?? new DefaultVoicepeakProcessApi();
         _ui = ui ?? new UiConfig();
@@ -73,9 +71,10 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
             _hook.HookConnectTotalWaitMs);
         _modifierIsolationCoordinator = new ModifierIsolationCoordinator(modifierKeyHookController, _log);
         _uiAutomationExecutor = new UiAutomationExecutor();
-        _uiaProcessHost = uiaProcessHost ?? new UiaProcessHost(_debug.UiaProbeRecycleIntervalSec, _log);
-        _ownsUiaProcessHost = uiaProcessHost == null || ownsUiaProcessHost;
     }
+
+    // 依存を受け取ってUI操作を初期化
+    
 
     // 対象プロセスとメインウィンドウを解決
     public bool TryResolveTarget(out Process process, out IntPtr mainHwnd)
@@ -223,13 +222,12 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
     // UIA読み取りを1回で実行して共通スナップショットを返す
     public ReadInputSnapshot ReadInputSnapshot(IntPtr mainHwnd)
     {
-        return _uiAutomationExecutor.Invoke(() => _uiaProcessHost.ReadInputSnapshot(mainHwnd));
+        return _uiAutomationExecutor.Invoke(() => ReadInputSnapshotCore(mainHwnd));
     }
 
     // 発話開始後のsafe pointを通知
     public void NotifyPlaybackSafePoint()
     {
-        _uiaProcessHost.NotifyPlaybackSafePoint();
     }
 
     // テスト互換用の可視入力欄数算出
@@ -247,14 +245,75 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
 
         try
         {
-            AutomationElement root = AutomationElement.FromHandle(mainHwnd);
-            List<TextCandidateInfo> candidates = CollectTextCandidates(root, maxCount: 200);
-            ReadInputResult read = BuildReadInputResult(candidates, root);
-            return new ReadInputSnapshot(read, candidates.Count);
+            Interop.UIAutomationClient.IUIAutomation automation = CreateOfficialUiaAutomation();
+            if (automation == null)
+            {
+                return new ReadInputSnapshot(ReadInputResult.Fail(ReadInputSource.Exception, string.Empty, 0), 0);
+            }
+
+            using ComScope automationScope = new ComScope(automation);
+            Interop.UIAutomationClient.IUIAutomationElement root = automation.ElementFromHandle(mainHwnd);
+            if (root == null)
+            {
+                return new ReadInputSnapshot(ReadInputResult.Fail(ReadInputSource.NoCandidate, string.Empty, 0), 0);
+            }
+
+            using ComScope rootScope = new ComScope(root);
+            List<OfficialComTextCandidateInfo> candidates = null;
+            try
+            {
+                candidates = CollectTextCandidatesOfficialCom(automation, root);
+                ReadInputResult read = BuildReadInputResultOfficialCom(candidates);
+                return new ReadInputSnapshot(read, candidates.Count);
+            }
+            finally
+            {
+                ReleaseOfficialComCandidates(candidates);
+            }
         }
         catch
         {
             return new ReadInputSnapshot(ReadInputResult.Fail(ReadInputSource.Exception, string.Empty, 0), 0);
+        }
+    }
+
+    internal static ReadInputResult ReadInputTextDetailedCore(IntPtr mainHwnd)
+    {
+        if (mainHwnd == IntPtr.Zero)
+        {
+            return ReadInputResult.Fail(ReadInputSource.NoCandidate, string.Empty, 0);
+        }
+
+        try
+        {
+            Interop.UIAutomationClient.IUIAutomation automation = CreateOfficialUiaAutomation();
+            if (automation == null)
+            {
+                return ReadInputResult.Fail(ReadInputSource.Exception, string.Empty, 0);
+            }
+
+            using ComScope automationScope = new ComScope(automation);
+            Interop.UIAutomationClient.IUIAutomationElement root = automation.ElementFromHandle(mainHwnd);
+            if (root == null)
+            {
+                return ReadInputResult.Fail(ReadInputSource.NoCandidate, string.Empty, 0);
+            }
+
+            using ComScope rootScope = new ComScope(root);
+            List<OfficialComTextCandidateInfo> candidates = null;
+            try
+            {
+                candidates = CollectTextCandidatesOfficialCom(automation, root);
+                return BuildReadInputResultForValidationOfficialCom(candidates);
+            }
+            finally
+            {
+                ReleaseOfficialComCandidates(candidates);
+            }
+        }
+        catch
+        {
+            return ReadInputResult.Fail(ReadInputSource.Exception, string.Empty, 0);
         }
     }
 
@@ -390,12 +449,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
     private bool ExecuteWithModifierIsolation(IntPtr targetHwnd, string operationName, Func<bool> action)
     {
         return _modifierIsolationCoordinator.ExecuteWithModifierIsolation(targetHwnd, operationName, action);
-    }
-
-    // フック統計をデバッグ時のみ出力
-    private void LogModifierHookStatsIfEnabled()
-    {
-        _modifierIsolationCoordinator.LogStatsIfEnabled(_debug.LogModifierHookStats);
     }
 
     // 互換フィールドをcoordinatorへ反映
@@ -806,7 +859,7 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
 
     public ReadInputResult ReadInputTextDetailed(IntPtr mainHwnd)
     {
-        return ReadInputSnapshot(mainHwnd).Read;
+        return _uiAutomationExecutor.Invoke(() => ReadInputTextDetailedCore(mainHwnd));
     }
 
     private bool SendKey(IntPtr hwnd, VirtualKey key)
@@ -832,149 +885,163 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
     }
 
 
-    private static AutomationElement FindBestInputBox(List<TextCandidateInfo> candidates)
+    private static List<OfficialComTextCandidateInfo> CollectTextCandidatesOfficialCom(
+        Interop.UIAutomationClient.IUIAutomation automation,
+        Interop.UIAutomationClient.IUIAutomationElement root)
     {
-        if (candidates == null || candidates.Count == 0)
-        {
-            return null;
-        }
-
-        AutomationElement best = null;
-        double bestScore = double.MinValue;
-        for (int i = 0; i < candidates.Count; i++)
-        {
-            TextCandidateInfo candidate = candidates[i];
-            if (candidate.Score > bestScore)
-            {
-                bestScore = candidate.Score;
-                best = candidate.Element;
-            }
-        }
-
-        return best;
-    }
-
-    private static int EstimateTotalInputTextLength(AutomationElement mainWindow, AutomationElement fallbackInputBox)
-    {
-        if (mainWindow != null)
-        {
-            List<AutomationElement> candidates = CollectTextLikeElements(mainWindow, maxCount: 200);
-            int sum = 0;
-            for (int i = 0; i < candidates.Count; i++)
-            {
-                AutomationElement e = candidates[i];
-                string t = NormalizeForLength(TryGetElementTextOrWindowTextSafe(e));
-                if (t.Length == 0)
-                {
-                    continue;
-                }
-
-                sum += t.Length;
-            }
-
-            if (sum > 0)
-            {
-                return sum;
-            }
-        }
-
-        string fallback = NormalizeForLength(TryGetElementTextOrWindowTextSafe(fallbackInputBox));
-        return fallback.Length;
-    }
-
-    private static List<AutomationElement> CollectTextLikeElements(AutomationElement root, int maxCount)
-    {
-        List<TextCandidateInfo> candidates = CollectTextCandidates(root, maxCount);
-        List<AutomationElement> result = new List<AutomationElement>(candidates.Count);
-        for (int i = 0; i < candidates.Count; i++)
-        {
-            result.Add(candidates[i].Element);
-        }
-
-        return result;
-    }
-
-    private static List<TextCandidateInfo> CollectTextCandidates(AutomationElement root, int maxCount)
-    {
-        List<TextCandidateInfo> result = new List<TextCandidateInfo>();
-        if (root == null || maxCount <= 0)
+        List<OfficialComTextCandidateInfo> result = new List<OfficialComTextCandidateInfo>();
+        if (automation == null || root == null)
         {
             return result;
         }
 
-        AutomationElementCollection matches = root.FindAll(TreeScope.Descendants, BuildRootChildCandidateCondition());
-        int count = Math.Min(matches.Count, maxCount);
-        for (int i = 0; i < count; i++)
+        Interop.UIAutomationClient.IUIAutomationCondition condition = null;
+        Interop.UIAutomationClient.IUIAutomationElementArray matches = null;
+        try
         {
-            AutomationElement e = matches[i];
-            if (TryBuildTextCandidate(e, out TextCandidateInfo candidate))
+            condition = CreateTextCandidateConditionOfficialCom(automation);
+            if (condition == null)
             {
-                result.Add(candidate);
+                return result;
             }
+
+            matches = root.FindAll(Interop.UIAutomationClient.TreeScope.TreeScope_Descendants, condition);
+            if (matches == null)
+            {
+                return result;
+            }
+
+            int length = matches.Length;
+            for (int i = 0; i < length; i++)
+            {
+                Interop.UIAutomationClient.IUIAutomationElement element = null;
+                try
+                {
+                    element = matches.GetElement(i);
+                    if (element == null)
+                    {
+                        continue;
+                    }
+
+                    if (TryBuildTextCandidateOfficialCom(element, out OfficialComTextCandidateInfo candidate))
+                    {
+                        result.Add(candidate);
+                        element = null;
+                    }
+                }
+                finally
+                {
+                    ReleaseComObjectIfNeeded(element);
+                }
+            }
+        }
+        finally
+        {
+            ReleaseComObjectIfNeeded(matches);
+            ReleaseComObjectIfNeeded(condition);
         }
 
         return result;
     }
 
-    // 候補型の条件を構築
-    private static Condition BuildRootChildCandidateCondition()
+    // 候補型の絞り込み条件を構築
+    private static Interop.UIAutomationClient.IUIAutomationCondition CreateTextCandidateConditionOfficialCom(
+        Interop.UIAutomationClient.IUIAutomation automation)
     {
-        return new OrCondition(
-            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text),
-            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit),
-            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Document));
+        if (automation == null)
+        {
+            return null;
+        }
+
+        Interop.UIAutomationClient.IUIAutomationCondition editCondition = null;
+        Interop.UIAutomationClient.IUIAutomationCondition textCondition = null;
+        Interop.UIAutomationClient.IUIAutomationCondition documentCondition = null;
+        Interop.UIAutomationClient.IUIAutomationCondition typeCondition = null;
+        Interop.UIAutomationClient.IUIAutomationCondition nameEmptyCondition = null;
+        Interop.UIAutomationClient.IUIAutomationCondition firstOr = null;
+        Interop.UIAutomationClient.IUIAutomationCondition finalCondition = null;
+        try
+        {
+            editCondition = automation.CreatePropertyCondition(UiaControlTypePropertyId, UiaControlTypeEdit);
+            textCondition = automation.CreatePropertyCondition(UiaControlTypePropertyId, UiaControlTypeText);
+            documentCondition = automation.CreatePropertyCondition(UiaControlTypePropertyId, UiaControlTypeDocument);
+            firstOr = automation.CreateOrCondition(editCondition, textCondition);
+            typeCondition = automation.CreateOrCondition(firstOr, documentCondition);
+            nameEmptyCondition = automation.CreatePropertyCondition(UiaNamePropertyId, string.Empty);
+            finalCondition = automation.CreateAndCondition(typeCondition, nameEmptyCondition);
+            return finalCondition;
+        }
+        finally
+        {
+            ReleaseComObjectIfNeeded(firstOr);
+            ReleaseComObjectIfNeeded(nameEmptyCondition);
+            ReleaseComObjectIfNeeded(typeCondition);
+            ReleaseComObjectIfNeeded(documentCondition);
+            ReleaseComObjectIfNeeded(textCondition);
+            ReleaseComObjectIfNeeded(editCondition);
+        }
     }
 
-    private static bool TryBuildTextCandidate(AutomationElement element, out TextCandidateInfo candidate)
+    // 候補条件でCOM要素を判定
+    private static bool TryBuildTextCandidateOfficialCom(
+        Interop.UIAutomationClient.IUIAutomationElement element,
+        out OfficialComTextCandidateInfo candidate)
     {
-        candidate = default(TextCandidateInfo);
+        candidate = default(OfficialComTextCandidateInfo);
         if (element == null)
         {
             return false;
         }
 
-        ControlType controlType = element.Current.ControlType;
-        string name = element.Current.Name;
-        if (!IsCollectTextCandidateTarget(controlType, name))
+        int controlTypeId = Convert.ToInt32(element.GetCurrentPropertyValue(UiaControlTypePropertyId));
+        string name = Convert.ToString(element.GetCurrentPropertyValue(UiaNamePropertyId)) ?? string.Empty;
+        if (!IsCollectTextCandidateTarget(controlTypeId, name))
         {
             return false;
         }
 
-        var rect = element.Current.BoundingRectangle;
-        double score = rect.Width * rect.Height;
-        if (controlType == ControlType.Edit)
-        {
-            score += 10000;
-        }
-
-        candidate = new TextCandidateInfo(element, score);
+        candidate = new OfficialComTextCandidateInfo(element);
         return true;
     }
 
-    internal static bool IsCollectTextCandidateTarget(ControlType controlType, string name)
+    internal static bool IsCollectTextCandidateTarget(int controlTypeId, string name)
     {
-        bool allowedControlType = controlType == ControlType.Edit
-                                  || controlType == ControlType.Document
-                                  || controlType == ControlType.Text;
+        bool allowedControlType = controlTypeId == UiaControlTypeEdit
+                                  || controlTypeId == UiaControlTypeDocument
+                                  || controlTypeId == UiaControlTypeText;
         return allowedControlType && name != null && name.Length == 0;
     }
 
-    private static ReadInputResult BuildReadInputResult(List<TextCandidateInfo> candidates, AutomationElement root)
+    private static ReadInputResult BuildReadInputResultOfficialCom(List<OfficialComTextCandidateInfo> candidates)
     {
-        AutomationElement bestInput = FindBestInputBox(candidates);
-        if (bestInput == null)
+        if (candidates == null || candidates.Count == 0)
         {
             return ReadInputResult.Fail(ReadInputSource.NoCandidate, string.Empty, 0);
         }
 
-        string primary = TryGetElementTextOrWindowTextSafe(bestInput);
+        OfficialComTextCandidateInfo primaryCandidate = candidates[0];
+        string primary = TryGetElementTextOfficialCom(primaryCandidate.Element);
         string normalizedPrimary = NormalizeForPanelCompare(primary);
-        int totalLength = EstimateTotalInputTextLength(root, bestInput);
+        int totalLength = EstimateTotalInputTextLengthOfficialCom(candidates);
         if (totalLength < normalizedPrimary.Length)
         {
             totalLength = normalizedPrimary.Length;
         }
 
+        return ReadInputResult.Ok(normalizedPrimary, totalLength, ReadInputSource.PrimaryUiA);
+    }
+
+    private static ReadInputResult BuildReadInputResultForValidationOfficialCom(List<OfficialComTextCandidateInfo> candidates)
+    {
+        OfficialComTextCandidateInfo? single = FindSingleInputBoxOfficialCom(candidates);
+        if (!single.HasValue || single.Value.Element == null)
+        {
+            return ReadInputResult.Fail(ReadInputSource.NoCandidate, string.Empty, 0);
+        }
+
+        string primary = TryGetElementTextOfficialCom(single.Value.Element);
+        string normalizedPrimary = NormalizeForPanelCompare(primary);
+        int totalLength = NormalizeForLength(normalizedPrimary).Length;
         return ReadInputResult.Ok(normalizedPrimary, totalLength, ReadInputSource.PrimaryUiA);
     }
 
@@ -998,77 +1065,142 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
         return text.Replace("\r", string.Empty).Replace("\n", string.Empty);
     }
 
-    private static string GetElementText(AutomationElement element)
+    // 候補配列から最良入力欄を選択
+    private static OfficialComTextCandidateInfo? FindSingleInputBoxOfficialCom(List<OfficialComTextCandidateInfo> candidates)
+    {
+        if (candidates == null || candidates.Count != 1)
+        {
+            return null;
+        }
+
+        return candidates[0];
+    }
+
+    // 候補群の総文字数を算出
+    private static int EstimateTotalInputTextLengthOfficialCom(List<OfficialComTextCandidateInfo> candidates)
+    {
+        if (candidates == null || candidates.Count == 0)
+        {
+            return 0;
+        }
+
+        int sum = 0;
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            string text = NormalizeForLength(TryGetElementTextOfficialCom(candidates[i].Element));
+            if (text.Length > 0)
+            {
+                sum += text.Length;
+            }
+        }
+
+        return sum;
+    }
+
+    // 公式COM経路で要素文字列を取得
+    private static string TryGetElementTextOfficialCom(Interop.UIAutomationClient.IUIAutomationElement element)
     {
         if (element == null)
         {
             return string.Empty;
         }
 
-        if (element.TryGetCurrentPattern(ValuePattern.Pattern, out object valuePatternObj))
+        object valuePatternObj = null;
+        object textPatternObj = null;
+        Interop.UIAutomationClient.IUIAutomationTextRange range = null;
+        try
         {
-            return ((ValuePattern)valuePatternObj).Current.Value ?? string.Empty;
-        }
+            string valuePropertyText = Convert.ToString(element.GetCurrentPropertyValue(UiaValueValuePropertyId)) ?? string.Empty;
+            if (!string.IsNullOrEmpty(valuePropertyText))
+            {
+                return valuePropertyText;
+            }
 
-        if (element.TryGetCurrentPattern(TextPattern.Pattern, out object textPatternObj))
+            valuePatternObj = element.GetCurrentPattern(UiaValuePatternId);
+            if (valuePatternObj is Interop.UIAutomationClient.IUIAutomationValuePattern valuePattern)
+            {
+                string value = valuePattern.CurrentValue;
+                if (!string.IsNullOrEmpty(value))
+                {
+                    return value;
+                }
+            }
+
+            textPatternObj = element.GetCurrentPattern(UiaTextPatternId);
+            if (textPatternObj is Interop.UIAutomationClient.IUIAutomationTextPattern textPattern)
+            {
+                range = textPattern.DocumentRange;
+                if (range != null)
+                {
+                    return (range.GetText(-1) ?? string.Empty).TrimEnd('\r', '\n');
+                }
+            }
+        }
+        catch
         {
-            return (((TextPattern)textPatternObj).DocumentRange.GetText(-1) ?? string.Empty).TrimEnd('\r', '\n');
+        }
+        finally
+        {
+            ReleaseComObjectIfNeeded(range);
+            ReleaseComObjectIfNeeded(textPatternObj);
+            ReleaseComObjectIfNeeded(valuePatternObj);
         }
 
         return string.Empty;
     }
 
-    private static string TryGetElementTextOrWindowTextSafe(AutomationElement element)
+    // 候補COM要素を一括解放
+    private static void ReleaseOfficialComCandidates(List<OfficialComTextCandidateInfo> candidates)
     {
+        if (candidates == null || candidates.Count == 0)
+        {
+            return;
+        }
+
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            ReleaseComObjectIfNeeded(candidates[i].Element);
+        }
+    }
+
+    // 公式COMオートメーションを生成
+    private static Interop.UIAutomationClient.IUIAutomation CreateOfficialUiaAutomation()
+    {
+        Type type = Type.GetTypeFromCLSID(ClsidCUIAutomation, throwOnError: false);
+        if (type == null)
+        {
+            type = Type.GetTypeFromCLSID(ClsidCUIAutomation8, throwOnError: false);
+        }
+
+        if (type == null)
+        {
+            return null;
+        }
+
+        object instance = Activator.CreateInstance(type);
+        return instance as Interop.UIAutomationClient.IUIAutomation;
+    }
+
+    // COMオブジェクトを安全に解放
+    private static void ReleaseComObjectIfNeeded(object comObject)
+    {
+        if (comObject == null)
+        {
+            return;
+        }
+
+        if (!Marshal.IsComObject(comObject))
+        {
+            return;
+        }
+
         try
         {
-            return GetElementTextOrWindowText(element);
+            Marshal.FinalReleaseComObject(comObject);
         }
         catch
         {
-            return string.Empty;
         }
-    }
-
-    private static string GetElementTextOrWindowText(AutomationElement element)
-    {
-        if (element == null)
-        {
-            return string.Empty;
-        }
-
-        string text = GetElementText(element);
-        if (!string.IsNullOrEmpty(text))
-        {
-            return text;
-        }
-
-        int nativeHandle = element.Current.NativeWindowHandle;
-        if (nativeHandle == 0)
-        {
-            return string.Empty;
-        }
-
-        IntPtr hWnd = new IntPtr(nativeHandle);
-        int length = (int)SendMessageTimeout(hWnd, WmGetTextLength, IntPtr.Zero, IntPtr.Zero, SmtoAbortIfHung, 500, out _);
-        if (length <= 0)
-        {
-            return string.Empty;
-        }
-
-        StringBuilder sb = new StringBuilder(length + 1);
-        SendMessageTimeout(hWnd, WmGetText, new IntPtr(sb.Capacity), sb, SmtoAbortIfHung, 500, out _);
-        return sb.ToString();
-    }
-
-    private static string SanitizeForLog(string value)
-    {
-        if (value == null)
-        {
-            return string.Empty;
-        }
-
-        return value.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\"", "\\\"");
     }
 
     private static IntPtr WaitMainWindowHandle(Process process, int timeoutMs)
@@ -1153,15 +1285,28 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
         Menu = 0x12
     }
 
-    private readonly struct TextCandidateInfo
+    private readonly struct OfficialComTextCandidateInfo
     {
-        public AutomationElement Element { get; }
-        public double Score { get; }
+        public Interop.UIAutomationClient.IUIAutomationElement Element { get; }
 
-        public TextCandidateInfo(AutomationElement element, double score)
+        public OfficialComTextCandidateInfo(Interop.UIAutomationClient.IUIAutomationElement element)
         {
             Element = element;
-            Score = score;
+        }
+    }
+
+    private readonly struct ComScope : IDisposable
+    {
+        private readonly object _comObject;
+
+        public ComScope(object comObject)
+        {
+            _comObject = comObject;
+        }
+
+        public void Dispose()
+        {
+            ReleaseComObjectIfNeeded(_comObject);
         }
     }
 
@@ -1279,11 +1424,6 @@ internal sealed class VoicepeakUiController : IVoicepeakUiController, IDisposabl
     public void Dispose()
     {
         _modifierIsolationCoordinator.Dispose();
-        if (_ownsUiaProcessHost)
-        {
-            _uiaProcessHost.Dispose();
-        }
-
         _uiAutomationExecutor.Dispose();
     }
 }

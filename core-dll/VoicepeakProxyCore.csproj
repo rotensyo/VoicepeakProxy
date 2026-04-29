@@ -7,16 +7,17 @@
     <Prefer32Bit>false</Prefer32Bit>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
-    <Version>1.1.0</Version>
-    <FileVersion>1.1.0.0</FileVersion>
+    <Version>1.2.0</Version>
+    <FileVersion>1.2.0.0</FileVersion>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <InformationalVersion>1.1.0</InformationalVersion>
+    <InformationalVersion>1.2.0</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <SourceRevisionId></SourceRevisionId>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="EasyHook" Version="2.7.7097" />
+    <PackageReference Include="Interop.UIAutomationClient" Version="10.19041.0" />
     <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
   </ItemGroup>
 
@@ -32,11 +33,7 @@
     <Compile Remove="uia-probe\**\*.cs" />
   </ItemGroup>
 
-  <Target Name="BuildUiaProbe" AfterTargets="Build" Condition="'$(IsUiaProbeBuild)' != 'true'">
-    <MSBuild Projects="uia-probe\VoicepeakProxyCore.UiaProbe.csproj" Targets="Restore;Build" Properties="Configuration=$(Configuration);Platform=x64;BuildProjectReferences=false;IsUiaProbeBuild=true" />
-  </Target>
-
-  <Target Name="MoveDependenciesToDepsFolder" AfterTargets="Build" DependsOnTargets="BuildUiaProbe" Condition="'$(IsUiaProbeBuild)' != 'true'">
+  <Target Name="MoveDependenciesToDepsFolder" AfterTargets="Build" Condition="'$(IsUiaProbeBuild)' != 'true'">
     <PropertyGroup>
       <CoreDepsDir>$(OutputPath)VoicepeakProxyCore.deps\</CoreDepsDir>
     </PropertyGroup>
@@ -48,7 +45,7 @@
       <CoreDependencyFiles Include="$(OutputPath)EasyHook*.dll" />
       <CoreDependencyFiles Include="$(OutputPath)EasyLoad*.dll" />
       <CoreDependencyFiles Include="$(OutputPath)NAudio*.dll" />
-      <CoreDependencyFiles Include="uia-probe\bin\x64\$(Configuration)\$(TargetFramework)\VoicepeakProxyCore.UiaProbe.exe" Condition="Exists('uia-probe\bin\x64\$(Configuration)\$(TargetFramework)\VoicepeakProxyCore.UiaProbe.exe')" />
+      <CoreDependencyFiles Include="$(OutputPath)Interop.UIAutomationClient*.dll" />
     </ItemGroup>
 
     <Copy SourceFiles="@(CoreDependencyFiles)" DestinationFolder="$(CoreDepsDir)" Condition="'@(CoreDependencyFiles)' != ''" />

@@ -642,14 +642,6 @@ namespace Plugin_VoicepeakProxy
             set { State.Settings.AppConfig.Debug.LogMinimumLevel = (value ?? string.Empty).Trim().ToLowerInvariant(); }
         }
 
-        [Category("Debug")]
-        [DisplayName("03)uiaProbeRecycleIntervalSec")]
-        [Description("UIAサブプロセスの再起動間隔秒です。1以上を指定します。")]
-        public int UiaProbeRecycleIntervalSec
-        {
-            get { return State.Settings.AppConfig.Debug.UiaProbeRecycleIntervalSec; }
-            set { State.Settings.AppConfig.Debug.UiaProbeRecycleIntervalSec = value; }
-        }
     }
 
     // ファイル選択エディタ共通基底

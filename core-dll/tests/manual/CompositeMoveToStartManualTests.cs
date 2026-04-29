@@ -39,11 +39,10 @@ public class CompositeMoveToStartManualTests
 
         // 単発読み上げを実行
         AppConfig config = CreateManualConfig();
-        SpeakOnceResult result;
-        using (VoicepeakOneShotSession session = VoicepeakOneShot.Start(config, new ConsoleAppLogger()))
-        {
-            result = session.SpeakOnceWait(new SpeakOnceRequest { Text = "目視確認用の単発読み上げです。" });
-        }
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWait(
+            config,
+            new SpeakOnceRequest { Text = "目視確認用の単発読み上げです。" },
+            new ConsoleAppLogger());
 
         MessageBox.Show(
             "VOICEPEAK入力欄が選択され、Ctrl+Upで先頭移動した後に単発読み上げが成功したことを目視確認してください。",
@@ -69,11 +68,10 @@ public class CompositeMoveToStartManualTests
             MessageBoxButtons.OK,
             MessageBoxIcon.Information);
 
-        SpeakOnceResult result;
-        using (VoicepeakOneShotSession session = VoicepeakOneShot.Start(config, new ConsoleAppLogger()))
-        {
-            result = session.SpeakOnceWait(new SpeakOnceRequest { Text = "削除処理確認用の単発読み上げです。" });
-        }
+        SpeakOnceResult result = VoicepeakOneShot.SpeakOnceWait(
+            config,
+            new SpeakOnceRequest { Text = "削除処理確認用の単発読み上げです。" },
+            new ConsoleAppLogger());
 
         MessageBox.Show(
             "削除処理で全選択ショートカット送信後にDelete2回が繰り返し実行され、旧文字列が消えていることを確認してください。",
