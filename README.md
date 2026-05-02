@@ -1,4 +1,4 @@
-# VoicepeakProxy
+# [VoicepeakProxy](https://github.com/rotensyo/VoicepeakProxy)
 
 VoicepeakProxy は、[VOICEPEAK](https://www.ah-soft.com/voice/)の自動読み上げを低遅延で実現するライブラリです。
 
