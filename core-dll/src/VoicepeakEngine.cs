@@ -154,7 +154,7 @@ internal sealed class VoicepeakEngine : IDisposable
                         break;
                 }
 
-                if (job.Interrupt)
+                if (job.Interrupt && _state != WorkerState.Idle)
                 {
                     _interruptRequested = true;
                 }
@@ -420,6 +420,7 @@ internal sealed class VoicepeakEngine : IDisposable
             {
                 OnModifierGuardFatal("session_end_failed");
             }
+            ConsumeInterruptIfAny(log: false);  // 完了時にもinterruptを消費させる
         }
     }
     internal static int ComputePostTypeWaitMs(string text, int perCharMs, int minMs)
