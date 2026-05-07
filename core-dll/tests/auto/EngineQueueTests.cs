@@ -138,6 +138,48 @@ public class EngineQueueTests
         }
     }
 
+    [TestMethod]
+    public void Enqueue_InterruptOnIdle_DoesNotSetInterruptRequested()
+    {
+        // idle時は自身へのinterruptを禁止
+        using CancellationTokenSource cts = new CancellationTokenSource();
+        object engine = ReflectionTestHelper.CreateVoicepeakEngine(CreateConfig(), cts, new TestLogger());
+        try
+        {
+            ReflectionTestHelper.SetField(engine, "_state", ReflectionTestHelper.ParseCoreEnum("WorkerState", "Idle"));
+            ReflectionTestHelper.SetField(engine, "_interruptRequested", false);
+
+            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { Text = "first", Mode = EnqueueMode.Next, Interrupt = true });
+
+            Assert.IsFalse((bool)ReflectionTestHelper.GetField(engine, "_interruptRequested"));
+        }
+        finally
+        {
+            ReflectionTestHelper.InvokeCoreInstance(engine, "Dispose");
+        }
+    }
+
+    [TestMethod]
+    public void Enqueue_InterruptOnPreExecute_SetsInterruptRequested()
+    {
+        // preexecute時は現行jobへのinterruptを許可
+        using CancellationTokenSource cts = new CancellationTokenSource();
+        object engine = ReflectionTestHelper.CreateVoicepeakEngine(CreateConfig(), cts, new TestLogger());
+        try
+        {
+            ReflectionTestHelper.SetField(engine, "_state", ReflectionTestHelper.ParseCoreEnum("WorkerState", "PreExecute"));
+            ReflectionTestHelper.SetField(engine, "_interruptRequested", false);
+
+            ReflectionTestHelper.InvokeCoreInstance(engine, "Enqueue", new SpeakRequest { Text = "first", Mode = EnqueueMode.Next, Interrupt = true });
+
+            Assert.IsTrue((bool)ReflectionTestHelper.GetField(engine, "_interruptRequested"));
+        }
+        finally
+        {
+            ReflectionTestHelper.InvokeCoreInstance(engine, "Dispose");
+        }
+    }
+
     private static object GetFirstQueuedJob(object engine)
     {
         object queue = ReflectionTestHelper.GetField(engine, "_queue");
