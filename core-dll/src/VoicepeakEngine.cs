@@ -9,6 +9,7 @@ namespace VoicepeakProxyCore;
 internal enum WorkerState
 {
     Idle,
+    PreExecute,
     ExecutingInputValidate,
     ExecutingPrePlayWait,
     Speaking,
@@ -210,6 +211,7 @@ internal sealed class VoicepeakEngine : IDisposable
                 {
                     job = _queue.First.Value;
                     _queue.RemoveFirst();
+                    _state = WorkerState.PreExecute;
                 }
             }
 
@@ -223,6 +225,7 @@ internal sealed class VoicepeakEngine : IDisposable
             lock (_gate)
             {
                 _state = WorkerState.Idle;
+                _interruptRequested = false;  // 完了時にもinterruptを消費させる
             }
         }
     }
@@ -420,7 +423,6 @@ internal sealed class VoicepeakEngine : IDisposable
             {
                 OnModifierGuardFatal("session_end_failed");
             }
-            ConsumeInterruptIfAny(log: false);  // 完了時にもinterruptを消費させる
         }
     }
     internal static int ComputePostTypeWaitMs(string text, int perCharMs, int minMs)
